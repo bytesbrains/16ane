@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-19
 - **Current Phase:** Phase 1 `P0` Sandbox Implementation Complete & Verified Locally (`forge test`, `@16ane/sdk`, `ane_sdk`, `ane` CLI, and E2E Scenarios `S1`–`S6` passing)
-- **Repository Revision:** `bytesbrains/16ane-agent-economy`
+- **Repository Revision:** `bytesbrains/16ane`
 
 ---
 

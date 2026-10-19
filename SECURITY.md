@@ -13,7 +13,7 @@
 If you discover a security vulnerability within 16ane smart contracts, SDKs, facilitator, or infrastructure, please do NOT disclose it publicly on GitHub issues or social media.
 
 Please report vulnerabilities directly via:
-- **GitHub private vulnerability reporting (preferred)**: open the [Security tab](https://github.com/bytesbrains/16ane-agent-economy/security) and click **Report a vulnerability**, or go straight to the [advisory form](https://github.com/bytesbrains/16ane-agent-economy/security/advisories/new).
+- **GitHub private vulnerability reporting (preferred)**: open the [Security tab](https://github.com/bytesbrains/16ane/security) and click **Report a vulnerability**, or go straight to the [advisory form](https://github.com/bytesbrains/16ane/security/advisories/new).
 - Email: **security@16ane.com**
 
 Please include:

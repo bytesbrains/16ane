@@ -26,7 +26,7 @@
 
 ## Decision
 Adopt **Option A**:
-1. **Legacy `16ane` Repo Ignored:** Treat `bytesbrains/16ane-agent-economy` as a clean-slate repository with zero code, state, or navigation dependencies on the legacy `16ane` directory.
+1. **Legacy `16ane` Repo Ignored:** Treat `bytesbrains/16ane` as a clean-slate repository with zero code, state, or navigation dependencies on the legacy `16ane` directory.
 2. **Engineering Pattern Reuse from `copra` Only:** Reuse battle-tested infrastructure patterns from `copra` (Foundry `0.8.28` deterministic build config, `Ownable2Step` registry pattern, `.gitleaks.toml`, `.githooks`, Docker Compose Anvil + Playwright E2E harness, Cloudflare static security headers) with completely independent contract names, salts, and deployments.
 3. **Canonical Asset Identification:** All protocols (`x402`, service manifests, SDKs, CLI) identify `tANE` by CAIP-19 / CAIP-2 chain ID + verified contract address (`eip155:84532/<address>`) rather than relying on ticker symbol uniqueness.
 

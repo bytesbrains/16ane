@@ -11,7 +11,7 @@
 ### `ISS-001` — `[E01][research][docs] Complete repository, sibling Copra pattern, and primary standards audit`
 - **Labels:** `research`, `docs`, `P0`
 - **Estimate:** 0.5–1 day (Low uncertainty — drafted in this planning cycle)
-- **Context / Motivation:** Establish an evidence-backed baseline of existing files in `bytesbrains/16ane-agent-economy`, reusable engineering patterns in `/Users/nandal/Desktop/desk/repos/copra`, and current versions of primary standards (`ERC-20`, `EIP-2612`, `EIP-3009`, `ERC-4337`, `EIP-7702`, `ERC-8004`, `x402`, `MCP`, `A2A`, `Base Sepolia`) before writing code.
+- **Context / Motivation:** Establish an evidence-backed baseline of existing files in `bytesbrains/16ane`, reusable engineering patterns in `/Users/nandal/Desktop/desk/repos/copra`, and current versions of primary standards (`ERC-20`, `EIP-2612`, `EIP-3009`, `ERC-4337`, `EIP-7702`, `ERC-8004`, `x402`, `MCP`, `A2A`, `Base Sepolia`) before writing code.
 - **Scope:** Produce `docs/planning/CAPABILITY_GAP_REPORT.md` with exact file/commit citations and primary specification URLs checked on 2026-10-19.
 - **Out of scope:** Importing any code from legacy `/Users/nandal/Desktop/desk/repos/16ane` (`ADR-0014`) or deploying contracts.
 - **Dependencies:** None.

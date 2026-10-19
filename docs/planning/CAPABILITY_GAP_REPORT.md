@@ -1,13 +1,13 @@
 # Capability Gap Report and Standards Audit (`E01`)
 
 - **Date Checked:** 2026-10-19
-- **Target Repository:** `bytesbrains/16ane-agent-economy` (commit `53f0ee8`)
+- **Target Repository:** `bytesbrains/16ane` (commit `53f0ee8`)
 - **Reference Sibling Repository:** `/Users/nandal/Desktop/desk/repos/copra` (commit `465dd8be027c27eada5fcd83aa69f893eb1037bb`)
 - **Out-of-Scope Repository:** `/Users/nandal/Desktop/desk/repos/16ane` (ignored per maintainer instruction and `ADR-0014`)
 
 ---
 
-## 1. Current Repository State (`bytesbrains/16ane-agent-economy` @ `53f0ee8`)
+## 1. Current Repository State (`bytesbrains/16ane` @ `53f0ee8`)
 
 The `16ane-agent-economy` repository currently contains **planning specifications and governance documentation only** (23 files, 0 lines of executable smart contract, SDK, CLI, or backend code):
 - Root governance: `README.md`, `AGENTS.md`, `LICENSE-NOTE.md`, `assets/16ane_logo.png`.
@@ -15,7 +15,7 @@ The `16ane-agent-economy` repository currently contains **planning specification
 - Architecture & protocol specs: `docs/architecture/SYSTEM.md`, `docs/protocol/WALLET.md`, `docs/protocol/PAYMENTS.md`, `docs/protocol/DISCOVERY.md`, `docs/protocol/DEVELOPER_INTERFACES.md`.
 - Research, security & operations: `docs/research/STANDARDS_AND_ADRS.md`, `docs/research/MAINNET_AND_REGULATORY.md`, `docs/security/THREAT_MODEL.md`, `docs/operations/OPERATIONS.md`.
 - Planning & issue templates: `docs/planning/ROADMAP.md`, `docs/planning/EPICS.md`, `docs/planning/ISSUE_GENERATION.md`, `examples/SCENARIOS.md`, `.github/ISSUE_TEMPLATE/feature.yml`, `.github/ISSUE_TEMPLATE/research.yml`.
-- **Open GitHub Issues:** `0` (verified on `bytesbrains/16ane-agent-economy`).
+- **Open GitHub Issues:** `0` (verified on `bytesbrains/16ane`).
 
 ---
 

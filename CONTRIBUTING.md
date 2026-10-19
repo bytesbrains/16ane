@@ -15,7 +15,7 @@ Before contributing, please read [AGENTS.md](AGENTS.md), [README.md](README.md),
 
 1. **Clone the repository**:
    ```bash
-   git clone --recurse-submodules https://github.com/bytesbrains/16ane-agent-economy.git
+   git clone --recurse-submodules https://github.com/bytesbrains/16ane.git
    cd 16ane-agent-economy
    ```
 

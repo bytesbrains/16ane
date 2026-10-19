@@ -65,18 +65,20 @@ Adopt **Option A**:
       - from 2026-10-19: `p=none`; review the daily aggregate reports sent to `admin@16ane.com`;
       - from 2026-10-26, if every legitimate sender passes: `p=quarantine; pct=5`, raised in steps to `pct=100`, with at least a week at each step;
       - then `p=reject`. Record each change and its date in this ADR.
-   3. Merge this ADR and `web/` to `main` and connect Workers Builds, so the live site is built from `main`.
+   3. Confirm the first Workers Builds deploy from `main` is live: `https://16ane.com/.well-known/security.txt` shows the comment from `main`. After that, never run `wrangler deploy` by hand.
    4. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
    5. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
    6. Delete the old Google Cloud DNS zone and the Firebase site.
 
-## Cutover log (2026-10-19)
+## Cutover log (2026-10-19 to 2026-10-20)
 - 17:14 UTC: the maintainer moved the nameservers to Cloudflare. Firebase records were imported unchanged.
 - The maintainer deleted both Firebase `A` records before the new site was deployed, so the domain briefly had no website.
 - The first `wrangler deploy` uploaded `16ane-site` to the personal account and failed to attach the domain (`Can't infer zone from route`, code 10082). That stray Worker was deleted.
 - `wrangler deploy` with the `bytesbrains` profile from branch `feat/iss-036-site` (`4145bf0`) attached `16ane.com` as a Custom Domain. Version `5d5a0d7f-c69e-4bbc-8897-c2f2e7065572`. Checked: HTTPS 200, CSP and HSTS present, 404 page served, `http://` redirects to `https://`.
 - The maintainer added the Google Workspace records. Checked on `kirk.ns.cloudflare.com`: verification TXT, MX `1 smtp.google.com`, SPF and DKIM present; `_dmarc` and `www` not yet present.
 - The maintainer added `_dmarc` (`p=none`), the proxied `www` record and the "Redirect from WWW to root" Redirect Rule. Checked through the Cloudflare edge: `https://www.16ane.com/a/b?x=1&y=2` and `http://www.16ane.com/z` both return `301` to the same path on `https://16ane.com`, with the query string kept.
+- #37 merged to `main` (`33954b7`). The live Worker was still the hand-deployed version from the branch.
+- 2026-10-20: the maintainer connected Workers Builds to `bytesbrains/16ane` (production branch `main`). This log entry is the first commit to `main` after that, and so triggers the first automatic deploy.
 
 ## Consequences
 - The site costs nothing to serve and has no runtime code to patch.

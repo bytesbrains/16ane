@@ -66,7 +66,7 @@ Adopt **Option A**:
       - from 2026-10-26, if every legitimate sender passes: `p=quarantine; pct=5`, raised in steps to `pct=100`, with at least a week at each step;
       - then `p=reject`. Record each change and its date in this ADR.
    3. ~~Confirm the first Workers Builds deploy from `main` is live~~ (done 2026-10-19, see log): `https://16ane.com/.well-known/security.txt` shows the comment from `main`. After that, never run `wrangler deploy` by hand.
-   4. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
+   4. ~~Make `bytesbrains/16ane` public (#32)~~ (done 2026-10-19, see log). The page's GitHub links now resolve for visitors.
    5. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
    6. Delete the old Google Cloud DNS zone and the Firebase site.
 
@@ -85,6 +85,7 @@ Adopt **Option A**:
 - 19:00 UTC: the maintainer turned on *Always Use HTTPS*. Checked through the Cloudflare edge: `http://16ane.com/` returns `301` to `https://16ane.com/` with `Server: cloudflare`.
 - 19:04 UTC: the maintainer deleted the `hosting-site=solaanedotcom` TXT record. Checked on `kirk` and `brianna`: only the Google verification and SPF TXT records remain at the apex. Remaining step 1 is done.
 - Later that day: the maintainer turned off builds for non-production branches (Workers Builds → Previews). Only `main` builds and deploys; `wrangler.jsonc` drops the unused `previews` block and sets `preview_urls: false`.
+- About 23:10 UTC: `bytesbrains/16ane` was made public (#32). Remaining step 4 is done.
 
 ## Consequences
 - The site costs nothing to serve and has no runtime code to patch.

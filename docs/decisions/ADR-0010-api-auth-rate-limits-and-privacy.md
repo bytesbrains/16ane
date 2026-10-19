@@ -18,7 +18,7 @@
   - "Owner-sensitive actions must be signed and authenticated; avoid server custody by default."
   - "PRIV: no PII in immutable on-chain metadata; minimize IP/log retention; secrets never logged."
   - "OBS: correlate purchase intent, chain tx, settlement and delivery without leaking secrets."
-- **Sibling `copra` Security Baseline (`/Users/nandal/Desktop/desk/repos/copra/web/_headers`, `.gitleaks.toml`):**
+- **Sibling `copra` Security Baseline ([`copra/web/_headers`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/web/_headers), `.gitleaks.toml`):**
   - Enforces strict Content-Security-Policy, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and automated gitleaks scanning.
 
 ## Security and legal impacts

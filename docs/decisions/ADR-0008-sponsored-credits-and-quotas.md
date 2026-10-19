@@ -14,7 +14,7 @@ In the 16ane public sandbox, `tANE` is free and worthless (`REQ-012`). However, 
 3. **Option C: Relying on `tANE` Faucet Rate Limits Alone to Bound Provider Compute.**
 
 ## Evidence and sources
-- **Repo Specifications (`docs/product/SANDBOX_AND_CREDITS.md` lines 10–21, `docs/product/TOKENOMICS.md` lines 13–22):**
+- **Repo Specifications (`docs/product/SANDBOX_AND_CREDITS.md` lines 10–21, `docs/product/TOKENOMICS.md`, "tANE: public sandbox only" and "Separate accounting systems"):**
   - Five separate accounting systems must never be conflated: (1) `tANE` balance, (2) Delegated allowance, (3) Provider service quota, (4) Revenue, (5) Future ANE reserve liability.
   - "A user with 1M tANE still cannot bypass provider compute limits."
   - "Provide deterministic simulated endpoint so demonstration survives sponsor outages."
@@ -41,8 +41,8 @@ Adopt **Option A**:
 - Core sandbox onboarding never breaks when a sponsor pauses a campaign because Tier 1 deterministic endpoints always remain live.
 
 ## Alternatives rejected
-- **Option B (On-chain quota ERC-20 tokens):** Confuses transferable tokens with non-transferable provider compute entitlements (`TOKENOMICS.md` line 16) and cannot track real-time millisecond LLM token usage without off-chain state.
-- **Option C (Relying on faucet limits alone):** Explicitly forbidden by `TOKENOMICS.md` line 21 ("A user with 1M tANE still cannot bypass provider compute limits").
+- **Option B (On-chain quota ERC-20 tokens):** Confuses transferable tokens with non-transferable provider compute entitlements (`TOKENOMICS.md`, "Separate accounting systems" item 3) and cannot track real-time millisecond LLM token usage without off-chain state.
+- **Option C (Relying on faucet limits alone):** Explicitly forbidden by `TOKENOMICS.md`, "Sponsored service example" ("A user with 1M tANE still cannot bypass provider compute limits").
 
 ## Open risks
 - Concurrent requests racing for the last unit of a sponsor's compute budget; mitigated by atomic reservation (pre-debiting estimated max request cost before upstream invocation and reconciling actual cost on completion).

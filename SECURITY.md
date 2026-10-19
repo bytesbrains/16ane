@@ -6,15 +6,15 @@
 
 | Version | Environment | Supported |
 | ------- | ----------- | --------- |
-| 0.1.x   | Public Sandbox (`eip155:84532`) | Yes |
+| 0.1.x   | Sandbox code targeting Base Sepolia (`eip155:84532`); not yet deployed | Yes |
 
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability within 16ane smart contracts, SDKs, facilitator, or infrastructure, please do NOT disclose it publicly on GitHub issues or social media.
 
 Please report vulnerabilities directly via:
-- **GitHub private vulnerability reporting (preferred)**: open the [Security tab](https://github.com/bytesbrains/16ane/security) and click **Report a vulnerability**, or go straight to the [advisory form](https://github.com/bytesbrains/16ane/security/advisories/new).
-- Email: **security@16ane.com**
+- **GitHub private vulnerability reporting**: open the [Security tab](https://github.com/bytesbrains/16ane/security) and click **Report a vulnerability**, or go straight to the [advisory form](https://github.com/bytesbrains/16ane/security/advisories/new).
+- **If that button is not available**: open a public issue titled `Security contact request` containing **no vulnerability details**. A maintainer will open a private draft security advisory and invite you to it so the report can continue privately.
 
 Please include:
 1. Detailed description of the vulnerability and affected component (`tANE`, `AneAgentVault`, `AneFaucet`, SDK, facilitator, or web UI).
@@ -23,7 +23,7 @@ Please include:
 
 ## Vulnerability Handling Process
 
-1. **Acknowledgment**: We acknowledge receipt of vulnerability reports within 24 hours.
-2. **Investigation**: The engineering team verifies and validates the issue.
+1. **Acknowledgment**: Maintainers aim to acknowledge reports within 3 business days.
+2. **Investigation**: Maintainers verify and validate the issue, and keep the reporter updated in the advisory thread.
 3. **Mitigation**: A fix is prepared, tested in an isolated environment, and deployed.
 4. **Disclosure**: Coordinated public disclosure after mitigations are live.

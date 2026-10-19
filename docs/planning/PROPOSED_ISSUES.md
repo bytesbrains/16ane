@@ -11,9 +11,9 @@
 ### `ISS-001` — `[E01][research][docs] Complete repository, sibling Copra pattern, and primary standards audit`
 - **Labels:** `research`, `docs`, `P0`
 - **Estimate:** 0.5–1 day (Low uncertainty — drafted in this planning cycle)
-- **Context / Motivation:** Establish an evidence-backed baseline of existing files in `bytesbrains/16ane`, reusable engineering patterns in `/Users/nandal/Desktop/desk/repos/copra`, and current versions of primary standards (`ERC-20`, `EIP-2612`, `EIP-3009`, `ERC-4337`, `EIP-7702`, `ERC-8004`, `x402`, `MCP`, `A2A`, `Base Sepolia`) before writing code.
+- **Context / Motivation:** Establish an evidence-backed baseline of existing files in `bytesbrains/16ane`, reusable engineering patterns in [`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb), and current versions of primary standards (`ERC-20`, `EIP-2612`, `EIP-3009`, `ERC-4337`, `EIP-7702`, `ERC-8004`, `x402`, `MCP`, `A2A`, `Base Sepolia`) before writing code.
 - **Scope:** Produce `docs/planning/CAPABILITY_GAP_REPORT.md` with exact file/commit citations and primary specification URLs checked on 2026-10-19.
-- **Out of scope:** Importing any code from legacy `/Users/nandal/Desktop/desk/repos/16ane` (`ADR-0014`) or deploying contracts.
+- **Out of scope:** Importing any code from the legacy `16ane` marketplace codebase (separate and not public; `ADR-0014`) or deploying contracts.
 - **Dependencies:** None.
 - **Acceptance criteria:**
   - Given `docs/planning/CAPABILITY_GAP_REPORT.md`, when reviewed, then every standard in `STANDARDS_AND_ADRS.md` includes a verified URL, date checked, status, and Base Sepolia (`84532`) compatibility analysis.
@@ -272,7 +272,7 @@
 - **Scope:**
   - Implement campaign store and atomic quota middleware (`campaign_id`, `provider_id`, `service_id`, `test_token_price`, `max_calls_per_wallet`, `max_tokens_per_request`, `provider_cost_budget`, `starts_at`, `expires_at`, `eligibility`, `status`).
   - Expose `GET /v1/campaigns` and provider circuit-breaker controls (`pauseCampaign`).
-- **Out of scope:** Treating provider compute quotas as transferable ERC-20 tokens (`TOKENOMICS.md` line 16).
+- **Out of scope:** Treating provider compute quotas as transferable ERC-20 tokens (`TOKENOMICS.md`, "Separate accounting systems" item 3).
 - **Dependencies:** `ISS-007`, `ISS-011`.
 - **Acceptance criteria:**
   - Given an agent holding `1,000,000 tANE` calling a sponsored endpoint with `max_calls_per_wallet = 5` or `provider_cost_budget = $1.00`, when the quota or budget ceiling is reached, then the 6th call is rejected with `429 QuotaExceeded` / `503 SponsorBudgetExhausted` before settling `tANE` or invoking upstream compute (`SCENARIOS.md` S3, `THREAT_MODEL.md` #8).
@@ -382,9 +382,9 @@
 ### `ISS-024` — `[E22][legal-review][research][docs] Prepare Indian legal counsel brief and institutional partner feasibility dossier`
 - **Labels:** `legal-review`, `research`, `docs`, `BLOCKED-LEGAL`
 - **Estimate:** External legal/institutional timeline (High uncertainty — strictly non-blocking for `tANE` sandbox)
-- **Context / Motivation:** Organize the 7 open legal questions and institutional architecture options in `docs/research/MAINNET_AND_REGULATORY.md` (`ADR-0012`) into a formal brief for external Indian legal counsel and prospective licensed banking/PPI partners.
+- **Context / Motivation:** Organize the open legal questions and institutional architecture options in `docs/research/MAINNET_AND_REGULATORY.md` (`ADR-0012`) into a formal brief for external Indian legal counsel and prospective licensed banking/PPI partners.
 - **Scope:**
-  - Produce counsel briefing package covering RBI / PSS Act / PPI Master Directions / VDA / FEMA / Income Tax Section 194S open questions, reserve segregation models, and redemption state-machine requirements.
+  - Produce counsel briefing package covering RBI / PSS Act / PPI Master Directions (2021, draft 2026) / Payment Aggregator Directions 2025 / VDA / FIU-IND / FEMA / Income-tax Act, 2025 (former s.194S and s.115BBH) / DPDP open questions, reserve segregation models, and redemption state-machine requirements.
 - **Out of scope:** **NO live INR acceptance, NO mainnet token deployment, NO legal advice, and NO bridging of `tANE` to `ANE`.**
 - **Dependencies:** `ISS-001`, `ISS-002`.
 - **Acceptance criteria:**

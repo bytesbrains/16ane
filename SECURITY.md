@@ -22,7 +22,7 @@ Please include:
 
 ## Vulnerability Handling Process
 
-1. **Acknowledgment**: We acknowledge receipt of vulnerability reports within 24 hours.
-2. **Investigation**: The engineering team verifies and validates the issue.
+1. **Acknowledgment**: Maintainers aim to acknowledge reports within 3 business days.
+2. **Investigation**: Maintainers verify and validate the issue, and keep the reporter updated in the advisory thread.
 3. **Mitigation**: A fix is prepared, tested in an isolated environment, and deployed.
 4. **Disclosure**: Coordinated public disclosure after mitigations are live.

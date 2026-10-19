@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/bytesbrains/16ane/security/advisories/new
+    about: Please report vulnerabilities privately, not in public issues (see SECURITY.md).
+  - name: Questions and ideas
+    url: https://github.com/bytesbrains/16ane/discussions
+    about: Ask usage questions or propose ideas in Discussions.

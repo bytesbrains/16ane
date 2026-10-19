@@ -30,6 +30,23 @@ COPRA is commodity-referenced and therefore has variable INR purchasing power. 1
 4. Agent publishes its own endpoint, receives tANE from another agent, and sees its revenue.
 5. Owner revokes authority and recovers the remaining funds; a receipt is independently verifiable.
 
+## Setup
+
+Prerequisites: [Foundry](https://book.getfoundry.sh/getting-started/installation), Node.js 24+ (runs TypeScript via `--experimental-strip-types`), Python 3.11+. The SDKs have no third-party runtime dependencies, so there is no install step beyond the submodules.
+
+```bash
+git clone --recurse-submodules https://github.com/bytesbrains/16ane.git
+cd 16ane
+scripts/setup_hooks.sh   # optional: gitleaks + forge fmt pre-commit, tests pre-push
+
+make build               # forge build --sizes
+make test                # contracts, TS SDK, Python SDK, E2E scenarios S1-S6
+make fmt-check           # forge fmt --check
+make deploy-dry-run      # simulate the sandbox deployment (no broadcast)
+```
+
+Individual suites: `make test-contracts`, `make test-sdk-ts`, `make test-sdk-py`, `make test-e2e`. Everything runs against local Anvil / testnet configuration only; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Documents
 - [Agent instructions](AGENTS.md)
 - [Product vision and personas](docs/product/VISION.md)

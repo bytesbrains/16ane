@@ -1,0 +1,23 @@
+# Weekly dependency update PRs. Actions are SHA-pinned; Dependabot rewrites the
+# pin and its trailing version comment together.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /packages/sdk-ts
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: /packages/sdk-py
+    schedule:
+      interval: weekly

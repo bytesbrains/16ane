@@ -36,6 +36,11 @@ permissions:
   id-token: write # prove identity to wrokin via OIDC
   pull-requests: write # post the advisory comment
 
+# A new push to a PR supersedes its in-flight hunt; manual runs are keyed by PR number.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   hunt:
     # Don't even start a runner for an automatic PR run on a repo set to on-demand
@@ -50,6 +55,7 @@ jobs:
     # organisation variable to a self-hosted runner label (it needs Docker). The image is
     # published for amd64 and arm64, so either kind of runner runs it natively.
     runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Log in to GHCR (pull the wrokin-hunter image)

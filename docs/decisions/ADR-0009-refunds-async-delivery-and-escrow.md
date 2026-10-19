@@ -6,7 +6,7 @@
 - **Related epics:** E02, E06, E10, E18
 
 ## Context
-On an EVM chain, a finalized token transfer (`tANE.transfer` or `AneAgentVault.settlePayment`) cannot be unilaterally reversed by the payer (`docs/protocol/PAYMENTS.md` line 18). However, distributed HTTP calls between agents and merchants experience network timeouts, dropped responses, upstream service failures, and asynchronous long-running jobs. We must define exact idempotency semantics, honest refund mechanics (`REQ-008`), and the boundary between P0 synchronous settlement and P2 asynchronous escrow (`REQ-201`).
+On an EVM chain, a finalized token transfer (`tANE.transfer` or `AneAgentVault.settlePayment`) cannot be unilaterally reversed by the payer (`docs/protocol/PAYMENTS.md`, "Refunds"). However, distributed HTTP calls between agents and merchants experience network timeouts, dropped responses, upstream service failures, and asynchronous long-running jobs. We must define exact idempotency semantics, honest refund mechanics (`REQ-008`), and the boundary between P0 synchronous settlement and P2 asynchronous escrow (`REQ-201`).
 
 ## Options
 1. **Option A: P0 Synchronous Settlement with Mandatory Idempotency-Key + Verifiable On-Chain Refund Reference (`refundPayment`), and P2 Optional Milestone Escrow Contract (`AneTaskEscrow`) for Async Jobs.**
@@ -14,7 +14,7 @@ On an EVM chain, a finalized token transfer (`tANE.transfer` or `AneAgentVault.s
 3. **Option C: Off-Chain IOUs Only.**
 
 ## Evidence and sources
-- **Repo Specs (`docs/protocol/PAYMENTS.md` lines 14–19, `docs/product/REQUIREMENTS.md` REQ-008 & REQ-201, `examples/SCENARIOS.md` S4):**
+- **Repo Specs (`docs/protocol/PAYMENTS.md`, "Required failure semantics" and "Refunds"; `docs/product/REQUIREMENTS.md` REQ-008 & REQ-201, `examples/SCENARIOS.md` S4):**
   - "A finalized on-chain transfer cannot be reversed unilaterally. Merchant-initiated refund is a new transfer or escrow release. Reference refund to original `payment_id`, show original and refund tx hashes, and disclose partial/nonrefundable cases."
   - Scenario `S4`: "Client times out after confirmed payment; retry with same idempotency key must not cause second charge. Merchant cannot deliver; merchant sends refund transfer with original payment reference."
 

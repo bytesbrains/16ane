@@ -16,7 +16,7 @@
 - **Maintainer Direction (2026-10-19):** Confirmed that the legacy `16ane` marketplace codebase (separate and not public) is unrelated to the current 16ane Open Agent Economy vision and must be ignored, while [`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb) (commodity-referenced crypto on Base) may be referenced strictly for reusable engineering patterns.
 - **Repo Spec (`README.md`, "Why separate from COPRA?" and the "Naming and domains are proposals" note):**
   - "COPRA is commodity-referenced and therefore has variable INR purchasing power. 16ane targets predictable INR-referenced pricing for agents. Reuse open wallet/payment infrastructure where possible; do not merge monetary policies or imply COPRA backing."
-- **Proposed Subdomain Topology (`docs/protocol/DEVELOPER_INTERFACES.md` lines 6–15):**
+- **Proposed Subdomain Topology (`docs/protocol/DEVELOPER_INTERFACES.md`, "Domains"):**
   - `16ane.com`, `docs.16ane.com`, `app.16ane.com`, `faucet.16ane.com`, `api.16ane.com/v1`, `registry.16ane.com`, `pay.16ane.com`, `mcp.16ane.com`, `status.16ane.com`.
 
 ## Security and legal impacts

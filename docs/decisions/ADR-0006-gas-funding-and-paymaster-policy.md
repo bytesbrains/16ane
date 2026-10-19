@@ -6,7 +6,7 @@
 - **Related epics:** E02, E05, E06, E16
 
 ## Context
-New developers onboarding to the 5-minute sandbox quickstart (`README.md`) may not initially hold Base Sepolia ETH (`eip155:84532`). In the sibling `copra` repo (`web/assets/wallet.js` line 217, `src/testnet/TestnetUSDC.sol`), the faucet requires the user to submit an on-chain transaction paying their own Base Sepolia ETH gas and has no cooldown or rate-limiting in the contract. For 16ane, `REQ-002` requires bounded faucet distributions with abuse controls that never restrict ordinary token transfers (`REQ-001`), and `REQ-105` requires optional gas sponsorship with metered policy and no unlimited subsidy.
+New developers onboarding to the 5-minute sandbox quickstart (`README.md`) may not initially hold Base Sepolia ETH (`eip155:84532`). In the sibling `copra` repo ([`web/assets/wallet.js`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/web/assets/wallet.js#L217) `claimFaucet()`, `src/testnet/TestnetUSDC.sol`), the faucet requires the user to submit an on-chain transaction paying their own Base Sepolia ETH gas and has no cooldown or rate-limiting in the contract. For 16ane, `REQ-002` requires bounded faucet distributions with abuse controls that never restrict ordinary token transfers (`REQ-001`), and `REQ-105` requires optional gas sponsorship with metered policy and no unlimited subsidy.
 
 ## Options
 1. **Option A: Dual-Mode Faucet & Gasless Meta-Transaction Settlement (On-Chain `AneFaucet` with Cooldowns + Hosted Cloudflare Worker Relayer with Turnstile/Signed Challenge & Hard Daily ETH Budget Cap).**
@@ -17,7 +17,7 @@ New developers onboarding to the 5-minute sandbox quickstart (`README.md`) may n
 - **Sibling `copra` Faucet Audit ([`copra/src/testnet/TestnetUSDC.sol`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/src/testnet/TestnetUSDC.sol#L11-L33) lines 11–33):**
   - `TestnetUSDC.faucet()` allows any caller with Base Sepolia ETH to mint `10,000 * 1e6` per call with zero cooldown.
 - **EIP-2612 (`https://eips.ethereum.org/EIPS/eip-2612`) & EIP-3009 (`https://eips.ethereum.org/EIPS/eip-3009`):** Checked 2026-10-19. Enable off-chain EIP-712 signatures from `owner` and `agentSigner` so a relayer/facilitator can submit vault creation, delegation, and payment settlement transactions without the agent holding ETH.
-- **Threat Model (`docs/security/THREAT_MODEL.md` line 15):**
+- **Threat Model (`docs/security/THREAT_MODEL.md`, "High-priority abuse cases": gas-draining denial of service):**
   - "Sponsor or paymaster suffers gas-draining denial of service."
 
 ## Security and legal impacts

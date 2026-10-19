@@ -12,7 +12,14 @@ import {
   type ServiceManifestPayload,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } from "./demo.ts";
-import { readRequestBody, sendError, sendJson } from "./http.ts";
+import {
+  clientIp,
+  DEFAULT_MAX_BODY_BYTES,
+  PayloadTooLargeError,
+  readRequestBody,
+  sendError,
+  sendJson,
+} from "./http.ts";
 
 export interface SandboxServerConfig {
   port?: number;
@@ -20,10 +27,12 @@ export interface SandboxServerConfig {
   chainId?: number;
   registryAddress: string;
   relayerPrivateKey: string | SecretKey;
-  faucetSignerPrivateKey?: string | SecretKey;
   providerPrivateKey?: string | SecretKey;
   trialFreeCallsPerCaller?: number;
   trialGlobalDailyCap?: number;
+  /** Honour X-Forwarded-For only when a trusted reverse proxy sets it. */
+  trustProxy?: boolean;
+  maxBodyBytes?: number;
 }
 
 export interface ClaimStatusRecord {
@@ -50,15 +59,12 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   close: () => Promise<void>;
 }> {
   const chainId = config.chainId ?? 84532;
+  const trustProxy = config.trustProxy ?? false;
+  const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const relayerKey =
     config.relayerPrivateKey instanceof SecretKey
       ? config.relayerPrivateKey
       : new SecretKey(config.relayerPrivateKey);
-  const faucetSignerKey = config.faucetSignerPrivateKey
-    ? config.faucetSignerPrivateKey instanceof SecretKey
-      ? config.faucetSignerPrivateKey
-      : new SecretKey(config.faucetSignerPrivateKey)
-    : relayerKey;
   const providerKey = config.providerPrivateKey
     ? config.providerPrivateKey instanceof SecretKey
       ? config.providerPrivateKey
@@ -94,6 +100,8 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     providerKey,
     providerAddress,
     contracts,
+    trustProxy,
+    maxBodyBytes,
   };
 
   const buildSignedManifest = (): ServiceManifestPayload => {
@@ -161,7 +169,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
 
       // 4. Faucet Claims (POST /v1/faucet/claims & GET /v1/faucet/claims/:id)
       if (method === "POST" && pathname === "/v1/faucet/claims") {
-        const rawBody = await readRequestBody(req);
+        const rawBody = await readRequestBody(req, maxBodyBytes);
         const body = rawBody ? (JSON.parse(rawBody) as { recipient?: string; amount?: string }) : {};
         if (!body.recipient) {
           sendError(res, 400, "ANE-E-1001", "Missing recipient address", false);
@@ -180,13 +188,10 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
           return;
         }
 
-        const clientIp =
-          (req.headers["x-forwarded-for"] as string | undefined) ??
-          req.socket.remoteAddress ??
-          "local";
+        const ip = clientIp(req, trustProxy);
         const ipHash = crypto
           .createHash("sha256")
-          .update(`${ipSalt}:${clientIp}:${recipient.toLowerCase()}`)
+          .update(`${ipSalt}:${ip}:${recipient.toLowerCase()}`)
           .digest("hex");
         const lastClaimAt = ipCooldowns.get(ipHash) ?? 0;
         const nowSec = Math.floor(Date.now() / 1000);
@@ -333,7 +338,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       }
 
       if (method === "POST" && pathname === "/v1/services") {
-        const rawBody = await readRequestBody(req);
+        const rawBody = await readRequestBody(req, maxBodyBytes);
         const manifest = JSON.parse(rawBody) as ServiceManifestPayload;
         const check = client.verifyServiceManifest(manifest, contracts.aneServiceDirectory);
         if (!check.valid) {
@@ -385,6 +390,11 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
 
       sendError(res, 404, "ANE-E-4040", `Route not found: ${method} ${pathname}`, false);
     } catch (err) {
+      if (err instanceof PayloadTooLargeError) {
+        res.setHeader("connection", "close");
+        sendError(res, 413, "ANE-E-4130", err.message, false);
+        return;
+      }
       sendError(res, 500, "ANE-E-5000", err instanceof Error ? err.message : String(err), true);
     }
   });

@@ -106,7 +106,6 @@ export async function startSandboxStack(t: TestContext) {
     chainId: 84532,
     registryAddress,
     relayerPrivateKey: DEPLOYER_KEY,
-    faucetSignerPrivateKey: DEPLOYER_KEY,
     providerPrivateKey: PROVIDER_KEY,
     trialFreeCallsPerCaller: 1,
     trialGlobalDailyCap: 50,

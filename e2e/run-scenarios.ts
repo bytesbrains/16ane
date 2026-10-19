@@ -397,6 +397,14 @@ print(json.dumps(res))
 
     const spentAfterFallback = (await client.getAccountingSummary(vaultAddress)).cumulativeSpent;
     assert.equal(spentAfterFallback, spentBeforeTrial + 16n * ONE_TANE);
+
+    // Rotating the unauthenticated x-agent-vault header must not mint a fresh trial (#31)
+    const spoofed = await fetch(`${sandbox.url}/v1/demo/summarize`, {
+      method: "POST",
+      headers: { "x-trial-request": "true", "x-agent-vault": `0x${"ab".repeat(20)}` },
+      body: JSON.stringify({ text: "spoofed caller" }),
+    });
+    assert.equal(spoofed.status, 402);
   });
 
   await t.test("S5: Facilitator Outage / Direct On-Chain Settlement & CLI Receipt Verification (REQ-005)", async () => {

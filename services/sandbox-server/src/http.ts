@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import http from "node:http";
 import { SANDBOX_DISCLAIMER } from "../../../packages/sdk-ts/src/index.ts";
 
@@ -25,6 +26,30 @@ export function sendError(
 ): void {
   sendJson(res, status, {
     error: { code, message, retryable, disclaimer: SANDBOX_DISCLAIMER },
+  });
+}
+
+// Strips URLs (an RPC URL often embeds an API key) from text that is about to be logged.
+export function redactUrls(text: string): string {
+  return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, "<url>");
+}
+
+// For failures whose underlying error may carry internal detail (RPC responses, chain-client
+// errors): the client gets a fixed message and an id; the detail is logged server-side with URLs
+// redacted, under the same id (ADR-0010).
+export function sendLoggedError(
+  res: http.ServerResponse,
+  status: number,
+  code: string,
+  publicMessage: string,
+  retryable: boolean,
+  cause: unknown,
+): void {
+  const errorId = randomUUID();
+  const detail = cause instanceof Error ? cause.message : String(cause);
+  console.error(`[16ane-sandbox] ${code} ${errorId}: ${redactUrls(detail)}`);
+  sendJson(res, status, {
+    error: { code, message: publicMessage, retryable, errorId, disclaimer: SANDBOX_DISCLAIMER },
   });
 }
 

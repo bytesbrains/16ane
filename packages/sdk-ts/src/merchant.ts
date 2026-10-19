@@ -184,7 +184,8 @@ export class AnePaymentVerifier {
     idempotencyKey?: string;
   }): Promise<
     | { ok: true; receipt: X402Receipt; receiptHeaderB64: string }
-    | { ok: false; status: number; code: string; message: string }
+    // `message` is safe to send to the client; `cause` is the underlying error, for server-side logs only.
+    | { ok: false; status: number; code: string; message: string; cause?: unknown }
   > {
     let decoded: {
       x402Version: number;
@@ -313,7 +314,8 @@ export class AnePaymentVerifier {
             ok: false,
             status: 401,
             code: "ANE-E-4010",
-            message: `Signature recovery error: ${err instanceof Error ? err.message : String(err)}`,
+            message: "Signature recovery failed",
+            cause: err,
           };
         }
 
@@ -330,7 +332,8 @@ export class AnePaymentVerifier {
             ok: false,
             status: 402,
             code: "ANE-E-4011",
-            message: `On-chain settlement reverted: ${err instanceof Error ? err.message : String(err)}`,
+            message: "On-chain settlement failed",
+            cause: err,
           };
         }
       }

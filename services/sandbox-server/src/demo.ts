@@ -14,7 +14,7 @@ import {
   type ServiceManifestPayload,
   type X402Receipt,
 } from "../../../packages/sdk-ts/src/index.ts";
-import { clientIp, readRequestBody, sendError, sendJson } from "./http.ts";
+import { clientIp, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
 
 const ONE_TANE = 10n ** 18n;
 const PRICE_SUMMARIZE = 16n * ONE_TANE; // 16 tANE (= 1 simulated INR)
@@ -235,7 +235,12 @@ export async function handleDemoRequest(
   });
 
   if (!settled.ok) {
-    sendError(res, settled.status, settled.code, settled.message, settled.status >= 500);
+    if (settled.cause !== undefined) {
+      const retryable = settled.status >= 500;
+      sendLoggedError(res, settled.status, settled.code, settled.message, retryable, settled.cause);
+    } else {
+      sendError(res, settled.status, settled.code, settled.message, settled.status >= 500);
+    }
     return;
   }
 

@@ -1,0 +1,31 @@
+name: Feature / implementation
+about: Propose a scoped 16ane feature
+labels: [enhancement]
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: Epic / requirement IDs
+      placeholder: E04 / REQ-004
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and expected outcome
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Testable acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security, privacy, and dependencies

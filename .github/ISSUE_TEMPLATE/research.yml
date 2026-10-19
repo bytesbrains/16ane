@@ -1,0 +1,26 @@
+name: Research / ADR
+about: Research an architectural or regulatory question
+labels: [research]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision question and context
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and evaluation criteria
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Primary sources and date checked
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and recommended ADR output

@@ -1,0 +1,92 @@
+# wrokin Builder — added for you by "Enable" in the wrokin dashboard.
+#
+# It implements an issue on your own runner: pi works on it, calling Cruise with the key
+# and lane saved on your Builder card, then the action runs your tests itself. You get a
+# ready PR when they pass, and a draft when they don't or there are none.
+#
+# wrok.in is called at job start for the key, the lane and a short-lived wrokin App
+# token for this repository, and again only when the run opens a ready PR, with that PR's
+# number and commit so auto-merge can check it. It never sees prompts or steers the run.
+name: wrokin agent build
+# The issue or PR number in the title links each run to its issue and PR on wrok.in's Runs page (#846).
+run-name: "wrokin agent build · ${{ inputs.pr_number != '' && format('PR #{0}', inputs.pr_number) || inputs.issue_number != '' && format('issue #{0}', inputs.issue_number) || 'target missing' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue to implement"
+        required: false
+        default: ""
+      pr_number:
+        description: "Pull request to rework"
+        required: false
+        default: ""
+      model:
+        description: "Cruise lane or model id (blank: the Builder card's choice)"
+        required: false
+        default: ""
+      test_command:
+        description: "Command that proves the change (blank: the repo's test script)"
+        required: false
+        default: ""
+      base_branch:
+        description: "Branch to start from and open the PR against (blank: the Builder card's, else worked out)"
+        required: false
+        default: ""
+      read_cap_kb:
+        description: "Whole-file read cap in KB, 0 = off (blank: the Builder card's)"
+        required: false
+        default: ""
+      compress_tool_output:
+        description: "Compress bash/grep/find tool output, false/0 = off, true = on (blank: the Builder card's)"
+        required: false
+        default: ""
+      thinking:
+        description: "Model thinking / reasoning mode: default, off, on (blank: the Builder card's)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read # checkout; the push uses the check-in's wrokin App token
+  issues: write # say why on the issue when check-in itself is refused
+  id-token: write # check in with wrok.in for the key, lane and GitHub token
+
+concurrency:
+  group: wrokin-agent-build-${{ inputs.pr_number != '' && format('pr-{0}', inputs.pr_number) || inputs.issue_number != '' && format('issue-{0}', inputs.issue_number) || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # GitHub's hosted Linux runner unless you set a RUNNER_AGENT (or RUNNER_LINUX)
+    # repository or organisation variable to a self-hosted runner label.
+    runs-on: ${{ vars.RUNNER_AGENT || vars.RUNNER_LINUX || 'ubuntu-latest' }}
+    timeout-minutes: 90
+
+    steps:
+      - name: Validate target
+        run: |
+          if [ -z "$(printf '%s' "$ISSUE_NUMBER" | tr -d '[:space:]')" ] && [ -z "$(printf '%s' "$PR_NUMBER" | tr -d '[:space:]')" ]; then
+            echo "::error::Either issue_number or pr_number must be provided"
+            exit 1
+          fi
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Do NOT persist GITHUB_TOKEN in .git/config: pi runs commands in this
+          # checkout and must not be able to read it off disk (#275).
+          persist-credentials: false
+      # https://github.com/bytesbrains/wrokin-agent — v0.9.7, pinned by commit.
+      - uses: bytesbrains/wrokin-agent@2e0b694af33ae1d675245403435c39fced63a297
+        with:
+          issue_number: ${{ inputs.issue_number }}
+          pr_number: ${{ inputs.pr_number }}
+          model: ${{ inputs.model }}
+          test_command: ${{ inputs.test_command }}
+          base_branch: ${{ inputs.base_branch }}
+          read_cap_kb: ${{ inputs.read_cap_kb }}
+          compress_tool_output: ${{ inputs.compress_tool_output }}
+          thinking: ${{ inputs.thinking }}
+          wrokin_api_base: https://api.wrok.in

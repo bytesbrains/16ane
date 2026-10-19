@@ -96,6 +96,7 @@ for (const page of PAGES) {
 test("security.txt names a contact and has not expired (RFC 9116)", () => {
   const body = read(".well-known/security.txt");
   assert.match(body, new RegExp(`^Contact: ${REPO}/security/advisories/new$`, "m"));
+  assert.match(body, /^Contact: mailto:security@16ane\.com$/m);
   const expires = body.match(/^Expires: (.+)$/m)?.[1];
   assert.ok(expires && Date.parse(expires) > Date.now(), "Expires is in the future; renew it");
 });

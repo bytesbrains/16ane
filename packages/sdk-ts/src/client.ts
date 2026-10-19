@@ -1,70 +1,24 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { abiWordAddress, abiWordBytes32, abiWordUint, functionSelector } from "./abi.ts";
 import {
-  abiWordAddress,
-  abiWordBytes32,
-  abiWordUint,
-  functionSelector,
   hashServiceManifest,
-  keccak256Utf8,
-  recoverAddress,
-  signDigest,
-  toChecksumAddress,
   type ServiceManifestPayload,
   type SpendIntent,
   type TransferWithAuthorization,
 } from "./crypto.ts";
+import { keccak256Utf8 } from "./keccak.ts";
 import { redactSecrets, SecretKey } from "./secret.ts";
+import { recoverAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
+import {
+  BUDGET_MODE,
+  type AneClientOptions,
+  type AneContractAddresses,
+  type PaymentRecordView,
+  type VaultAccountingSummary,
+} from "./types.ts";
 
 const execFileAsync = promisify(execFile);
-
-export const BUDGET_MODE = {
-  FIXED: 0,
-  REVOLVING: 1,
-} as const;
-
-export type BudgetModeName = "FIXED" | "REVOLVING";
-
-export interface AneContractAddresses {
-  registry: string;
-  aneTestToken: string;
-  aneVaultFactory: string;
-  aneFaucet: string;
-  aneServiceDirectory: string;
-}
-
-export interface VaultAccountingSummary {
-  owner: string;
-  agentSigner: string;
-  tokenBalance: bigint;
-  ownerPrincipalDeposited: bigint;
-  maxTotalSpend: bigint;
-  cumulativeSpent: bigint;
-  authorizedRemaining: bigint;
-  spendableNow: bigint;
-  verifiedRevenue: bigint;
-  unallocatedBalance: bigint;
-  policyVersion: number;
-  expiry: number;
-  budgetMode: BudgetModeName;
-  revolvingTreasuryCeiling: bigint;
-  active: boolean;
-}
-
-export interface PaymentRecordView {
-  merchant: string;
-  amountPaid: bigint;
-  amountRefunded: bigint;
-  settledAt: number;
-}
-
-export interface AneClientOptions {
-  rpcUrl: string;
-  chainId?: number;
-  registryAddress?: string;
-  contracts?: Partial<AneContractAddresses>;
-  facilitatorUrl?: string;
-}
 
 function splitWords(hexData: string): string[] {
   const clean = hexData.startsWith("0x") ? hexData.slice(2) : hexData;

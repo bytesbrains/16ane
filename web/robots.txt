@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+# Fork-PR post-switch check (#32); this PR is closed without merging.

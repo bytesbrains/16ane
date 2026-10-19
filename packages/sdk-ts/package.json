@@ -10,5 +10,12 @@
   "scripts": {
     "test": "node --experimental-strip-types --test test/*.test.ts"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "homepage": "https://16ane.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bytesbrains/16ane.git",
+    "directory": "packages/sdk-ts"
+  },
+  "bugs": "https://github.com/bytesbrains/16ane/issues"
 }

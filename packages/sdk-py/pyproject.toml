@@ -11,6 +11,12 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = []
 
+[project.urls]
+Homepage = "https://16ane.com"
+Source = "https://github.com/bytesbrains/16ane/tree/main/packages/sdk-py"
+Issues = "https://github.com/bytesbrains/16ane/issues"
+Security = "https://github.com/bytesbrains/16ane/blob/main/SECURITY.md"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ane_sdk*"]

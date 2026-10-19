@@ -272,7 +272,7 @@
 - **Scope:**
   - Implement campaign store and atomic quota middleware (`campaign_id`, `provider_id`, `service_id`, `test_token_price`, `max_calls_per_wallet`, `max_tokens_per_request`, `provider_cost_budget`, `starts_at`, `expires_at`, `eligibility`, `status`).
   - Expose `GET /v1/campaigns` and provider circuit-breaker controls (`pauseCampaign`).
-- **Out of scope:** Treating provider compute quotas as transferable ERC-20 tokens (`TOKENOMICS.md` line 16).
+- **Out of scope:** Treating provider compute quotas as transferable ERC-20 tokens (`TOKENOMICS.md`, "Separate accounting systems" item 3).
 - **Dependencies:** `ISS-007`, `ISS-011`.
 - **Acceptance criteria:**
   - Given an agent holding `1,000,000 tANE` calling a sponsored endpoint with `max_calls_per_wallet = 5` or `provider_cost_budget = $1.00`, when the quota or budget ceiling is reached, then the 6th call is rejected with `429 QuotaExceeded` / `503 SponsorBudgetExhausted` before settling `tANE` or invoking upstream compute (`SCENARIOS.md` S3, `THREAT_MODEL.md` #8).

@@ -41,7 +41,7 @@ Adopt **Option A**:
 - Eliminates gas-draining griefing attacks against the sandbox operator.
 
 ## Alternatives rejected
-- **Option B (User must bring Base Sepolia ETH first):** Breaks the 5-minute onboarding story (`README.md` lines 26–32) for developers who do not have mainnet ETH balances required by third-party Sepolia ETH faucets.
+- **Option B (User must bring Base Sepolia ETH first):** Breaks the 5-minute onboarding story (`README.md`, "First five-minute success story") for developers who do not have mainnet ETH balances required by third-party Sepolia ETH faucets.
 - **Option C (Unrestricted ERC-4337 Paymaster):** Vulnerable to gas-draining attacks via expensive calldata or repeated failed `UserOperation` simulations.
 
 ## Open risks

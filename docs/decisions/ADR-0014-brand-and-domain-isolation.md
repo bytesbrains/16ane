@@ -6,7 +6,7 @@
 - **Related epics:** E01, E02
 
 ## Context
-`README.md` (line 53) and `docs/research/STANDARDS_AND_ADRS.md` (line 28, `ADR-014`) note that `16ane.com` had an earlier unrelated business-marketplace codebase (legacy `16ane`, separate and not public) and require evaluating brand/domain isolation and symbol collisions (`tANE` / `ANE`), as well as clear separation from the commodity-referenced `COPRA` protocol ([`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb)).
+`README.md` (the "Naming and domains are proposals" note) and `docs/research/STANDARDS_AND_ADRS.md` (the `ADR-014` entry) note that `16ane.com` had an earlier unrelated business-marketplace codebase (legacy `16ane`, separate and not public) and require evaluating brand/domain isolation and symbol collisions (`tANE` / `ANE`), as well as clear separation from the commodity-referenced `COPRA` protocol ([`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb)).
 
 ## Options
 1. **Option A: Complete Clean-Slate Code & Navigation Separation from Legacy `16ane` Marketplace Repo + Distinct Subdomain/Contract Namespace for the 16ane Open Agent Economy + Explicit Separation from `COPRA`.**
@@ -14,7 +14,7 @@
 
 ## Evidence and sources
 - **Maintainer Direction (2026-10-19):** Confirmed that the legacy `16ane` marketplace codebase (separate and not public) is unrelated to the current 16ane Open Agent Economy vision and must be ignored, while [`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb) (commodity-referenced crypto on Base) may be referenced strictly for reusable engineering patterns.
-- **Repo Spec (`README.md` lines 14–16, 53):**
+- **Repo Spec (`README.md`, "Why separate from COPRA?" and the "Naming and domains are proposals" note):**
   - "COPRA is commodity-referenced and therefore has variable INR purchasing power. 16ane targets predictable INR-referenced pricing for agents. Reuse open wallet/payment infrastructure where possible; do not merge monetary policies or imply COPRA backing."
 - **Proposed Subdomain Topology (`docs/protocol/DEVELOPER_INTERFACES.md` lines 6–15):**
   - `16ane.com`, `docs.16ane.com`, `app.16ane.com`, `faucet.16ane.com`, `api.16ane.com/v1`, `registry.16ane.com`, `pay.16ane.com`, `mcp.16ane.com`, `status.16ane.com`.

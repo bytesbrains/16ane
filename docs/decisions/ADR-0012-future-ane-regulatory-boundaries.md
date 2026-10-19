@@ -48,7 +48,7 @@ Adopt **Option A**:
 
 ## Alternatives rejected
 - **Option B (Speculative mainnet/INR contract implementation):** Violates `AGENTS.md` authority boundaries and risks building non-compliant workflows before legal/banking requirements are known.
-- **Option C (`tANE` conversion/airdrop promises):** Violates `AGENTS.md` line 16, `TOKENOMICS.md` line 8, and `MAINNET_AND_REGULATORY.md` line 29.
+- **Option C (`tANE` conversion/airdrop promises):** Violates `AGENTS.md` ("`tANE` is **free, simulated and worthless**"), `TOKENOMICS.md` ("tANE: public sandbox only": no airdrop/convertibility into real ANE), and `MAINNET_AND_REGULATORY.md` ("Hard boundary").
 
 ## Open risks
 - Third-party users or unofficial forks attempting to wrap or trade `tANE` on testnet/DEX pools; mitigated by explicit contract metadata (`"16ane Sandbox Test Token (NO CASH VALUE)"`), unrestricted faucet minting (`REQ-002` renders `tANE` abundant and valueless), and prominent UI/docs warnings.

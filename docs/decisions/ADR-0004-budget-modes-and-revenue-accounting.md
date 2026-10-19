@@ -1,6 +1,6 @@
 # ADR-0004: Fixed and Revolving Budget Semantics and Revenue Accounting
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol Maintainers
 - **Related requirements:** REQ-004, REQ-005, REQ-008, REQ-107
 - **Related epics:** E02, E04, E17

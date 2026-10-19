@@ -1,6 +1,6 @@
 # ADR-0011: Contract Upgrade Philosophy, Role Separation, and Emergency Response
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol & Security Maintainers
 - **Related requirements:** REQ-001, REQ-003, REQ-004, REQ-005, REQ-010, REQ-013, REQ-SEC
 - **Related epics:** E02, E03, E04, E11

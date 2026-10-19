@@ -1,6 +1,6 @@
 # ADR-0008: Provider-Sponsored Introductory Credits and Quota Accounting
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Product & Infrastructure Maintainers
 - **Related requirements:** REQ-012, REQ-014, REQ-103
 - **Related epics:** E02, E10, E14, E15

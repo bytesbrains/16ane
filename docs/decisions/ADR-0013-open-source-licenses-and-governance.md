@@ -1,6 +1,6 @@
 # ADR-0013: Open-Source Licensing, Dependency Policy, and Contribution Governance
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Repository Maintainers
 - **Related requirements:** REQ-001, REQ-010, REQ-106
 - **Related epics:** E01, E02, E11

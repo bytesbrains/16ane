@@ -1,6 +1,6 @@
 # ADR-0007: Signed Service Manifests, A2A/ERC-8004 Alignment, and Discovery Indexing
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol & Ecosystem Maintainers
 - **Related requirements:** REQ-001, REQ-010, REQ-101, REQ-106, REQ-202, REQ-203
 - **Related epics:** E02, E12, E16, E19

@@ -1,6 +1,6 @@
 # ADR-0006: Gas Funding, Relayer Sponsorship, and Faucet Abuse Policy
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol & Operations Maintainers
 - **Related requirements:** REQ-001, REQ-002, REQ-012, REQ-105
 - **Related epics:** E02, E05, E06, E16

@@ -1,6 +1,6 @@
 # ADR-0005: HTTP Payment Protocol, x402 Compatibility, and Settlement Finality
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol & SDK Maintainers
 - **Related requirements:** REQ-006, REQ-007, REQ-008, REQ-015, REQ-106
 - **Related epics:** E02, E06, E07, E08, E10, E16

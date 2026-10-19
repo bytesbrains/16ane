@@ -1,6 +1,6 @@
 # ADR-0012: Future Regulated ANE Boundaries and Sandbox Isolation
 
-- **Status:** Proposed — `BLOCKED-LEGAL` for any real-value implementation (Sandbox-only isolation rules active immediately)
+- **Status:** Accepted for Sandbox Isolation (2026-10-19) — `BLOCKED-LEGAL` for any real-value implementation
 - **Date and owners:** 2026-10-19 | 16ane Maintainers & External Legal Counsel (Future Track)
 - **Related requirements:** REQ-012, REQ-103
 - **Related epics:** E02, E22

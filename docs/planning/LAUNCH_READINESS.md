@@ -20,7 +20,7 @@ Per `AGENTS.md` ("Never claim endpoints, contracts, package names, audit results
 | **G0-04** | Primary standards researched with source URLs, date checked (2026-10-19), and Base Sepolia (`84532`) support verified | **PASS** | `docs/planning/CAPABILITY_GAP_REPORT.md` |
 | **G0-05** | All 14 ADRs (`ADR-0001`–`ADR-0014`) drafted with security/legal impacts and validation plans | **PASS** | `docs/decisions/ADR-0001-*.md` through `ADR-0014-*.md` |
 | **G0-06** | Dependency-ordered epics (`E01`–`E22`), actionable issues (`ISS-001`–`ISS-024`), and traceability matrix created | **PASS** | `docs/planning/EPIC_DEPENDENCY_GRAPH.md`, `docs/planning/PROPOSED_ISSUES.md`, `docs/planning/TRACEABILITY.md` |
-| **G0-07** | Maintainer review and ratification of Phase 0 ADRs & P0 backlog (`AGENTS.md` Step 7) | **UNKNOWN** | Pending maintainer review of this Phase 0 deliverable package |
+| **G0-07** | Maintainer review and ratification of Phase 0 ADRs & P0 backlog (`AGENTS.md` Step 7) | **PASS** | Ratified on 2026-10-19 (`ADR-0001`–`ADR-0014` Accepted) |
 
 ### Gate Group B — Phase 1 Public Sandbox Launch Gates (`P0`)
 

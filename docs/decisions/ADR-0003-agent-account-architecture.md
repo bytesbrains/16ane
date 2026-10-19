@@ -1,6 +1,6 @@
 # ADR-0003: Agent Account Architecture (Dedicated Policy Vault vs ERC-4337 vs EIP-7702)
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol & Security Maintainers
 - **Related requirements:** REQ-001, REQ-003, REQ-004, REQ-005, REQ-104, REQ-107
 - **Related epics:** E02, E04, E06, E17

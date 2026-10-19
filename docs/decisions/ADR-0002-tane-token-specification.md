@@ -1,6 +1,6 @@
 # ADR-0002: tANE ERC-20 Token Specification, Decimals, Roles, and Extensions
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol Maintainers
 - **Related requirements:** REQ-001, REQ-002, REQ-006, REQ-010, REQ-012
 - **Related epics:** E02, E03, E05, E06

@@ -1,6 +1,6 @@
 # ADR-0010: API Authentication, Rate Limits, Privacy, and Log Retention
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Security & Operations Maintainers
 - **Related requirements:** REQ-002, REQ-003, REQ-015, REQ-PRIV, REQ-OBS
 - **Related epics:** E02, E05, E10, E11, E15

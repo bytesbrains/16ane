@@ -1,6 +1,6 @@
 # ADR-0009: Refunds, Idempotency, Asynchronous Delivery, and Escrow Boundary
 
-- **Status:** Proposed (Phase 0 review required)
+- **Status:** Accepted (2026-10-19)
 - **Date and owners:** 2026-10-19 | 16ane Protocol Maintainers
 - **Related requirements:** REQ-006, REQ-007, REQ-008, REQ-015, REQ-201
 - **Related epics:** E02, E06, E10, E18

@@ -60,12 +60,12 @@ Adopt **Option A**:
 
    No Firebase records remain: the `A` records were deleted at cutover, and the `hosting-site` TXT record should be deleted too.
 5. **Remaining steps.**
-   1. Delete the `hosting-site` TXT record.
+   1. Delete the `hosting-site` TXT record, and turn on *Always Use HTTPS* so `http://16ane.com` redirects (see log).
    2. **DMARC rollout**, following Google's [recommended rollout](https://knowledge.workspace.google.com/admin/security/recommended-dmarc-rollout) ("Start with a policy set to **none** ... for one week"):
       - from 2026-10-19: `p=none`; review the daily aggregate reports sent to `admin@16ane.com`;
       - from 2026-10-26, if every legitimate sender passes: `p=quarantine; pct=5`, raised in steps to `pct=100`, with at least a week at each step;
       - then `p=reject`. Record each change and its date in this ADR.
-   3. Confirm the first Workers Builds deploy from `main` is live: `https://16ane.com/.well-known/security.txt` shows the comment from `main`. After that, never run `wrangler deploy` by hand.
+   3. ~~Confirm the first Workers Builds deploy from `main` is live~~ (done 2026-10-19, see log): `https://16ane.com/.well-known/security.txt` shows the comment from `main`. After that, never run `wrangler deploy` by hand.
    4. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
    5. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
    6. Delete the old Google Cloud DNS zone and the Firebase site.
@@ -79,6 +79,10 @@ Adopt **Option A**:
 - The maintainer added `_dmarc` (`p=none`), the proxied `www` record and the "Redirect from WWW to root" Redirect Rule. Checked through the Cloudflare edge: `https://www.16ane.com/a/b?x=1&y=2` and `http://www.16ane.com/z` both return `301` to the same path on `https://16ane.com`, with the query string kept.
 - #37 merged to `main` (`33954b7`). The live Worker was still the hand-deployed version from the branch.
 - 2026-10-20: the maintainer connected Workers Builds to `bytesbrains/16ane` (production branch `main`). This log entry is the first commit to `main` after that, and so triggers the first automatic deploy.
+- Workers Builds confirmed: `wrangler deployments list` shows deploys at 18:37, 18:46 and 18:49 UTC on 2026-10-19, matching the merges of `218a33e`, `a944110` and `65a4ce8` to `main`. Remaining step 3 is done.
+- Checked through the Cloudflare edge on 2026-10-19 18:55 UTC: `https://16ane.com` returns 200 with CSP, HSTS, `nosniff`, `Referrer-Policy` and `frame-ancestors 'none'`; `www` redirects (301) to the apex; MX, SPF, DKIM (`google._domainkey`) and DMARC `p=none` resolve on `kirk.ns.cloudflare.com`. The `.com` registry still has no `DS` record (unsigned, as planned).
+- **Regression against the earlier entry:** `http://16ane.com/` now returns `200` over plain HTTP instead of redirecting to `https://`. Browsers that saw the HSTS header upgrade on their own, but a first visit does not. Fix: turn on *SSL/TLS → Edge Certificates → Always Use HTTPS* for the zone (dashboard; the repository's Wrangler login is read-only for zone settings). Re-check with `curl -sI http://16ane.com/`.
+- The `hosting-site=solaanedotcom` TXT record is still published (also remaining step 1).
 
 ## Consequences
 - The site costs nothing to serve and has no runtime code to patch.

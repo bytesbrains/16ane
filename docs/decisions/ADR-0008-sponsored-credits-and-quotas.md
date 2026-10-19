@@ -14,17 +14,17 @@ In the 16ane public sandbox, `tANE` is free and worthless (`REQ-012`). However, 
 3. **Option C: Relying on `tANE` Faucet Rate Limits Alone to Bound Provider Compute.**
 
 ## Evidence and sources
-- **Repo Specifications (`docs/product/SANDBOX_AND_CREDITS.md` lines 10–21, `docs/product/TOKENOMICS.md`, "tANE: public sandbox only" and "Separate accounting systems"):**
+- **Repo Specifications (`docs/product/SANDBOX_AND_CREDITS.md`, "Provider-sponsored trials" to "Demonstration requirements"; `docs/product/TOKENOMICS.md`, "tANE: public sandbox only" and "Separate accounting systems"):**
   - Five separate accounting systems must never be conflated: (1) `tANE` balance, (2) Delegated allowance, (3) Provider service quota, (4) Revenue, (5) Future ANE reserve liability.
   - "A user with 1M tANE still cannot bypass provider compute limits."
   - "Provide deterministic simulated endpoint so demonstration survives sponsor outages."
-- **Operations Runbook (`docs/operations/OPERATIONS.md` line 13):**
+- **Operations Runbook (`docs/operations/OPERATIONS.md`, "Runbooks": sponsor budget exceeded):**
   - "Sponsor budget exceeded: immediately stop real compute while retaining simulated settlement and refund policy."
 
 ## Security and legal impacts
-- **Faucet farming cannot drain sponsor compute (`THREAT_MODEL.md` line 12):** Even if an attacker accumulates millions of `tANE` across 1,000 wallets over months, the provider's campaign middleware enforces hard atomic counters on `provider_cost_budget_usd_micros` (aggregate real compute cost), `max_calls_per_wallet_per_day`, `max_tokens_per_request`, and `concurrency_limit` **before** invoking any upstream paid LLM/compute API.
+- **Faucet farming cannot drain sponsor compute (`THREAT_MODEL.md`, "High-priority abuse cases": faucet farming):** Even if an attacker accumulates millions of `tANE` across 1,000 wallets over months, the provider's campaign middleware enforces hard atomic counters on `provider_cost_budget_usd_micros` (aggregate real compute cost), `max_calls_per_wallet_per_day`, `max_tokens_per_request`, and `concurrency_limit` **before** invoking any upstream paid LLM/compute API.
 - **No charge on quota rejection:** Quota checks execute during the HTTP `402` quote phase **and** immediately prior to calling `settlePayment`. If a campaign's real-compute budget is exhausted, the merchant returns `429 Too Many Requests` / `503 SponsorQuotaExhausted` **before** settling `tANE`, so the agent's `tANE` is not taken for an undeliverable sponsored call (or if client-settled, triggers an immediate documented refund/fallback per `ADR-0009`).
-- **Truthful disclosure (`AGENTS.md` line 22):** Every sponsored response header and receipt includes `sponsor_campaign_id`, `is_simulated`, `remaining_wallet_quota`, and `"TEST TOKENS — NO CASH VALUE"`.
+- **Truthful disclosure (`AGENTS.md`, "Invariants and prohibitions"):** Every sponsored response header and receipt includes `sponsor_campaign_id`, `is_simulated`, `remaining_wallet_quota`, and `"TEST TOKENS — NO CASH VALUE"`.
 
 ## Decision
 Adopt **Option A**:

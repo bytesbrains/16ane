@@ -16,10 +16,10 @@ Because standard ERC-20 `transfer(vault, amount)` directly increases `tANE.balan
 3. **Option C: Custom `tANE` transfer hook (`ERC-1363` / `ERC-777` style callback on every `transfer`).**
 
 ## Evidence and sources
-- **Repo Requirements (`docs/product/REQUIREMENTS.md` line 47, `docs/protocol/WALLET.md` lines 15–23):**
+- **Repo Requirements (`docs/product/REQUIREMENTS.md`, "Example acceptance journey"; `docs/protocol/WALLET.md`, "Modes" and "Invariants to test"):**
   - Example journey: Owner funds agent with `1,600 tANE` and delegates `maxTotal = 320 tANE`. Agent spends `16 tANE` and earns `32 tANE`. Under `FIXED` mode, remaining spend authority must be `320 - 16 = 304 tANE` (NOT `336 tANE`), while total vault token balance is `1,600 - 16 + 32 = 1,616 tANE`.
   - Invariant: "Agent can receive tANE regardless of spend permission, unless account policy explicitly blocks it."
-- **Threat Model (`docs/security/THREAT_MODEL.md` line 13):**
+- **Threat Model (`docs/security/THREAT_MODEL.md`, "High-priority abuse cases": fake earnings via wash trades):**
   - "Fake 'earnings' via wash trades used to evade fixed-budget spending cap."
 
 ## Security and legal impacts

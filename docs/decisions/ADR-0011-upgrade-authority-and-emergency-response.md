@@ -6,7 +6,7 @@
 - **Related epics:** E02, E03, E04, E11
 
 ## Context
-Smart contracts for `tANE`, `AneAgentVault`, `AneVaultFactory`, `AneFaucet`, and `AneRegistry` must balance security invariants (`REQ-001` permissionless transfers, `REQ-003`/`REQ-004`/`REQ-005` owner custody and revocation) with the practical need to roll out new contract versions on the public sandbox testnet (`docs/architecture/SYSTEM.md` lines 37–38, `docs/security/THREAT_MODEL.md` line 16).
+Smart contracts for `tANE`, `AneAgentVault`, `AneVaultFactory`, `AneFaucet`, and `AneRegistry` must balance security invariants (`REQ-001` permissionless transfers, `REQ-003`/`REQ-004`/`REQ-005` owner custody and revocation) with the practical need to roll out new contract versions on the public sandbox testnet (`docs/architecture/SYSTEM.md`, "Contract upgrade philosophy"; `docs/security/THREAT_MODEL.md`, "High-priority abuse cases": contract upgrade/admin key compromise).
 
 ## Options
 1. **Option A: Immutable Implementation Contracts + Versioned Pointer Registry (`AneRegistry`, adapted from `copra/src/CopraRegistry.sol`) + Non-Upgradeable EIP-1167 Agent Vault Clones.**
@@ -14,15 +14,15 @@ Smart contracts for `tANE`, `AneAgentVault`, `AneVaultFactory`, `AneFaucet`, and
 3. **Option C: Hardcoded Unversioned Deployments without a Registry.**
 
 ## Evidence and sources
-- **Repo Architecture (`docs/architecture/SYSTEM.md` lines 37–38):**
+- **Repo Architecture (`docs/architecture/SYSTEM.md`, "Contract upgrade philosophy"):**
   - "Prefer minimal immutable components. Any proxy/upgrade authority must be documented, time-locked where appropriate, monitored and explicitly disclosed."
 - **Sibling `copra` Architecture ([`copra/src/CopraRegistry.sol`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/src/CopraRegistry.sol), `src/CopraVault.sol`):**
   - Uses immutable, non-proxy implementation contracts (`CopraToken`, `CopraVault`, `CopraOracle`) discovered through a single `CREATE2`-deployed `CopraRegistry` contract (`Ownable2Step`) that validates cross-contract wiring before incrementing `version` and emitting `DeploymentUpdated`.
   - `CopraVault` intentionally avoids `Pausable` on user redemptions and has no admin drain function so an admin key compromise cannot steal or freeze user funds.
 
 ## Security and legal impacts
-- **Eliminates proxy upgrade rug risk (`THREAT_MODEL.md` line 16):** Because `tANE` and `AneAgentVault` are non-upgradeable contracts (not ERC-1967 proxies), a compromised protocol admin key can **never** upgrade `AneAgentVault` bytecode to steal owner funds or add a transfer freeze to `tANE`.
-- **Emergency response boundaries (`OPERATIONS.md` lines 10–15):**
+- **Eliminates proxy upgrade rug risk (`THREAT_MODEL.md`, "High-priority abuse cases": contract upgrade/admin key compromise):** Because `tANE` and `AneAgentVault` are non-upgradeable contracts (not ERC-1967 proxies), a compromised protocol admin key can **never** upgrade `AneAgentVault` bytecode to steal owner funds or add a transfer freeze to `tANE`.
+- **Emergency response boundaries (`OPERATIONS.md`, "Runbooks"):**
   - If `AneFaucet` is abused or its relayer key is compromised, the protocol admin can call `AneFaucet.pause()` or revoke `MINTER_ROLE` from the old faucet on `tANE` without affecting any existing `tANE` balances, transfers (`REQ-001`), or `AneAgentVault` withdrawals (`REQ-005`).
   - If a bug is discovered in `AneVaultFactory` or `AneAgentVault`, a patched `AneVaultFactory v2` is deployed and registered in `AneRegistry.setDeployment(...)`. Existing owners can still call `withdraw()` / `revokeAndSweep()` directly on their v1 vaults and migrate to v2 at their discretion.
 

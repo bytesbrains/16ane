@@ -18,7 +18,7 @@ In the 16ane architecture, `tANE` is the free, unbacked, worthless public sandbo
 ## Evidence and sources
 - **ERC-20 (`https://eips.ethereum.org/EIPS/eip-20`), EIP-2612 (`https://eips.ethereum.org/EIPS/eip-2612`), EIP-3009 (`https://eips.ethereum.org/EIPS/eip-3009`):** Checked 2026-10-19. All three are Final EIP standards.
 - **x402 Payment Protocol (`https://www.x402.org/`, `https://github.com/coinbase/x402`):** Checked 2026-10-19. The reference x402 EVM `exact` scheme uses EIP-3009 `transferWithAuthorization` (with random `bytes32` nonces) because sequential nonces in EIP-2612 cause race conditions during concurrent agent HTTP calls. Supporting both `(v, r, s)` EOA signatures and `bytes signature` (ERC-1271) overloads in EIP-3009 matches the x402 verifier interface.
-- **Existing Repo Spec (`docs/protocol/PAYMENTS.md` line 27):** Illustrates `"amount_base_units": "16000000000000000000"` (`16 * 10^18`) for 16 `tANE`.
+- **Existing Repo Spec (`docs/protocol/PAYMENTS.md`, "Example conceptual quote"):** Illustrates `"amount_base_units": "16000000000000000000"` (`16 * 10^18`) for 16 `tANE`.
 - **Sibling `copra` Repo ([`copra/src/CopraToken.sol`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/src/CopraToken.sol) & `src/testnet/TestnetUSDC.sol`):** Uses OpenZeppelin v5.7.0 (`lib/openzeppelin-contracts`), 18 decimals on `CopraToken`, 6 decimals on `TestnetUSDC`, and lacks EIP-2612/EIP-3009.
 
 ## Security and legal impacts

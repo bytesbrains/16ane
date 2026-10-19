@@ -48,7 +48,7 @@
 - **Acceptance criteria:**
   - Given a staged file containing a 32-byte hex private key, when `make lint` or `.githooks/pre-commit` runs, then gitleaks blocks the commit, while 20-byte EVM addresses pass (`test/gitleaks/allowlist.test.sh` exits 0).
   - Given a PR, when GitHub Actions runs, then `forge fmt --check`, `forge build --sizes`, `forge test -vvv`, and `check-committed-files.sh` execute with zero permissions leakage (`permissions: {}`).
-- **Threat / Security considerations:** Prevents accidental private key commits (`AGENTS.md` line 18) and supply-chain drift via SHA-pinned actions.
+- **Threat / Security considerations:** Prevents accidental private key commits (`AGENTS.md`, "Invariants and prohibitions") and supply-chain drift via SHA-pinned actions.
 - **Docs updates & Observable outputs:** `foundry.toml`, `.gitleaks.toml`, `.githooks/*`, `Makefile`, `.github/workflows/test.yml`.
 
 ### `ISS-004` — `[E03][contract][security] Implement AneRegistry and deterministic CREATE2 deployment harness`
@@ -149,9 +149,9 @@
 - **Out of scope:** Custodial key storage; SDK must redact private keys in all logs and exceptions (`ADR-0010`).
 - **Dependencies:** `ISS-006`, `ISS-008`.
 - **Acceptance criteria:**
-  - Given the pseudocode flow in `docs/protocol/DEVELOPER_INTERFACES.md` (lines 28–36), when run against local Anvil in CI, then `create_agent_wallet -> fund_testnet -> delegate -> purchase -> revoke -> withdraw_available` completes end-to-end and passes all assertions.
+  - Given the pseudocode flow in `docs/protocol/DEVELOPER_INTERFACES.md` ("SDK pseudocode"), when run against local Anvil in CI, then `create_agent_wallet -> fund_testnet -> delegate -> purchase -> revoke -> withdraw_available` completes end-to-end and passes all assertions.
   - If a merchant returns a `402` quote exceeding `max_payment` or targeting an unauthorized asset/network, the SDK raises `PolicyViolationError` without signing.
-  - Secret-redaction unit test confirms `repr(session)` and stack traces never output raw private keys (`AGENTS.md` line 18).
+  - Secret-redaction unit test confirms `repr(session)` and stack traces never output raw private keys (`AGENTS.md`, "Invariants and prohibitions").
 - **Threat / Security considerations:** Strict `max_payment` check before signing; untrusted merchant response handling.
 - **Docs updates & Observable outputs:** `packages/sdk-py/`, unit + Anvil integration tests, `docs/protocol/DEVELOPER_INTERFACES.md`.
 
@@ -195,7 +195,7 @@
 ### `ISS-012` — `[E09][sdk][docs] Build ane CLI and five-minute developer quickstart`
 - **Labels:** `sdk`, `docs`, `demo`, `P0`
 - **Estimate:** 1.5–2 days (Low uncertainty)
-- **Context / Motivation:** Deliver the `ane` CLI specified in `docs/protocol/DEVELOPER_INTERFACES.md` (line 22) and the 5-minute onboarding flow in `README.md` (lines 26–32) (`REQ-009`, `REQ-011`, `REQ-012`, `REQ-DOC`).
+- **Context / Motivation:** Deliver the `ane` CLI specified in `docs/protocol/DEVELOPER_INTERFACES.md` ("CLI (proposed)") and the 5-minute onboarding flow in `README.md` ("First five-minute success story") (`REQ-009`, `REQ-011`, `REQ-012`, `REQ-DOC`).
 - **Scope:**
   - Implement CLI commands (`packages/cli` or `packages/sdk-ts/bin/ane` + Python CLI entrypoint):
     - `ane network list`
@@ -212,7 +212,7 @@
 - **Dependencies:** `ISS-007`, `ISS-009`, `ISS-010`, `ISS-011`.
 - **Acceptance criteria:**
   - A clean environment running the 5-minute quickstart script completes: wallet creation -> faucet grant (`1,600 tANE`) -> delegation (`320 tANE`) -> paid API call (`16 tANE`) -> merchant peer sale (`32 tANE`) -> receipt verification -> authority revocation -> owner fund recovery in `< 60 seconds` on Anvil and `< 3 minutes` on Base Sepolia.
-- **Threat / Security considerations:** Store local CLI test keys with `0600` file permissions in user config directory; never print private keys to stdout or logs (`AGENTS.md` line 18).
+- **Threat / Security considerations:** Store local CLI test keys with `0600` file permissions in user config directory; never print private keys to stdout or logs (`AGENTS.md`, "Invariants and prohibitions").
 - **Docs updates & Observable outputs:** `packages/cli/`, `docs/QUICKSTART.md`.
 
 ### `ISS-013` — `[E11][infra][security][docs] End-to-end Docker scenario suite (S1–S6), threat-model tests, and SLO observability`
@@ -242,7 +242,7 @@
   - Define `schemas/service-manifest.v0.schema.json` and A2A extension schema.
   - Implement EIP-712 manifest signing & verification in Python and TypeScript SDKs (including recipient-match check against HTTP `402` `payTo`).
   - Implement `src/AneServiceDirectory.sol` (`anchorService`, `updateServiceStatus`, `ServiceAnchored` event) and reference indexer.
-- **Out of scope:** Centralized approval to list a service (`DISCOVERY.md` line 10).
+- **Out of scope:** Centralized approval to list a service (`DISCOVERY.md`, "Merchant onboarding").
 - **Dependencies:** `ISS-008`, `ISS-009`, `ISS-010`.
 - **Acceptance criteria:**
   - Given a signed manifest hosted at a URL, when an agent fetches it and calls the endpoint, the SDK verifies the provider's EIP-712 signature, checks expiry/status, and aborts if the HTTP `402` recipient differs from `manifest.pricing.recipient` (`THREAT_MODEL.md` #1).
@@ -252,12 +252,12 @@
 ### `ISS-015` — `[E13][sdk][security] Build MCP Adapter Server (@16ane/mcp-server) with wallet-side policy enforcement`
 - **Labels:** `sdk`, `security`, `P1`
 - **Estimate:** 2–2.5 days (Low-Medium uncertainty)
-- **Context / Motivation:** Expose 16ane discovery, quoting, balance inspection, and bounded purchasing to MCP-compatible LLM hosts (`REQ-102`, `docs/protocol/DEVELOPER_INTERFACES.md` lines 24–25).
+- **Context / Motivation:** Expose 16ane discovery, quoting, balance inspection, and bounded purchasing to MCP-compatible LLM hosts (`REQ-102`, `docs/protocol/DEVELOPER_INTERFACES.md`, "MCP adapter (proposed)").
 - **Scope:**
   - Implement MCP server supporting `stdio` and `Streamable HTTP` (`MCP Spec 2026-07-28`):
     - Read-only tools: `list_services`, `get_quote`, `wallet_balance`, `payment_status`.
     - State-changing tools: `purchase_service`, `publish_service`, `request_refund`.
-  - Enforce `max_payment` per call and isolate `agentSigner` key inside the MCP process; never accept or expose owner root keys (`AGENTS.md` line 18).
+  - Enforce `max_payment` per call and isolate `agentSigner` key inside the MCP process; never accept or expose owner root keys (`AGENTS.md`, "Invariants and prohibitions").
 - **Out of scope:** Giving LLM direct access to raw signing primitives or owner keys.
 - **Dependencies:** `ISS-009`, `ISS-010`, `ISS-014`.
 - **Acceptance criteria:**
@@ -285,7 +285,7 @@
 - **Context / Motivation:** Provide an accessible web UI (`REQ-104`, `REQ-ACC`, `REQ-012`) for owners to create agent vaults, fund/delegate budgets, inspect receipts/revenue, revoke signers, withdraw funds, and monitor sponsored campaigns.
 - **Scope:**
   - Adapt `copra/web/` static architecture (`wrangler.jsonc`, `web/_headers` strict CSP, `scripts/web-env.cjs`, zero-`innerHTML` DOM updates, EIP-1193 wallet connection).
-  - Display `"TEST TOKENS (tANE) — NO CASH VALUE"` banner on every screen (`SANDBOX_AND_CREDITS.md` line 20).
+  - Display `"TEST TOKENS (tANE) — NO CASH VALUE"` banner on every screen (`SANDBOX_AND_CREDITS.md`, "Demonstration requirements").
   - Full keyboard navigation, ARIA labels, focus management, and WCAG AA contrast (`REQ-ACC`).
 - **Out of scope:** Server-side custody of user keys.
 - **Dependencies:** `ISS-006`, `ISS-014`, `ISS-016`.
@@ -389,5 +389,5 @@
 - **Dependencies:** `ISS-001`, `ISS-002`.
 - **Acceptance criteria:**
   - Legal questionnaire and institutional risk register reviewed by maintainers and external counsel; remains strictly gated behind `BLOCKED-LEGAL` until formal written regulatory/institutional authorization exists.
-- **Threat / Security considerations:** Never assert that on-chain supply or reserve attestations are cryptographic proof of a bank balance (`AGENTS.md` line 21).
+- **Threat / Security considerations:** Never assert that on-chain supply or reserve attestations are cryptographic proof of a bank balance (`AGENTS.md`, "Invariants and prohibitions").
 - **Docs updates & Observable outputs:** `docs/research/MAINNET_AND_REGULATORY.md`, external counsel briefing packet.

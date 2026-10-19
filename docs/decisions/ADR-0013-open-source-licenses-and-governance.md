@@ -14,9 +14,9 @@
 3. **Option C: Source-Available / BSL License.**
 
 ## Evidence and sources
-- **Repo File (`LICENSE-NOTE.md` lines 1–3):** Calls for `ADR-013` to resolve code, documentation, contributor policy, and trademark rules.
+- **Repo File (`LICENSE-NOTE.md`, before this ADR):** Called for `ADR-013` to resolve code, documentation, contributor policy, and trademark rules.
 - **Sibling `copra` Repo ([`copra/LICENSE`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/LICENSE), `CONTRIBUTING.md`, `SECURITY.md`):**
-  - Uses the **MIT License** (`LICENSE` lines 1–22), with OpenZeppelin Contracts v5.7.0 (`MIT`) and forge-std v1.17.0 (`MIT`/`Apache-2.0`).
+  - Uses the **MIT License** (`LICENSE`), with OpenZeppelin Contracts v5.7.0 (`MIT`) and forge-std v1.17.0 (`MIT`/`Apache-2.0`).
 - **Ecosystem Standards (`coinbase/x402`, `@modelcontextprotocol/sdk`, `a2a-protocol`):**
   - Licensed under `Apache-2.0` and `MIT`.
 

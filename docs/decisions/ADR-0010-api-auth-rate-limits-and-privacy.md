@@ -6,7 +6,7 @@
 - **Related epics:** E02, E05, E10, E11, E15
 
 ## Context
-16ane exposes optional hosted conveniences (`faucet`, `indexer`, `facilitator`, `demo merchant endpoints`) alongside open SDKs and contracts (`docs/protocol/DEVELOPER_INTERFACES.md`, `docs/operations/OPERATIONS.md`). We must define authentication for owner/agent actions, rate-limiting against abuse, secret-handling rules (`AGENTS.md` line 18: "Never embed owner keys in prompts, logs, demo source, analytics or MCP outputs"), and privacy/log retention (`REQ-PRIV`).
+16ane exposes optional hosted conveniences (`faucet`, `indexer`, `facilitator`, `demo merchant endpoints`) alongside open SDKs and contracts (`docs/protocol/DEVELOPER_INTERFACES.md`, `docs/operations/OPERATIONS.md`). We must define authentication for owner/agent actions, rate-limiting against abuse, secret-handling rules (`AGENTS.md`, "Invariants and prohibitions": "Never embed owner keys in prompts, logs, demo source, analytics or MCP outputs"), and privacy/log retention (`REQ-PRIV`).
 
 ## Options
 1. **Option A: Stateless EIP-712 / SIWE Wallet Signatures for State-Changing API Calls + Unauthenticated Read Endpoints + IP/Wallet Token-Bucket Rate Limits + Zero-PII On-Chain Events & 7-Day Ephemeral Operational Logs.**
@@ -14,7 +14,7 @@
 3. **Option C: Unauthenticated Write Endpoints without Rate Limits.**
 
 ## Evidence and sources
-- **Repo Requirements (`docs/protocol/DEVELOPER_INTERFACES.md` line 19, `docs/product/REQUIREMENTS.md` REQ-PRIV & REQ-OBS, `docs/operations/OPERATIONS.md` lines 21–23):**
+- **Repo Requirements (`docs/protocol/DEVELOPER_INTERFACES.md`, "Proposed public REST surface"; `docs/product/REQUIREMENTS.md` REQ-PRIV & REQ-OBS, `docs/operations/OPERATIONS.md`, "Privacy"):**
   - "Owner-sensitive actions must be signed and authenticated; avoid server custody by default."
   - "PRIV: no PII in immutable on-chain metadata; minimize IP/log retention; secrets never logged."
   - "OBS: correlate purchase intent, chain tx, settlement and delivery without leaking secrets."

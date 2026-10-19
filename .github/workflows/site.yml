@@ -1,0 +1,46 @@
+name: Site
+
+# Checks the static 16ane.com site (ADR-0015). Deploys are done by Cloudflare Workers Builds, not here,
+# so this workflow holds no Cloudflare credentials.
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'test/web/**', 'wrangler.jsonc', 'package.json', 'package-lock.json', '.github/workflows/site.yml']
+  pull_request:
+    paths: ['web/**', 'test/web/**', 'wrangler.jsonc', 'package.json', 'package-lock.json', '.github/workflows/site.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  site:
+    name: Site checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Check headers, disclosure, wording and links
+        run: npm run test:web
+
+      - name: Install pinned Wrangler
+        run: npm ci --ignore-scripts
+
+      - name: Package the Worker without uploading
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: npx wrangler deploy --dry-run

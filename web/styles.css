@@ -1,0 +1,260 @@
+/* 16ane.com: static, no JavaScript. Colours follow the logo (navy and gold). */
+
+:root {
+  --bg: #0B1A3A;
+  --bg-lift: #16305E;
+  --surface: #102450;
+  --ink: #EEF1F7;
+  --ink-soft: #B9C3D6;
+  --gold: #E8C877;
+  --gold-strong: #F3D58C;
+  --line: rgba(232, 200, 119, 0.22);
+  --ok: #8FD3A8;
+  --no: #F2A38F;
+  --notice-bg: rgba(232, 200, 119, 0.08);
+  --button-ink: #0B1A3A;
+  --radius: 12px;
+  --measure: 40rem;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #FBF8F1;
+    --bg-lift: #FFFFFF;
+    --surface: #FFFFFF;
+    --ink: #0B1A3A;
+    --ink-soft: #3E4B66;
+    --gold: #8A5A00;
+    --gold-strong: #6E4800;
+    --line: rgba(11, 26, 58, 0.14);
+    --ok: #1F7A45;
+    --no: #A6391F;
+    --notice-bg: #FFF4D6;
+    --button-ink: #FFFFFF;
+    color-scheme: light;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse 110% 60% at 50% -10%, var(--bg-lift) 0%, transparent 70%),
+    var(--bg);
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--gold); text-underline-offset: 0.18em; }
+a:hover { color: var(--gold-strong); }
+a:focus-visible, .button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+code {
+  font: 0.92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.skip {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--gold);
+  color: var(--button-ink);
+  border-radius: 6px;
+  z-index: 1;
+}
+.skip:focus { top: 1rem; }
+
+.bar, main, .foot {
+  width: 100%;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding-left: max(1rem, 4vw);
+  padding-right: max(1rem, 4vw);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+}
+.brand:hover { color: var(--ink); }
+.brand img { display: block; }
+
+@media (prefers-color-scheme: light) {
+  .brand img {
+    box-sizing: content-box;
+    padding: 5px 4px;
+    border-radius: 8px;
+    background: #0B1A3A;
+  }
+}
+
+.bar-link { font-weight: 600; text-decoration: none; }
+.bar-link:hover { text-decoration: underline; }
+
+section { padding: 3rem 0; border-top: 1px solid var(--line); }
+main > section:last-child { border-bottom: 1px solid var(--line); }
+section.hero { border-top: 0; padding: clamp(3rem, 10vw, 6.5rem) 0 3rem; }
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 1.25rem;
+  color: var(--gold);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 4px var(--line);
+}
+
+h1, h2, h3 { line-height: 1.15; margin: 0; text-wrap: balance; }
+
+h1 {
+  max-width: 22ch;
+  font-size: clamp(2.1rem, 6vw, 3.6rem);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: clamp(1.4rem, 3vw, 1.75rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 1.5rem;
+}
+
+h3 { font-size: 1.05rem; font-weight: 700; }
+
+p { margin: 0; }
+
+.lead {
+  max-width: var(--measure);
+  margin-top: 1.5rem;
+  color: var(--ink-soft);
+  font-size: 1.15rem;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+
+.button {
+  display: inline-block;
+  padding: 0.75rem 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.button:hover { color: var(--ink); border-color: var(--gold); }
+.button.primary { background: var(--gold); border-color: var(--gold); color: var(--button-ink); }
+.button.primary:hover { background: var(--gold-strong); border-color: var(--gold-strong); color: var(--button-ink); }
+
+.notice {
+  padding: 1.5rem;
+  margin: 1rem 0 0;
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--notice-bg);
+}
+.notice h2 {
+  margin-bottom: 0.9rem;
+  color: var(--gold);
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+}
+.notice + section { border-top: 0; }
+.notice ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.45rem; }
+
+.steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+.steps li {
+  counter-increment: step;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.steps li::before {
+  content: counter(step, decimal-leading-zero);
+  display: block;
+  margin-bottom: 0.6rem;
+  color: var(--gold);
+  font: 600 0.85rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.steps p { margin-top: 0.4rem; color: var(--ink-soft); font-size: 0.98rem; }
+
+.status { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 2rem; }
+.status h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; }
+
+.tag {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.tag.ok { color: var(--ok); }
+.tag.no { color: var(--no); }
+
+.list { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.45rem; color: var(--ink-soft); }
+
+.fine { margin-top: 1.75rem; color: var(--ink-soft); font-size: 0.95rem; }
+
+.name p { max-width: var(--measure); color: var(--ink-soft); }
+
+.foot {
+  padding-top: 2rem;
+  padding-bottom: 3rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button, a { transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease; }
+}

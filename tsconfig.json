@@ -17,6 +17,7 @@
     "packages/cli/test",
     "services/sandbox-server/src",
     "services/sandbox-server/test",
-    "e2e"
+    "e2e",
+    "test/web"
   ]
 }

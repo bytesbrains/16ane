@@ -1,0 +1,19 @@
+# Static assets only: there is no Worker script, so these apply to every response (ADR-0015).
+# The page has no JavaScript, fonts or third-party resources, so the CSP allows only same-origin
+# styles and images. HSTS omits `preload` on purpose: preload is slow to undo.
+/*
+  Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/.well-known/security.txt
+  Content-Type: text/plain; charset=utf-8
+
+# Branch previews and version URLs on workers.dev are copies of the site, not the site: keep them
+# out of search. 16ane.com stays indexable.
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex

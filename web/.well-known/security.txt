@@ -1,0 +1,6 @@
+# RFC 9116. Security reports go through GitHub private vulnerability reporting only (see SECURITY.md).
+Contact: https://github.com/bytesbrains/16ane/security/advisories/new
+Policy: https://github.com/bytesbrains/16ane/blob/main/SECURITY.md
+Preferred-Languages: en
+Canonical: https://16ane.com/.well-known/security.txt
+Expires: 2027-04-19T00:00:00.000Z

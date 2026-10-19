@@ -103,6 +103,21 @@ test("any mention of the ANE peg stays a qualified proposal (AGENTS.md, ADR-0012
   }
 });
 
+test("link previews point at a real image with its true size (Open Graph)", () => {
+  const html = read("index.html");
+  const meta = (key: string) =>
+    html.match(new RegExp(`<meta (?:property|name)="${key}" content="([^"]+)">`))?.[1];
+  const image = meta("og:image") ?? "";
+  assert.match(image, /^https:\/\/16ane\.com\/[\w.-]+\.png$/, "og:image is an absolute 16ane.com PNG URL");
+  const png = readFileSync(path.join(WEB, image.slice("https://16ane.com/".length)));
+  // PNG IHDR: width and height are big-endian uint32s at bytes 16 and 20.
+  assert.equal(meta("og:image:width"), String(png.readUInt32BE(16)));
+  assert.equal(meta("og:image:height"), String(png.readUInt32BE(20)));
+  assert.ok(png.length <= 1024 * 1024, "og:image stays under 1 MB");
+  assert.equal(meta("twitter:card"), "summary_large_image");
+  assert.equal(meta("og:url"), "https://16ane.com/");
+});
+
 test("security.txt names a contact and has not expired (RFC 9116)", () => {
   const body = read(".well-known/security.txt");
   assert.match(body, new RegExp(`^Contact: ${REPO}/security/advisories/new$`, "m"));

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/16ane_social_preview.png" alt="16ane: give an agent a budget. Contract-enforced spending limits for AI agents that pay each other. Open source, testnet sandbox." width="100%">
+</p>
+
 # 16ane — Open Agent Economy
 
 **Status:** Product vision, planning specification, and a sandbox implementation (contracts, SDKs, CLI, reference server) that is tested locally and in CI only, v0.1.0 (2026-10-19). **Nothing is deployed to a public network, no hosted faucet or API exists, and this is not a regulatory authorization.** See [launch readiness](docs/planning/LAUNCH_READINESS.md).

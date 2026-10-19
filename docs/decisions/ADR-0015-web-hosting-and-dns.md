@@ -1,13 +1,13 @@
 # ADR-0015: Web Hosting and DNS for `16ane.com`
 
-- **Status:** Proposed (2026-10-19). The maintainer chose Cloudflare over Firebase Hosting on 2026-10-19; the rest is open for review in #36.
+- **Status:** Proposed (2026-10-19), and already in effect: the site went live on Cloudflare on 2026-10-19 (see *Cutover log*). The maintainer chose Cloudflare over Firebase Hosting and dropped Firebase entirely; the rest is open for review in #36.
 - **Date and owners:** 2026-10-19 | 16ane Maintainers
 - **Related requirements:** REQ-012 (no-value disclosures)
 - **Related epics and issues:** E01, E15; #32 (public readiness), #36 (this site), `ISS-017` (`app.16ane.com`, separate)
 - **Related ADRs:** `ADR-0010` (security headers baseline), `ADR-0013` (licensing, `web/.well-known/security.txt`), `ADR-0014` (brand and domain isolation)
 
 ## Context
-`16ane.com` serves a placeholder ("16ane is paused while we build the next version.", last modified 2026-09-04). The page appears to be served by Firebase Hosting: the apex and `www` `A` records were `199.36.158.100` and the zone carried `hosting-site=solaanedotcom`. This repository contains no site code. `ADR-0014` expects the domain to point at an Open Agent Economy overview, with the legacy marketplace retired, and `docs/protocol/DEVELOPER_INTERFACES.md` proposes nine subdomains. None of them exist.
+Before this ADR, `16ane.com` served a placeholder ("16ane is paused while we build the next version.", last modified 2026-09-04). The page appeared to be served by Firebase Hosting: the apex and `www` `A` records were `199.36.158.100` and the zone carried `hosting-site=solaanedotcom`. This repository contains no site code. `ADR-0014` expects the domain to point at an Open Agent Economy overview, with the legacy marketplace retired, and `docs/protocol/DEVELOPER_INTERFACES.md` proposes nine subdomains. None of them exist.
 
 DNS state, checked with `dig` and `whois` on 2026-10-19:
 
@@ -37,34 +37,42 @@ DNS state, checked with `dig` and `whois` on 2026-10-19:
 ## Security and legal impacts
 - **What the page may claim.** Only what `docs/planning/LAUNCH_READINESS.md` records: gates `G1-12` (Base Sepolia deployment) and `G1-13` (hosted faucet/demo server) are FAIL, so the page says plainly that nothing is deployed. It must carry `TEST TOKENS (tANE) - NO CASH VALUE` (REQ-012) and state that there is no token sale, presale or tradable token (`AGENTS.md`). `test/web/site.test.ts` enforces this in CI.
 - **No third-party code.** The page is static HTML and CSS: no JavaScript, fonts, analytics or CDNs. The CSP is `default-src 'none'` with only `'self'` for styles and images, which is stricter than copra's.
-- **Account and token risk.** Whoever controls the Cloudflare account controls `16ane.com`. The account needs 2FA. Workers Builds deploys from Cloudflare's GitHub integration, so no Cloudflare API token is stored in GitHub. If deploys move to GitHub Actions later, the token must be scoped to Workers deploy only, with no DNS edit.
+- **Account and token risk.** Whoever controls the Cloudflare account controls `16ane.com`. The zone and the Worker live in the BytesBrains account (`admin@bytesbrains.com`, account ID `1539190079828744a96d18d3fa1b4241`), which needs 2FA. `wrangler.jsonc` pins that `account_id`, because the first deploy attempt went to a maintainer's personal account through Wrangler's default login. Workers Builds deploys from Cloudflare's GitHub integration, so no Cloudflare API token is stored in GitHub. If deploys move to GitHub Actions later, the token must be scoped to Workers deploy only, with no DNS edit.
 - **Impersonation.** A "crypto" domain attracts copycat scams. The page states where official contract addresses will be published (this repository and this page), and that anyone selling 16ane tokens is not 16ane.
-- **Spoofed email.** The domain sends no mail (no `MX`, and `SECURITY.md` uses GitHub private reporting only), so publishing a null `MX`, `v=spf1 -all` and DMARC `p=reject` costs nothing.
+- **Email.** `16ane.com` is a Google Workspace alias domain of the BytesBrains Workspace, with aliases `admin`, `contact`, `hello`, `notify`, `security`, `support` and `unsubscribe`. SPF, DKIM and DMARC protect those addresses from spoofing. An earlier draft of this ADR proposed null-MX "sends no mail" records; those would break the aliases and must not be published. `SECURITY.md` still lists GitHub private reporting only; whether to add `security@16ane.com` is a separate maintainer decision.
 
 ## Decision
 Adopt **Option A**:
 1. **Hosting.** An assets-only Worker named `16ane-site`, configured in root `wrangler.jsonc`, serves `web/`. Wrangler is pinned in `package.json` (`ADR-0013` pinned-lockfile rule).
 2. **Domains.** `16ane.com` is a Worker Custom Domain (`routes[].custom_domain`). `www.16ane.com` is a proxied placeholder record (`AAAA 100::`) plus a Cloudflare Redirect Rule `https://www.16ane.com/*` → `https://16ane.com/${1}`, 301, preserving the query string. `workers_dev` is off. Branch previews stay on (`previews`) and are sent `X-Robots-Tag: noindex` from `web/_headers`.
-3. **Deploys.** Cloudflare Workers Builds, connected to `bytesbrains/16ane` with production branch `main`. Unlike the GitHub Actions deploy proposed in #36, this keeps no Cloudflare token in GitHub, and it matches copra. CI (`.github/workflows/site.yml`) checks the page but does not deploy it.
+3. **Deploys.** Cloudflare Workers Builds, connected to `bytesbrains/16ane` with production branch `main`. Unlike the GitHub Actions deploy proposed in #36, this keeps no Cloudflare token in GitHub, and it matches copra. CI (`.github/workflows/site.yml`) checks the page but does not deploy it. Until Workers Builds is connected, a maintainer deploys by hand with `npx wrangler deploy` using the `bytesbrains` Wrangler profile, and only from a commit on `main`.
 4. **DNS records (maintainer, Cloudflare dashboard).**
 
    | Name | Type | Value | Proxy | Purpose |
    |---|---|---|---|---|
    | `16ane.com` | Worker | `16ane-site` (created by the custom domain) | proxied | the site |
    | `www` | `AAAA` | `100::` | proxied | target for the redirect rule |
-   | `16ane.com` | `MX` | `0 .` | n/a | null MX (RFC 7505): accepts no mail |
-   | `16ane.com` | `TXT` | `v=spf1 -all` | n/a | no host may send as `16ane.com` |
-   | `_dmarc` | `TXT` | `v=DMARC1; p=reject; adkim=s; aspf=s` | n/a | receivers reject spoofed mail |
+   | `16ane.com` | `TXT` | `google-site-verification=…` | n/a | Google Workspace domain ownership |
+   | `16ane.com` | `MX` | `1 smtp.google.com` | n/a | mail for the aliases goes to Google Workspace |
+   | `16ane.com` | `TXT` | `v=spf1 include:_spf.google.com ~all` | n/a | only Google may send as `16ane.com` |
+   | `google._domainkey` | `TXT` | DKIM key from Google Admin | n/a | signs outgoing mail |
+   | `_dmarc` | `TXT` | `v=DMARC1; p=none; rua=mailto:admin@16ane.com` | n/a | reports first; move to `p=quarantine` once reports are clean |
 
-   Delete the Firebase `A` records (apex and `www`) and the `hosting-site` TXT record at cutover.
-5. **Cutover order.**
-   1. Wait until `bytesbrains/16ane` is public (#32). Until then every GitHub link on the page is a 404 for visitors.
-   2. Wait until old nameserver delegations have expired from resolver caches (up to 48 hours after 2026-10-19 17:14 UTC).
-   3. In Cloudflare: delete the Firebase `A` records, connect Workers Builds, and let the first `main` build attach the custom domain.
-   4. Add the `www` record, the redirect rule, and the mail records.
-   5. Check: `curl -sI https://16ane.com` shows the CSP header; `curl -sI https://www.16ane.com/x?y` returns `301` to `https://16ane.com/x?y`.
-   6. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
-   7. Delete the old Google Cloud DNS zone and the Firebase site.
+   No Firebase records remain: the `A` records were deleted at cutover, and the `hosting-site` TXT record should be deleted too.
+5. **Remaining steps.**
+   1. Add the `www` record and the redirect rule, then check that `curl -sI 'https://www.16ane.com/x?y'` returns `301` to `https://16ane.com/x?y`.
+   2. Add the `_dmarc` record and delete the `hosting-site` TXT record.
+   3. Merge this ADR and `web/` to `main` and connect Workers Builds, so the live site is built from `main`.
+   4. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
+   5. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
+   6. Delete the old Google Cloud DNS zone and the Firebase site.
+
+## Cutover log (2026-10-19)
+- 17:14 UTC: the maintainer moved the nameservers to Cloudflare. Firebase records were imported unchanged.
+- The maintainer deleted both Firebase `A` records before the new site was deployed, so the domain briefly had no website.
+- The first `wrangler deploy` uploaded `16ane-site` to the personal account and failed to attach the domain (`Can't infer zone from route`, code 10082). That stray Worker was deleted.
+- `wrangler deploy` with the `bytesbrains` profile from branch `feat/iss-036-site` (`4145bf0`) attached `16ane.com` as a Custom Domain. Version `5d5a0d7f-c69e-4bbc-8897-c2f2e7065572`. Checked: HTTPS 200, CSP and HSTS present, 404 page served, `http://` redirects to `https://`.
+- The maintainer added the Google Workspace records. Checked on `kirk.ns.cloudflare.com`: verification TXT, MX `1 smtp.google.com`, SPF and DKIM present; `_dmarc` and `www` not yet present.
 
 ## Consequences
 - The site costs nothing to serve and has no runtime code to patch.
@@ -77,7 +85,6 @@ Adopt **Option A**:
 
 ## Open risks
 - **Workers Builds and fork pull requests.** The builds page does not say whether pull requests from forks get preview builds. Check this before the repo goes public, because a fork preview would run the fork's build command. If they do, restrict builds to branches in this repository.
-- **Existing `A` record and Custom Domain.** The docs only say that a `CNAME` blocks a Custom Domain. Deleting the Firebase `A` record first avoids finding out the hard way, at the cost of a few minutes without a page.
 - **Wording drift.** The page repeats facts from `LAUNCH_READINESS.md`. When a gate changes, update the page in the same pull request.
 
 ## Validation plan

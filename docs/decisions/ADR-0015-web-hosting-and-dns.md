@@ -44,7 +44,7 @@ DNS state, checked with `dig` and `whois` on 2026-10-19:
 ## Decision
 Adopt **Option A**:
 1. **Hosting.** An assets-only Worker named `16ane-site`, configured in root `wrangler.jsonc`, serves `web/`. Wrangler is pinned in `package.json` (`ADR-0013` pinned-lockfile rule).
-2. **Domains.** `16ane.com` is a Worker Custom Domain (`routes[].custom_domain`). `www.16ane.com` is a proxied placeholder record (`AAAA 100::`) plus a Cloudflare Redirect Rule `https://www.16ane.com/*` → `https://16ane.com/${1}`, 301, preserving the query string. `workers_dev` is off. Branch previews stay on (`previews`) and are sent `X-Robots-Tag: noindex` from `web/_headers`.
+2. **Domains.** `16ane.com` is a Worker Custom Domain (`routes[].custom_domain`). `www.16ane.com` is a proxied placeholder record (`AAAA 100::`) plus a Cloudflare Redirect Rule `https://www.16ane.com/*` → `https://16ane.com/${1}`, 301, preserving the query string. `workers_dev` is off. Workers Builds builds only `main`: builds for non-production branches are off (dashboard) and `preview_urls` is `false`, so no branch or pull request gets a preview URL. Version and deployment URLs on `workers.dev` still exist and are sent `X-Robots-Tag: noindex` from `web/_headers`.
 3. **Deploys.** Cloudflare Workers Builds, connected to `bytesbrains/16ane` with production branch `main`. Unlike the GitHub Actions deploy proposed in #36, this keeps no Cloudflare token in GitHub, and it matches copra. CI (`.github/workflows/site.yml`) checks the page but does not deploy it. Until Workers Builds is connected, a maintainer deploys by hand with `npx wrangler deploy` using the `bytesbrains` Wrangler profile, and only from a commit on `main`.
 4. **DNS records (maintainer, Cloudflare dashboard).**
 
@@ -84,6 +84,7 @@ Adopt **Option A**:
 - **Regression against the earlier entry:** `http://16ane.com/` now returns `200` over plain HTTP instead of redirecting to `https://`. Browsers that saw the HSTS header upgrade on their own, but a first visit does not. Fix: turn on *SSL/TLS → Edge Certificates → Always Use HTTPS* for the zone (dashboard; the repository's Wrangler login is read-only for zone settings). Re-check with `curl -sI --resolve 16ane.com:80:104.21.67.192 http://16ane.com/` (pin a Cloudflare IP: a resolver still caching the old Firebase `A` record reaches Firebase, which also answers `301` with `Server: Varnish`).
 - 19:00 UTC: the maintainer turned on *Always Use HTTPS*. Checked through the Cloudflare edge: `http://16ane.com/` returns `301` to `https://16ane.com/` with `Server: cloudflare`.
 - 19:04 UTC: the maintainer deleted the `hosting-site=solaanedotcom` TXT record. Checked on `kirk` and `brianna`: only the Google verification and SPF TXT records remain at the apex. Remaining step 1 is done.
+- Later that day: the maintainer turned off builds for non-production branches (Workers Builds → Previews). Only `main` builds and deploys; `wrangler.jsonc` drops the unused `previews` block and sets `preview_urls: false`.
 
 ## Consequences
 - The site costs nothing to serve and has no runtime code to patch.
@@ -95,7 +96,7 @@ Adopt **Option A**:
 - **Option C (Firebase):** The maintainer chose Cloudflare. It also keeps DNS, TLS, redirects and hosting with one provider.
 
 ## Open risks
-- **Workers Builds and fork pull requests.** The builds page does not say whether pull requests from forks get preview builds. Check this before the repo goes public, because a fork preview would run the fork's build command. If they do, restrict builds to branches in this repository.
+- ~~**Workers Builds and fork pull requests.**~~ Resolved 2026-10-19: builds for non-production branches are off, so Workers Builds builds only `main` and never runs a branch's or fork's build command. After the repo goes public, confirm that a pull request from a fork starts no Workers Build. Pull requests are checked by CI (`site.yml`) instead.
 - **Wording drift.** The page repeats facts from `LAUNCH_READINESS.md`. When a gate changes, update the page in the same pull request.
 
 ## Validation plan

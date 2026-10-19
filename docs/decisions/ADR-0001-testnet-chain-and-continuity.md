@@ -20,7 +20,7 @@
   - Canonical contracts deployed on `84532`: Permit2 (`0x000000000022D473030F116dDEE9F6B43aC78BA3`), Multicall3 (`0xcA11bde05977b3631167028862bE2a173976CA11`), ERC-4337 EntryPoints v0.6, v0.7 (`0x0000000071727De22E5E9d8BAf0edAc6f37da03`), v0.8 (`0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108`), and v0.9.
 - **x402 Protocol Ecosystem** (`https://www.x402.org/`, `https://github.com/coinbase/x402`, checked 2026-10-19):
   - First-class support for `eip155:84532` (Base Sepolia) in reference TypeScript and Python packages.
-- **Sibling `copra` Repository Evidence** (`/Users/nandal/Desktop/desk/repos/copra` @ commit `465dd8be027c27eada5fcd83aa69f893eb1037bb`):
+- **Sibling `copra` Repository Evidence** ([`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb) @ commit `465dd8be027c27eada5fcd83aa69f893eb1037bb`):
   - Proven Foundry deployment pipeline (`script/DeployCopra.s.sol`), deterministic `CREATE2` registry pattern (`src/CopraRegistry.sol`), network definitions (`networks/sepolia.json`, `networks/local.json`), and Docker Compose Anvil E2E stack (`e2e/docker-compose.yml`) already targeting Base Sepolia (`84532`).
 
 ## Security and legal impacts

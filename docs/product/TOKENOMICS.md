@@ -1,5 +1,7 @@
 # Token units, test economics and future INR peg
 
+> `tANE` is a free testnet token with **no cash value**. Everything about real-value `ANE` below is a research target, not an offer or plan to issue; its legality is an open question (`docs/research/MAINNET_AND_REGULATORY.md`, `ADR-0012`). Nothing here is legal or financial advice.
+
 ## Historical anchor and proposed units
 The name **16ane** comes from the historical **anna** (*ānna*), a monetary subunit used in India until currency decimalisation in 1957:
 - **Etymology:** Derived from the Sanskrit **अन्न** (*anna*), meaning *"grain"* — the foundational unit of sustenance and everyday exchange. In Indian usage, *"solah aane"* (16 annas) also denotes completeness (`16/16 = 100%`).

@@ -2,8 +2,8 @@
 
 - **Date Checked:** 2026-10-19
 - **Target Repository:** `bytesbrains/16ane` (commit `53f0ee8`)
-- **Reference Sibling Repository:** `/Users/nandal/Desktop/desk/repos/copra` (commit `465dd8be027c27eada5fcd83aa69f893eb1037bb`)
-- **Out-of-Scope Repository:** `/Users/nandal/Desktop/desk/repos/16ane` (ignored per maintainer instruction and `ADR-0014`)
+- **Reference Sibling Repository:** [`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb) (commit `465dd8be027c27eada5fcd83aa69f893eb1037bb`)
+- **Out-of-Scope Repository:** the legacy `16ane` marketplace codebase (separate and not public) (ignored per maintainer instruction and `ADR-0014`)
 
 ---
 
@@ -21,7 +21,7 @@ The `16ane-agent-economy` repository currently contains **planning specification
 
 ## 2. Reusable Engineering Evidence from Sibling `copra` Repo (`465dd8be027c27eada5fcd83aa69f893eb1037bb`)
 
-Per `README.md` ("Reuse open wallet/payment infrastructure where possible; do not merge monetary policies or imply COPRA backing"), we audited `/Users/nandal/Desktop/desk/repos/copra`:
+Per `README.md` ("Reuse open wallet/payment infrastructure where possible; do not merge monetary policies or imply COPRA backing"), we audited [`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb):
 
 | Capability Area | `copra` Evidence (File Paths & Revisions) | Reusability in `16ane-agent-economy` | Gaps to Fill for `16ane` |
 |---|---|---|---|

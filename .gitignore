@@ -1,0 +1,74 @@
+# ----------------------------------------------------------------------------
+# 16ane Protocol - Git Ignore Configuration
+# ----------------------------------------------------------------------------
+
+# Solidity & Foundry compilation artifacts
+out/
+cache/
+artifacts/
+typechain/
+typechain-types/
+
+# Broadcast & deployment logs (prevents leaking local run traces)
+broadcast/
+
+# e2e stack output (deployment manifest of the throwaway local chain)
+e2e/.out/
+
+# wrangler dev's local state (miniflare's D1, KV, R2 and trace stores)
+.wrangler/
+
+# Environment, keys, and secret credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.secret
+keystore/
+secrets/
+
+# Node & package manager dependencies
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+
+# OS-specific metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor files
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# General logs and temporary directories
+*.log
+.logs/
+tmp/
+temp/

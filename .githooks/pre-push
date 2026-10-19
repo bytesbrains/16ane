@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# ----------------------------------------------------------------------------
+# 16ane Protocol - Pre-push Git Hook
+# Checks committed file hygiene and runs the test suite before push
+# ----------------------------------------------------------------------------
+
+set -e
+
+echo "[16ane Hook] Running pre-push validation..."
+
+remote="$1"
+zero=$(git hash-object --stdin </dev/null | tr '0-9a-f' '0')
+while read -r _ local_sha _ _; do
+    [[ "$local_sha" == "$zero" ]] && continue
+    if ! scripts/check-committed-files.sh "$local_sha" --not --remotes="$remote"; then
+        echo "[16ane Hook] ERROR: Push aborted."
+        exit 1
+    fi
+done
+
+if command -v forge >/dev/null 2>&1; then
+    echo "[16ane Hook] Running forge test suite..."
+    if ! forge test; then
+        echo "[16ane Hook] ERROR: Tests failed! Push aborted."
+        exit 1
+    fi
+    echo "[16ane Hook] All unit and integration tests passed."
+fi
+
+echo "[16ane Hook] Ready to push!"
+exit 0

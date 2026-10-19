@@ -1,0 +1,15 @@
+{
+  "name": "sandbox-sepolia",
+  "environment": "sandbox",
+  "chainId": 84532,
+  "caip2": "eip155:84532",
+  "chainName": "Base Sepolia",
+  "rpcUrl": "https://sepolia.base.org",
+  "fallbackRpcUrl": "https://base-sepolia-rpc.publicnode.com",
+  "explorer": "https://sepolia.basescan.org",
+  "explorerName": "Basescan",
+  "registrySalt": "16ane.registry.sandbox.v1",
+  "assetSymbol": "tANE",
+  "assetDecimals": 18,
+  "disclaimer": "TEST TOKENS (tANE) — NO CASH VALUE, NO INR BACKING, NO REDEMPTION OR CONVERSION."
+}

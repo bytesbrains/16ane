@@ -1,0 +1,15 @@
+{
+  "name": "dev-sepolia",
+  "environment": "dev",
+  "chainId": 84532,
+  "caip2": "eip155:84532",
+  "chainName": "Base Sepolia (16ane Breaking-Change Dev)",
+  "rpcUrl": "https://sepolia.base.org",
+  "fallbackRpcUrl": "https://base-sepolia-rpc.publicnode.com",
+  "explorer": "https://sepolia.basescan.org",
+  "explorerName": "Basescan",
+  "registrySalt": "16ane.registry.dev.v1",
+  "assetSymbol": "tANE",
+  "assetDecimals": 18,
+  "disclaimer": "DEV TEST TOKENS (tANE) — UNSTABLE STAGING ENVIRONMENT — NO CASH VALUE."
+}

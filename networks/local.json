@@ -1,0 +1,15 @@
+{
+  "name": "local",
+  "environment": "local",
+  "chainId": 84532,
+  "caip2": "eip155:84532",
+  "chainName": "16ane Local Anvil Sandbox",
+  "rpcUrl": "http://127.0.0.1:8545",
+  "fallbackRpcUrl": "http://127.0.0.1:8545",
+  "explorer": null,
+  "explorerName": null,
+  "registrySalt": "16ane.registry.sandbox.v1",
+  "assetSymbol": "tANE",
+  "assetDecimals": 18,
+  "disclaimer": "LOCAL ANVIL TEST TOKENS (tANE) — NO CASH VALUE."
+}

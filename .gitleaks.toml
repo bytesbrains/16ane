@@ -1,0 +1,26 @@
+# Gitleaks Configuration for 16ane Protocol
+# https://github.com/gitleaks/gitleaks
+
+title = "16ane Protocol Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for Solidity contract names, Anvil account 0 test key, and anchored 20-byte EVM addresses"
+regexes = [
+    '''ERC20Burnable''',
+    '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+    # Public 20-byte EVM addresses (contract/token addresses trip generic-api-key next to names like
+    # `token`). MUST stay anchored: a 32-byte private key begins with 40 hex chars, so an unanchored
+    # pattern would allowlist real keys.
+    '''^0x[0-9a-fA-F]{40}$''',
+]
+paths = [
+    '''lib/.*''',
+    '''cache/.*''',
+    '''out/.*''',
+    '''broadcast/.*''',
+    '''deployments/.*''',
+    '''\.gitleaks\.toml''',
+]

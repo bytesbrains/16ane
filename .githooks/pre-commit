@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# ----------------------------------------------------------------------------
+# 16ane Protocol - Pre-commit Git Hook
+# Validates code formatting and secret leaks before every commit
+# ----------------------------------------------------------------------------
+
+set -e
+
+echo "[16ane Hook] Running pre-commit validation..."
+
+# 1. Gitleaks Secret Detection
+if command -v gitleaks >/dev/null 2>&1; then
+    echo "[16ane Hook] Checking for secret leaks with Gitleaks..."
+    gitleaks protect --config .gitleaks.toml --staged --verbose
+    echo "[16ane Hook] No secrets detected."
+else
+    echo "[16ane Hook] WARNING: gitleaks CLI not found in PATH; skipping local secret scan."
+fi
+
+# 2. Forge Code Formatting Check
+if command -v forge >/dev/null 2>&1; then
+    echo "[16ane Hook] Checking Solidity code formatting with forge fmt..."
+    if ! forge fmt --check; then
+        echo "[16ane Hook] ERROR: Code formatting check failed! Run 'forge fmt' to fix."
+        exit 1
+    fi
+    echo "[16ane Hook] Code formatting clean."
+fi
+
+echo "[16ane Hook] All pre-commit checks passed!"
+exit 0

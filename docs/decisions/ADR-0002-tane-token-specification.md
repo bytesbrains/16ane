@@ -23,12 +23,12 @@ In the 16ane architecture, `tANE` is the free, unbacked, worthless public sandbo
 
 ## Security and legal impacts
 - **Permissionless transfer invariant (`REQ-001`):** `tANE` MUST NOT include a transfer pause, blacklist, freeze, or transfer fee on standard `transfer` / `transferFrom` / `transferWithAuthorization`. Only faucet minting (`MINTER_ROLE`) can be paused or rate-limited (`REQ-002`).
-- **Explicit no-value metadata (`REQ-012`):** Token `name()` is `"16ane Sandbox Test Token (NO CASH VALUE)"` and `symbol()` is `"tANE"`. A public constant `DISCLAIMER = "TESTNET SIMULATION TOKEN ONLY. NO INR BACKING, NO REDEMPTION, NO MONETARY VALUE."` and `isTestToken() == true` view function prevent confusion with any future token and allow mainnet scripts (like `copra`'s `_hasNoFaucet` check) to programmatically reject `tANE`.
+- **Explicit no-value metadata (`REQ-012`):** Token `name()` is `"16ane Sandbox (NO CASH VALUE)"` (29 bytes, fitting OpenZeppelin v5.7.0 `EIP712` `ShortStrings` 31-byte inline limit) and `symbol()` is `"tANE"`. A public constant `DISCLAIMER = "TESTNET SIMULATION TOKEN ONLY. NO INR BACKING, NO REDEMPTION, NO MONETARY VALUE."` and `isTestToken() == true` view function prevent confusion with any future token and allow mainnet scripts (like `copra`'s `_hasNoFaucet` check) to programmatically reject `tANE`.
 - **Role separation:** Uses OpenZeppelin `AccessControlDefaultAdminRules` (2-step admin transfer with delay). `DEFAULT_ADMIN_ROLE` manages roles; `MINTER_ROLE` is granted strictly to the `AneFaucet` contract (and capped per-epoch mint ceiling) so no EOA needs hot minting privileges in normal operation.
 
 ## Decision
 Adopt **Option A**:
-- **Name:** `"16ane Sandbox Test Token (NO CASH VALUE)"`
+- **Name:** `"16ane Sandbox (NO CASH VALUE)"`
 - **Symbol:** `"tANE"`
 - **Decimals:** `18` (`1 tANE = 10^18` base units; `16 tANE = 16 * 10^18` base units).
 - **Standard Interfaces:**

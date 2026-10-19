@@ -24,7 +24,8 @@ Before contributing, please read [AGENTS.md](AGENTS.md), [README.md](README.md),
    scripts/setup_hooks.sh
    ```
    - `pre-commit`: runs `gitleaks protect --config .gitleaks.toml --staged` and `forge fmt --check`.
-   - `pre-push`: runs `scripts/check-committed-files.sh` and `forge test`.
+   - `pre-push`: scans the commits being pushed with `gitleaks git`, then runs `scripts/check-committed-files.sh` and `forge test`. Unlike `pre-commit`, it refuses to push if `gitleaks` is not installed.
+   - CI's *Gitleaks secret scan* job scans every pull request's commits, so a commit made with `--no-verify` is still caught.
 
 3. **Build and test**:
    ```bash

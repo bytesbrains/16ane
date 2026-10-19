@@ -19,6 +19,7 @@ import {
   readRequestBody,
   sendError,
   sendJson,
+  sendLoggedError,
 } from "./http.ts";
 
 export interface SandboxServerConfig {
@@ -225,12 +226,13 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
           sendJson(res, 201, record);
           return;
         } catch (err) {
-          sendError(
+          sendLoggedError(
             res,
-            429,
+            502,
             "ANE-E-1004",
-            `On-chain faucet claim rejected: ${err instanceof Error ? err.message : String(err)}`,
+            "Faucet claim could not be completed on-chain; try again later",
             true,
+            err,
           );
           return;
         }
@@ -395,7 +397,12 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
         sendError(res, 413, "ANE-E-4130", err.message, false);
         return;
       }
-      sendError(res, 500, "ANE-E-5000", err instanceof Error ? err.message : String(err), true);
+      // JSON.parse and BigInt throw SyntaxError on malformed client input; their messages only echo that input.
+      if (err instanceof SyntaxError) {
+        sendError(res, 400, "ANE-E-4000", `Malformed request body: ${err.message}`, false);
+        return;
+      }
+      sendLoggedError(res, 500, "ANE-E-5000", "Internal server error", true, err);
     }
   });
 

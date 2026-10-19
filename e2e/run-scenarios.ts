@@ -257,8 +257,13 @@ print(json.dumps(res))
       body: bodyStr,
     });
     assert.equal(overspendRes.status, 402);
-    const overspendErr = (await overspendRes.json()) as { error: { code: string } };
+    const overspendErr = (await overspendRes.json()) as {
+      error: { code: string; message: string; errorId?: string };
+    };
     assert.equal(overspendErr.error.code, "ANE-E-4011");
+    // The revert detail is logged server-side under errorId, never sent to the client (#52).
+    assert.equal(overspendErr.error.message, "On-chain settlement failed");
+    assert.match(overspendErr.error.errorId ?? "", /^[0-9a-f-]{36}$/);
 
     // 4. Replaying a valid signed SpendIntent with a new Idempotency-Key is rejected with 409 (T6)
     const validSigned = session.signSpendIntent({

@@ -20,3 +20,4 @@ Nothing has been released yet: no version is tagged, and no package is published
 
 ### Security
 - Sandbox server: request bodies capped at 1 MiB, trial quota keyed on the connection address, and `X-Forwarded-For` trusted only with `trustProxy` (#31).
+- Sandbox server: error responses no longer echo internal error text, which could include the RPC URL and the `cast send` command line (#52). Failures that may carry internal detail return a fixed message and an `errorId`; the detail is logged server-side with URLs redacted. A failed faucet claim is now `502` (was `429`), and a malformed JSON body is `400 ANE-E-4000` (was `500`).

@@ -14,7 +14,7 @@ New developers onboarding to the 5-minute sandbox quickstart (`README.md`) may n
 3. **Option C: Open ERC-4337 Verifying Paymaster Sponsoring Arbitrary UserOperations.**
 
 ## Evidence and sources
-- **Sibling `copra` Faucet Audit (`/Users/nandal/Desktop/desk/repos/copra/src/testnet/TestnetUSDC.sol` lines 11–33):**
+- **Sibling `copra` Faucet Audit ([`copra/src/testnet/TestnetUSDC.sol`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/src/testnet/TestnetUSDC.sol#L11-L33) lines 11–33):**
   - `TestnetUSDC.faucet()` allows any caller with Base Sepolia ETH to mint `10,000 * 1e6` per call with zero cooldown.
 - **EIP-2612 (`https://eips.ethereum.org/EIPS/eip-2612`) & EIP-3009 (`https://eips.ethereum.org/EIPS/eip-3009`):** Checked 2026-10-19. Enable off-chain EIP-712 signatures from `owner` and `agentSigner` so a relayer/facilitator can submit vault creation, delegation, and payment settlement transactions without the agent holding ETH.
 - **Threat Model (`docs/security/THREAT_MODEL.md` line 15):**

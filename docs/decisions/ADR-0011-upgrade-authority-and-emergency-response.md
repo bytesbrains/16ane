@@ -16,7 +16,7 @@ Smart contracts for `tANE`, `AneAgentVault`, `AneVaultFactory`, `AneFaucet`, and
 ## Evidence and sources
 - **Repo Architecture (`docs/architecture/SYSTEM.md` lines 37–38):**
   - "Prefer minimal immutable components. Any proxy/upgrade authority must be documented, time-locked where appropriate, monitored and explicitly disclosed."
-- **Sibling `copra` Architecture (`/Users/nandal/Desktop/desk/repos/copra/src/CopraRegistry.sol`, `src/CopraVault.sol`):**
+- **Sibling `copra` Architecture ([`copra/src/CopraRegistry.sol`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/src/CopraRegistry.sol), `src/CopraVault.sol`):**
   - Uses immutable, non-proxy implementation contracts (`CopraToken`, `CopraVault`, `CopraOracle`) discovered through a single `CREATE2`-deployed `CopraRegistry` contract (`Ownable2Step`) that validates cross-contract wiring before incrementing `version` and emitting `DeploymentUpdated`.
   - `CopraVault` intentionally avoids `Pausable` on user redemptions and has no admin drain function so an admin key compromise cannot steal or freeze user funds.
 

@@ -1,6 +1,6 @@
 # 16ane — Open Agent Economy
 
-**Status:** Product vision + implementation planning specification, v0.1.0 (2026-10-19). **Not a deployed product or regulatory authorization.**
+**Status:** Product vision, planning specification, and a sandbox implementation (contracts, SDKs, CLI, reference server) that is tested locally and in CI only, v0.1.0 (2026-10-19). **Nothing is deployed to a public network, no hosted faucet or API exists, and this is not a regulatory authorization.** See [launch readiness](docs/planning/LAUNCH_READINESS.md).
 
 > **16 Aane = 1 Rupee.** Give an agent a budget. Let it discover, spend, earn, and return value.
 
@@ -24,6 +24,8 @@ COPRA is commodity-referenced and therefore has variable INR purchasing power. 1
 - Support India-first content and examples while allowing global sandbox participation.
 
 ## First five-minute success story
+_Target experience once the public sandbox is deployed; none of the hosted pieces below exist yet._
+
 1. Developer opens `docs.16ane.com` and creates an agent wallet on the public sandbox.
 2. Faucet grants 1,600 **tANE** (not rupees); owner delegates a fixed budget.
 3. Agent discovers a paid demo API and pays 16 tANE via a supported payment adapter.

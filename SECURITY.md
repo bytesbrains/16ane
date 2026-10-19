@@ -6,15 +6,14 @@
 
 | Version | Environment | Supported |
 | ------- | ----------- | --------- |
-| 0.1.x   | Public Sandbox (`eip155:84532`) | Yes |
+| 0.1.x   | Sandbox code targeting Base Sepolia (`eip155:84532`); not yet deployed | Yes |
 
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability within 16ane smart contracts, SDKs, facilitator, or infrastructure, please do NOT disclose it publicly on GitHub issues or social media.
 
 Please report vulnerabilities directly via:
-- **GitHub private vulnerability reporting (preferred)**: open the [Security tab](https://github.com/bytesbrains/16ane/security) and click **Report a vulnerability**, or go straight to the [advisory form](https://github.com/bytesbrains/16ane/security/advisories/new).
-- Email: **security@16ane.com**
+- **GitHub private vulnerability reporting**: open the [Security tab](https://github.com/bytesbrains/16ane/security) and click **Report a vulnerability**, or go straight to the [advisory form](https://github.com/bytesbrains/16ane/security/advisories/new).
 
 Please include:
 1. Detailed description of the vulnerability and affected component (`tANE`, `AneAgentVault`, `AneFaucet`, SDK, facilitator, or web UI).

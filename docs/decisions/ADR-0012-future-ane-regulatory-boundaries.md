@@ -20,7 +20,7 @@
 ## Evidence and sources
 - **Repo Policy (`AGENTS.md`, `README.md`, `docs/research/MAINNET_AND_REGULATORY.md`, `docs/product/TOKENOMICS.md`):**
   - Explicitly forbids live INR deposits, mainnet minting, bridging `tANE` to `ANE`, or presenting regulatory discussions as legal advice.
-- **Sibling `copra` Mainnet Safety Guard (`/Users/nandal/Desktop/desk/repos/copra/script/DeployCopra.s.sol` line 76 & `script/DeployCopraMainnet.s.sol` line 132):**
+- **Sibling `copra` Mainnet Safety Guard ([`copra/script/DeployCopra.s.sol`](https://github.com/bytesbrains/copra/blob/465dd8be027c27eada5fcd83aa69f893eb1037bb/script/DeployCopra.s.sol#L76) line 76 & `script/DeployCopraMainnet.s.sol` line 132):**
   - Demonstrates programmatic chain-ID refusal (`require(block.chainid != 8453)`) in testnet deployment scripts and `_hasNoFaucet` refusal checks.
 
 ## Security and legal impacts

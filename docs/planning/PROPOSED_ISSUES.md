@@ -11,9 +11,9 @@
 ### `ISS-001` — `[E01][research][docs] Complete repository, sibling Copra pattern, and primary standards audit`
 - **Labels:** `research`, `docs`, `P0`
 - **Estimate:** 0.5–1 day (Low uncertainty — drafted in this planning cycle)
-- **Context / Motivation:** Establish an evidence-backed baseline of existing files in `bytesbrains/16ane`, reusable engineering patterns in `/Users/nandal/Desktop/desk/repos/copra`, and current versions of primary standards (`ERC-20`, `EIP-2612`, `EIP-3009`, `ERC-4337`, `EIP-7702`, `ERC-8004`, `x402`, `MCP`, `A2A`, `Base Sepolia`) before writing code.
+- **Context / Motivation:** Establish an evidence-backed baseline of existing files in `bytesbrains/16ane`, reusable engineering patterns in [`bytesbrains/copra`](https://github.com/bytesbrains/copra/tree/465dd8be027c27eada5fcd83aa69f893eb1037bb), and current versions of primary standards (`ERC-20`, `EIP-2612`, `EIP-3009`, `ERC-4337`, `EIP-7702`, `ERC-8004`, `x402`, `MCP`, `A2A`, `Base Sepolia`) before writing code.
 - **Scope:** Produce `docs/planning/CAPABILITY_GAP_REPORT.md` with exact file/commit citations and primary specification URLs checked on 2026-10-19.
-- **Out of scope:** Importing any code from legacy `/Users/nandal/Desktop/desk/repos/16ane` (`ADR-0014`) or deploying contracts.
+- **Out of scope:** Importing any code from the legacy `16ane` marketplace codebase (separate and not public; `ADR-0014`) or deploying contracts.
 - **Dependencies:** None.
 - **Acceptance criteria:**
   - Given `docs/planning/CAPABILITY_GAP_REPORT.md`, when reviewed, then every standard in `STANDARDS_AND_ADRS.md` includes a verified URL, date checked, status, and Base Sepolia (`84532`) compatibility analysis.

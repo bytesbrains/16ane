@@ -1,4 +1,4 @@
-# RFC 9116. Reports go through GitHub private vulnerability reporting; there is no security mailbox.
+# RFC 9116. Security reports go through GitHub private vulnerability reporting only (see SECURITY.md).
 Contact: https://github.com/bytesbrains/16ane/security/advisories/new
 Policy: https://github.com/bytesbrains/16ane/blob/main/SECURITY.md
 Preferred-Languages: en

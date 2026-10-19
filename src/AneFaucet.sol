@@ -94,6 +94,8 @@ contract AneFaucet is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     /// @notice Returns the earliest timestamp at which `recipient` can claim again.
     function nextClaimTime(address recipient) public view returns (uint64) {
         uint64 last = lastClaimAt[recipient];
+        // Zero is the "never claimed" sentinel, not a balance.
+        // slither-disable-next-line incorrect-equality
         if (last == 0) return 0;
         return last + cooldownSeconds;
     }
@@ -101,6 +103,8 @@ contract AneFaucet is Ownable2Step, Pausable, ReentrancyGuard, EIP712 {
     /// @notice Returns the remaining tANE the faucet can mint during the current UTC day.
     function remainingDailyAllowance() public view returns (uint256) {
         uint64 today = uint64(block.timestamp / 1 days);
+        // Compares UTC day indices, not balances: a different day means the daily counter is stale.
+        // slither-disable-next-line incorrect-equality
         uint256 mintedToday = (currentDayIndex == today) ? currentDayMinted : 0;
         return maxDailyMint > mintedToday ? maxDailyMint - mintedToday : 0;
     }

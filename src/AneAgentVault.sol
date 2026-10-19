@@ -399,6 +399,8 @@ contract AneAgentVault is ReentrancyGuard {
         }
 
         uint64 today = uint64(block.timestamp / 1 days);
+        // Compares UTC day indices, not balances: a different day means the daily counter is stale.
+        // slither-disable-next-line incorrect-equality
         if (currentDayIndex == today) {
             if (currentDaySpent >= amount) {
                 currentDaySpent -= amount;
@@ -431,6 +433,8 @@ contract AneAgentVault is ReentrancyGuard {
 
         if (dailyLimit > 0) {
             uint64 today = uint64(block.timestamp / 1 days);
+            // Compares UTC day indices, not balances: a different day means the daily counter is stale.
+            // slither-disable-next-line incorrect-equality
             uint256 spentToday = (currentDayIndex == today) ? currentDaySpent : 0;
             if (spentToday >= dailyLimit) return 0;
             uint256 dailyRem = dailyLimit - spentToday;

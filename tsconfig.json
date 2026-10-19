@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "packages/sdk-ts/src",
+    "packages/sdk-ts/test",
+    "packages/cli/test",
+    "services/sandbox-server/src",
+    "services/sandbox-server/test",
+    "e2e"
+  ]
+}

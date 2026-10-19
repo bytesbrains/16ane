@@ -50,7 +50,14 @@ jobs:
     # hunt still starts and check-in decides, so this can only ever save a run that
     # would have been declined anyway. `workflow_dispatch` ignores it entirely:
     # asking for a hunt explicitly always runs one.
-    if: github.event_name != 'pull_request' || vars.WROKIN_HUNT_AUTO != 'off'
+    #
+    # Fork PRs never run automatically: this job executes PR code with the Docker socket
+    # mounted, which must not happen for untrusted contributors once the repo is public.
+    # For the same reason, never point RUNNER_LINUX at a self-hosted runner in a public repo.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (vars.WROKIN_HUNT_AUTO != 'off' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     # Runs on GitHub's hosted Linux runner unless you set a RUNNER_LINUX repository or
     # organisation variable to a self-hosted runner label (it needs Docker). The image is
     # published for amd64 and arm64, so either kind of runner runs it natively.

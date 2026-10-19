@@ -6,7 +6,9 @@
 - **Related epics:** E02, E03, E05, E06
 
 ## Context
-`tANE` is the free, unbacked, worthless public sandbox token used to simulate agent commerce (`16 tANE` illustrates `₹1` at target scale, `1,600 tANE` illustrates `₹100`, but carries **zero monetary value or redemption rights**). We must decide its ERC-20 decimals, symbol/name metadata (ensuring explicit no-value disclosure), mint/burn role architecture, and signature extensions required for gasless agent payments (`x402`) and vault funding.
+Historically in India (prior to the 1957 decimalisation of the rupee), **1 Rupee = 16 Annas** (`1 Anna = 1/16 Rupee = 6¼ paise = ₹0.0625`), further subdivided into **4 pices** (`1/64` rupee) and **12 pies** (`1/192` rupee), with the word *anna* derived from the Sanskrit **अन्न** (*anna*, meaning "grain").
+
+In the 16ane architecture, `tANE` is the free, unbacked, worthless public sandbox token that mirrors this 1/16th unit scale (`16 tANE` illustrates `₹1` at target scale, `4 tANE` illustrates `25 paise`, `1,600 tANE` illustrates `₹100`, while carrying **zero monetary value or redemption rights**). We must decide its ERC-20 decimals, symbol/name metadata (ensuring explicit no-value disclosure), mint/burn role architecture, and signature extensions required for gasless agent payments (`x402`) and vault funding.
 
 ## Options
 1. **Option A: 18 Decimals (`ERC20` + `ERC20Burnable` + `ERC20Permit` [EIP-2612] + `EIP-3009` [`transferWithAuthorization` / `receiveWithAuthorization` / `cancelAuthorization`] + `AccessControlDefaultAdminRules`).**

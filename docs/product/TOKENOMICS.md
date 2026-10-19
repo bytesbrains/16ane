@@ -1,7 +1,15 @@
 # Token units, test economics and future INR peg
 
 ## Historical anchor and proposed units
-Historically 16 annas = 1 rupee. Proposed real-value target: **16 ANE = ₹1**; **1 ANE = ₹0.0625**; **1,600 ANE = ₹100**. This is a **target denomination**, not a market guarantee. Contract decimals (likely standard EVM 18, to be decided) are independent of human-readable units.
+The name **16ane** comes from the historical **anna** (*ānna*), a monetary subunit used in India until currency decimalisation in 1957:
+- **Etymology:** Derived from the Sanskrit **अन्न** (*anna*), meaning *"grain"* — the foundational unit of sustenance and everyday exchange. In Indian usage, *"solah aane"* (16 annas) also denotes completeness (`16/16 = 100%`).
+- **Pre-1957 subdivision hierarchy:**
+  - **1 Rupee = 16 Annas** (`1 Anna = 1/16 Rupee`)
+  - **1 Anna = 4 Pices** (`64 Pices = 1 Rupee`)
+  - **1 Pice = 3 Pies** (`12 Pies = 1 Anna`, `192 Pies = 1 Rupee`)
+  - **Classical four-part notation (`Rs R-A-P-Pi`):** Written as `Rupees - Annas (1/16) - Pices (1/64) - Pies (1/192)` — for example, `Rs 1-4` (`₹1.25`, 1 rupee and 4 annas), `Rs 1-8` (`₹1.50`, 1 rupee and 8 annas).
+- **Decimal equivalence:** When India decimalised the rupee into 100 paise in 1957, **1 Anna equaled exactly $6\frac{1}{4}$ paise (`6.25 paise` = `₹0.0625`)**.
+- **Proposed target unit convention:** **16 ANE = ₹1** (`1 ANE = ₹0.0625 = 6.25 paise`; `4 ANE = ₹0.25`; `8 ANE = ₹0.50`; `1,600 ANE = ₹100`). This is a **target denomination**, not a market guarantee. Contract decimals (18 decimals per `ADR-0002`, where `1 ANE = 10^18` base units, so even `1/16`, `1/64`, and fractional per-token compute units divide cleanly) are independent of human-readable units.
 
 ## tANE: public sandbox only
 - Faucet-minted, unbacked testnet ERC-20-style asset. Supply can be increased for experiments, subject to transparent mint authority.

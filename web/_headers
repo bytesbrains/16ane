@@ -13,7 +13,7 @@
 /.well-known/security.txt
   Content-Type: text/plain; charset=utf-8
 
-# Branch previews and version URLs on workers.dev are copies of the site, not the site: keep them
+# Version and deployment URLs on workers.dev are copies of the site, not the site: keep them
 # out of search. 16ane.com stays indexable.
 https://:version.:subdomain.workers.dev/*
   X-Robots-Tag: noindex

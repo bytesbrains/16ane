@@ -14,5 +14,7 @@
     { "pattern": "16ane.com", "custom_domain": true }
   ],
   "workers_dev": false,
-  "previews": {}
+  // Workers Builds builds only main (non-production branch builds are off in the dashboard, ADR-0015),
+  // so there are no per-branch preview URLs. Explicit, although false is the default.
+  "preview_urls": false
 }

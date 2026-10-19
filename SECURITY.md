@@ -14,7 +14,7 @@ If you discover a security vulnerability within 16ane smart contracts, SDKs, fac
 
 Please report vulnerabilities directly via:
 - **GitHub private vulnerability reporting**: open the [Security tab](https://github.com/bytesbrains/16ane/security) and click **Report a vulnerability**, or go straight to the [advisory form](https://github.com/bytesbrains/16ane/security/advisories/new).
-- **If that button is not available**: open a public issue titled `Security contact request` containing **no vulnerability details**. A maintainer will open a private draft security advisory and invite you to it so the report can continue privately.
+- **Email**: [security@16ane.com](mailto:security@16ane.com), if you can't use GitHub or the button is not available. Don't put vulnerability details in a public issue.
 
 Please include:
 1. Detailed description of the vulnerability and affected component (`tANE`, `AneAgentVault`, `AneFaucet`, SDK, facilitator, or web UI).

@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ane-sdk"
+name = "16ane-sdk"
 version = "0.1.0"
 description = "Python SDK for the 16ane Agent Economy (tANE Sandbox)"
 readme = "README.md"

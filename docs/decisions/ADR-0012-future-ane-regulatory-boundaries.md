@@ -24,10 +24,11 @@
   - Demonstrates programmatic chain-ID refusal (`require(block.chainid != 8453)`) in testnet deployment scripts and `_hasNoFaucet` refusal checks.
 
 ## Security and legal impacts
-- **Open legal questions requiring independent Indian legal counsel (`docs/research/MAINNET_AND_REGULATORY.md` lines 16–24, NOT legal advice):**
+- **Open legal questions requiring independent Indian legal counsel (`docs/research/MAINNET_AND_REGULATORY.md`, "Required questions"; NOT legal advice):**
   1. Permissibility and licensing classification under Reserve Bank of India (RBI) rules, Payment and Settlement Systems Act, 2007 (PSS Act), Master Directions on Prepaid Payment Instruments (PPIs), or Virtual Digital Asset (VDA) frameworks.
   2. Entity structure for legal issuance, redemption liability, bankruptcy-remote INR reserve custody, and customer insolvency protection.
-  3. Applicability of Prevention of Money Laundering Act (PMLA) / FIU-IND registration, KYC/AML/CFT obligations, Income Tax Act Section 194S (1% TDS on VDA transfers) and Section 115BBH, GST, and FEMA cross-border transfer restrictions.
+  3. Applicability of Prevention of Money Laundering Act (PMLA) / FIU-IND registration (VDA AML/CFT guidelines updated January 2026), KYC/AML/CFT obligations, the Income-tax Act, 2025 VDA provisions (in force from 1 April 2026; the former s.194S 1% TDS is reported under s.393, and the successor to s.115BBH is to be confirmed), crypto-asset reporting, GST, and FEMA cross-border transfer restrictions.
+  4. The RBI's reported July 2026 opposition to legalising VDAs and to rupee-pegged stablecoins, and whether any licensed route (PPI, payment aggregator, bank-issued instrument) exists for an INR-referenced token. See the dated landscape snapshot and sources in `docs/research/MAINNET_AND_REGULATORY.md`.
 - **Technical air-gap:** No smart contract, SDK method, CLI command, or documentation page in the sandbox repository may implement fiat deposit intake, bank webhook minting, mainnet token deployment, or `tANE -> ANE` conversion/bridging.
 
 ## Decision

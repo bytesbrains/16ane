@@ -382,9 +382,9 @@
 ### `ISS-024` — `[E22][legal-review][research][docs] Prepare Indian legal counsel brief and institutional partner feasibility dossier`
 - **Labels:** `legal-review`, `research`, `docs`, `BLOCKED-LEGAL`
 - **Estimate:** External legal/institutional timeline (High uncertainty — strictly non-blocking for `tANE` sandbox)
-- **Context / Motivation:** Organize the 7 open legal questions and institutional architecture options in `docs/research/MAINNET_AND_REGULATORY.md` (`ADR-0012`) into a formal brief for external Indian legal counsel and prospective licensed banking/PPI partners.
+- **Context / Motivation:** Organize the open legal questions and institutional architecture options in `docs/research/MAINNET_AND_REGULATORY.md` (`ADR-0012`) into a formal brief for external Indian legal counsel and prospective licensed banking/PPI partners.
 - **Scope:**
-  - Produce counsel briefing package covering RBI / PSS Act / PPI Master Directions / VDA / FEMA / Income Tax Section 194S open questions, reserve segregation models, and redemption state-machine requirements.
+  - Produce counsel briefing package covering RBI / PSS Act / PPI Master Directions (2021, draft 2026) / Payment Aggregator Directions 2025 / VDA / FIU-IND / FEMA / Income-tax Act, 2025 (former s.194S and s.115BBH) / DPDP open questions, reserve segregation models, and redemption state-machine requirements.
 - **Out of scope:** **NO live INR acceptance, NO mainnet token deployment, NO legal advice, and NO bridging of `tANE` to `ANE`.**
 - **Dependencies:** `ISS-001`, `ISS-002`.
 - **Acceptance criteria:**

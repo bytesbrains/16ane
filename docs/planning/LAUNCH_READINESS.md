@@ -42,9 +42,11 @@ Per `AGENTS.md` ("Never claim endpoints, contracts, package names, audit results
 
 ### Gate Group C — Future Regulated Real-Money `ANE` Track (`E22` — `BLOCKED-LEGAL`)
 
+Full blocker checklist: [#35](https://github.com/bytesbrains/16ane/issues/35). None of these gates blocks the `tANE` testnet sandbox.
+
 | Gate ID | Gate Description | Status | Evidence / Blocker |
 |---|---|---|---|
-| **G2-01** | Independent Indian legal opinion on RBI / PSS Act / PPI / VDA / FEMA / Tax classification (`MAINNET_AND_REGULATORY.md`) | **UNKNOWN** | Open legal questions documented (`ADR-0012`, `ISS-024`); requires external legal counsel engagement |
+| **G2-01** | Independent Indian legal opinion on RBI / PSS Act / PPI / payment aggregator / VDA & FIU-IND / FEMA / Income-tax Act, 2025 / DPDP classification (`MAINNET_AND_REGULATORY.md`, snapshot checked 2026-10-19) | **UNKNOWN** | Open legal questions documented (`ADR-0012`, `ISS-024`); requires external legal counsel engagement |
 | **G2-02** | Licensed bank / payment institution partnership and ring-fenced reserve custody agreement | **FAIL** | No institutional partner agreement exists (`AGENTS.md` authority boundary) |
 | **G2-03** | External independent smart contract security audit and formal verification for production value | **FAIL** | No audit exists; mainnet deployment strictly prohibited (`AGENTS.md`) |
 

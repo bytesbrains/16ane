@@ -93,6 +93,16 @@ for (const page of PAGES) {
   });
 }
 
+test("any mention of the ANE peg stays a qualified proposal (AGENTS.md, ADR-0012)", () => {
+  for (const page of PAGES) {
+    const body = text(read(page)).replace(/\s+/g, " ");
+    if (!/16 ANE =/.test(body)) continue;
+    assert.match(body, /proposal, not a promise/i, `${page}: the peg is called a proposal`);
+    assert.match(body, /Indian law and regulators allow/i, `${page}: the peg is conditional on regulators`);
+    assert.match(body, /tANE will never turn into ANE/i, `${page}: tANE never converts`);
+  }
+});
+
 test("security.txt names a contact and has not expired (RFC 9116)", () => {
   const body = read(".well-known/security.txt");
   assert.match(body, new RegExp(`^Contact: ${REPO}/security/advisories/new$`, "m"));

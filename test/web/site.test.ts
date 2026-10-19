@@ -99,3 +99,10 @@ test("security.txt names a contact and has not expired (RFC 9116)", () => {
   const expires = body.match(/^Expires: (.+)$/m)?.[1];
   assert.ok(expires && Date.parse(expires) > Date.now(), "Expires is in the future; renew it");
 });
+
+test("the site workflow checks but never deploys, and runs no install scripts (ADR-0015)", () => {
+  const wf = readFileSync(path.resolve(import.meta.dirname, "../../.github/workflows/site.yml"), "utf8");
+  assert.doesNotMatch(wf, /pull_request_target|secrets\.|CLOUDFLARE_API_TOKEN/);
+  assert.doesNotMatch(wf, /wrangler deploy(?! --dry-run)/);
+  for (const line of wf.match(/npm (ci|install)\b.*/g) ?? []) assert.match(line, /--ignore-scripts/);
+});

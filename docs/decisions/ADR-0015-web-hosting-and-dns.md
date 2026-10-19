@@ -39,7 +39,7 @@ DNS state, checked with `dig` and `whois` on 2026-10-19:
 - **No third-party code.** The page is static HTML and CSS: no JavaScript, fonts, analytics or CDNs. The CSP is `default-src 'none'` with only `'self'` for styles and images, which is stricter than copra's.
 - **Account and token risk.** Whoever controls the Cloudflare account controls `16ane.com`. The zone and the Worker live in the BytesBrains account (`admin@bytesbrains.com`, account ID `1539190079828744a96d18d3fa1b4241`), which needs 2FA. `wrangler.jsonc` pins that `account_id`, because the first deploy attempt went to a maintainer's personal account through Wrangler's default login. Workers Builds deploys from Cloudflare's GitHub integration, so no Cloudflare API token is stored in GitHub. If deploys move to GitHub Actions later, the token must be scoped to Workers deploy only, with no DNS edit.
 - **Impersonation.** A "crypto" domain attracts copycat scams. The page states where official contract addresses will be published (this repository and this page), and that anyone selling 16ane tokens is not 16ane.
-- **Email.** `16ane.com` is a Google Workspace alias domain of the BytesBrains Workspace, with aliases `admin`, `contact`, `hello`, `notify`, `security`, `support` and `unsubscribe`. SPF, DKIM and DMARC protect those addresses from spoofing. An earlier draft of this ADR proposed null-MX "sends no mail" records; those would break the aliases and must not be published. `SECURITY.md` still lists GitHub private reporting only; whether to add `security@16ane.com` is a separate maintainer decision.
+- **Email.** `16ane.com` is a Google Workspace alias domain of the BytesBrains Workspace, with aliases `admin`, `contact`, `hello`, `notify`, `security`, `support` and `unsubscribe`. SPF and DKIM authenticate mail Google sends for the domain, but they do not stop spoofing on their own: receivers only reject or quarantine forged `@16ane.com` mail once DMARC is enforced. DMARC starts at `p=none` (reports only), so until the rollout in *Remaining steps* reaches `quarantine`, the aliases are **not** protected from spoofing. That gap matters for a crypto-adjacent domain that tells people to trust only official channels, so the rollout has dates. SPF stays `~all`, as Google recommends ("Google recommends you use **~all**", [SPF setup](https://knowledge.workspace.google.com/admin/security/set-up-spf)); DMARC enforcement, not `-all`, is what blocks spoofed mail. An earlier draft of this ADR proposed null-MX "sends no mail" records; those would break the aliases and must not be published. `SECURITY.md` still lists GitHub private reporting only; whether to add `security@16ane.com` is a separate maintainer decision.
 
 ## Decision
 Adopt **Option A**:
@@ -53,18 +53,22 @@ Adopt **Option A**:
    | `16ane.com` | Worker | `16ane-site` (created by the custom domain) | proxied | the site |
    | `www` | `AAAA` | `100::` | proxied | target for the redirect rule |
    | `16ane.com` | `TXT` | `google-site-verification=…` | n/a | Google Workspace domain ownership |
-   | `16ane.com` | `MX` | `1 smtp.google.com` | n/a | mail for the aliases goes to Google Workspace |
+   | `16ane.com` | `MX` | `1 smtp.google.com` | n/a | mail for the aliases goes to Google Workspace (Google's current single MX value; the legacy `aspmx` set is still supported but not needed, per [MX setup](https://knowledge.workspace.google.com/admin/domains/set-up-mx-records-for-google-workspace)) |
    | `16ane.com` | `TXT` | `v=spf1 include:_spf.google.com ~all` | n/a | only Google may send as `16ane.com` |
    | `google._domainkey` | `TXT` | DKIM key from Google Admin | n/a | signs outgoing mail |
-   | `_dmarc` | `TXT` | `v=DMARC1; p=none; rua=mailto:admin@16ane.com` | n/a | reports first; move to `p=quarantine` once reports are clean |
+   | `_dmarc` | `TXT` | `v=DMARC1; p=none; rua=mailto:admin@16ane.com` | n/a | reports only, so not yet enforced; see the DMARC rollout step |
 
    No Firebase records remain: the `A` records were deleted at cutover, and the `hosting-site` TXT record should be deleted too.
 5. **Remaining steps.**
    1. Delete the `hosting-site` TXT record.
-   2. Merge this ADR and `web/` to `main` and connect Workers Builds, so the live site is built from `main`.
-   3. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
-   4. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
-   5. Delete the old Google Cloud DNS zone and the Firebase site.
+   2. **DMARC rollout**, following Google's [recommended rollout](https://knowledge.workspace.google.com/admin/security/recommended-dmarc-rollout) ("Start with a policy set to **none** ... for one week"):
+      - from 2026-10-19: `p=none`; review the daily aggregate reports sent to `admin@16ane.com`;
+      - from 2026-10-26, if every legitimate sender passes: `p=quarantine; pct=5`, raised in steps to `pct=100`, with at least a week at each step;
+      - then `p=reject`. Record each change and its date in this ADR.
+   3. Merge this ADR and `web/` to `main` and connect Workers Builds, so the live site is built from `main`.
+   4. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
+   5. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
+   6. Delete the old Google Cloud DNS zone and the Firebase site.
 
 ## Cutover log (2026-10-19)
 - 17:14 UTC: the maintainer moved the nameservers to Cloudflare. Firebase records were imported unchanged.

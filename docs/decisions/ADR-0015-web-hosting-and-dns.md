@@ -70,7 +70,7 @@ Adopt **Option A**:
    5. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
    6. Delete the old Google Cloud DNS zone and the Firebase site.
 
-## Cutover log (2026-10-19 to 2026-10-20)
+## Cutover log (2026-10-19, times UTC)
 - 17:14 UTC: the maintainer moved the nameservers to Cloudflare. Firebase records were imported unchanged.
 - The maintainer deleted both Firebase `A` records before the new site was deployed, so the domain briefly had no website.
 - The first `wrangler deploy` uploaded `16ane-site` to the personal account and failed to attach the domain (`Can't infer zone from route`, code 10082). That stray Worker was deleted.
@@ -78,8 +78,8 @@ Adopt **Option A**:
 - The maintainer added the Google Workspace records. Checked on `kirk.ns.cloudflare.com`: verification TXT, MX `1 smtp.google.com`, SPF and DKIM present; `_dmarc` and `www` not yet present.
 - The maintainer added `_dmarc` (`p=none`), the proxied `www` record and the "Redirect from WWW to root" Redirect Rule. Checked through the Cloudflare edge: `https://www.16ane.com/a/b?x=1&y=2` and `http://www.16ane.com/z` both return `301` to the same path on `https://16ane.com`, with the query string kept.
 - #37 merged to `main` (`33954b7`). The live Worker was still the hand-deployed version from the branch.
-- 2026-10-20: the maintainer connected Workers Builds to `bytesbrains/16ane` (production branch `main`). This log entry is the first commit to `main` after that, and so triggers the first automatic deploy.
-- Workers Builds confirmed: `wrangler deployments list` shows deploys at 18:37, 18:46 and 18:49 UTC on 2026-10-19, matching the merges of `218a33e`, `a944110` and `65a4ce8` to `main`. Remaining step 3 is done.
+- Before 18:37 UTC (2026-10-20 in IST, the maintainer's local date, which an earlier version of this entry gave): the maintainer connected Workers Builds to `bytesbrains/16ane` (production branch `main`). This log entry (`218a33e`) is the first commit to `main` after that, and so triggers the first automatic deploy.
+- Workers Builds confirmed: `wrangler deployments list` shows deploys at 18:37, 18:46 and 18:49 UTC, within a minute of the merges of `218a33e` (18:37), `a944110` (18:46) and `65a4ce8` (18:49) to `main`. Their source is `Unknown (deployment)`, not the `Upload` that the hand `wrangler deploy` at 17:31 recorded, and the list has no `Upload` deploy after 17:31; two of the three are Dependabot merges. `https://16ane.com/.well-known/security.txt` serves the comment line from `main` ("Security reports go through GitHub private vulnerability reporting only"), not the branch version's ("there is no security mailbox"). Remaining step 3 is done.
 - Checked through the Cloudflare edge on 2026-10-19 18:55 UTC: `https://16ane.com` returns 200 with CSP, HSTS, `nosniff`, `Referrer-Policy` and `frame-ancestors 'none'`; `www` redirects (301) to the apex; MX, SPF, DKIM (`google._domainkey`) and DMARC `p=none` resolve on `kirk.ns.cloudflare.com`. The `.com` registry still has no `DS` record (unsigned, as planned).
 - **Regression against the earlier entry:** `http://16ane.com/` now returns `200` over plain HTTP instead of redirecting to `https://`. Browsers that saw the HSTS header upgrade on their own, but a first visit does not. Fix: turn on *SSL/TLS → Edge Certificates → Always Use HTTPS* for the zone (dashboard; the repository's Wrangler login is read-only for zone settings). Re-check with `curl -sI --resolve 16ane.com:80:104.21.67.192 http://16ane.com/` (pin a Cloudflare IP: a resolver still caching the old Firebase `A` record reaches Firebase, which also answers `301` with `Server: Varnish`).
 - 19:00 UTC: the maintainer turned on *Always Use HTTPS*. Checked through the Cloudflare edge: `http://16ane.com/` returns `301` to `https://16ane.com/` with `Server: cloudflare`.

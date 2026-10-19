@@ -1,0 +1,16 @@
+{
+  // 16ane.com: an assets-only Worker serving web/ (ADR-0015). Deployed by Cloudflare Workers Builds
+  // from main; there is no Worker script, so _headers applies to every response.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "16ane-site",
+  "compatibility_date": "2026-10-13",
+  "assets": {
+    "directory": "./web",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "16ane.com", "custom_domain": true }
+  ],
+  "workers_dev": false,
+  "previews": {}
+}

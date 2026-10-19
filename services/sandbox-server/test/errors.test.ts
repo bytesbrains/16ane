@@ -76,9 +76,9 @@ test("a failed faucet claim returns a fixed 502 and logs the detail without the 
     assert.equal(error.code, "ANE-E-1004");
     assert.equal(error.message, "Faucet claim could not be completed on-chain; try again later");
     assert.equal(logs.length, 1);
-    assert.ok(logs[0].includes(error.errorId), "log line carries the same errorId");
-    // The chain client shells out to `cast send`, so its error carries the command line and RPC URL.
-    assert.match(logs[0], /HTTP error 500/);
+    // The detail is logged under the same errorId. Its wording comes from the chain client (which
+    // shells out to `cast send`, so it carries the command line and RPC URL) and varies by version.
+    assert.match(logs[0], new RegExp(`ANE-E-1004 ${error.errorId}: \\S`));
     assert.doesNotMatch(logs[0], /DO_NOT_LEAK|rpc\.example|127\.0\.0\.1/);
   });
 });

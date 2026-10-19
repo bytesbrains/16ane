@@ -32,20 +32,22 @@ COPRA is commodity-referenced and therefore has variable INR purchasing power. 1
 
 ## Setup
 
-Prerequisites: [Foundry](https://book.getfoundry.sh/getting-started/installation), Node.js 24+ (runs TypeScript via `--experimental-strip-types`), Python 3.11+. The SDKs have no third-party runtime dependencies, so there is no install step beyond the submodules.
+Prerequisites: [Foundry](https://book.getfoundry.sh/getting-started/installation), Node.js 24+ (runs TypeScript via `--experimental-strip-types`), Python 3.11+. The SDKs have no third-party runtime dependencies; `npm ci` only installs the TypeScript type-checker.
 
 ```bash
 git clone --recurse-submodules https://github.com/bytesbrains/16ane.git
 cd 16ane
 scripts/setup_hooks.sh   # optional: gitleaks + forge fmt pre-commit, tests pre-push
+npm ci                   # dev-only: TypeScript type-checker (the SDKs have no runtime deps)
 
 make build               # forge build --sizes
-make test                # contracts, TS SDK, Python SDK, E2E scenarios S1-S6
+make test                # contracts, TS SDK, Python SDK, CLI, server, E2E scenarios S1-S6
+make typecheck           # tsc --strict over SDK, CLI tests, server and E2E
 make fmt-check           # forge fmt --check
 make deploy-dry-run      # simulate the sandbox deployment (no broadcast)
 ```
 
-Individual suites: `make test-contracts`, `make test-sdk-ts`, `make test-sdk-py`, `make test-e2e`. Everything runs against local Anvil / testnet configuration only; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Individual suites: `make test-contracts`, `make test-sdk-ts`, `make test-sdk-py`, `make test-cli`, `make test-server`, `make test-e2e`. `make lint-py` needs `ruff` on your PATH. Everything runs against local Anvil / testnet configuration only; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Documents
 - [Agent instructions](AGENTS.md)

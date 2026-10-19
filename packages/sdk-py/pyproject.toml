@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "ane-sdk"
 version = "0.1.0"
 description = "Python SDK for the 16ane Agent Economy (tANE Sandbox)"
-readme = "../../README.md"
+readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = []
@@ -14,3 +14,13 @@ dependencies = []
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ane_sdk*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+# Correctness (pyflakes, pycodestyle errors, bugbear) and import order; style modernisation is not enforced.
+select = ["E", "F", "W", "B", "I"]
+# EIP-712 type strings stay on one line so they can be diffed against the Solidity typehashes.
+ignore = ["E501"]

@@ -4,6 +4,8 @@ Thank you for your interest in contributing to **16ane — Open Agent Economy** 
 
 Before contributing, please read [AGENTS.md](AGENTS.md), [README.md](README.md), and the Architecture Decision Records in [docs/decisions/](docs/decisions/).
 
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Core Invariants for All Contributions
 
 1. **`tANE` Has Zero Monetary Value (`REQ-012`):** Never describe `tANE` as ₹-backed, redeemable, investable, or convertible to `ANE`. Every user-facing balance, quote, or CLI output must preserve the no-cash-value disclosure.
@@ -16,7 +18,7 @@ Before contributing, please read [AGENTS.md](AGENTS.md), [README.md](README.md),
 1. **Clone the repository**:
    ```bash
    git clone --recurse-submodules https://github.com/bytesbrains/16ane.git
-   cd 16ane-agent-economy
+   cd 16ane
    ```
 
 2. **Enable git hooks** (`.githooks/`):
@@ -40,3 +42,10 @@ Before contributing, please read [AGENTS.md](AGENTS.md), [README.md](README.md),
 2. **Traceability**: Reference the governing `REQ-*`, `ADR-*`, and `ISS-*` IDs in your PR description.
 3. **Testing**: Include unit, fuzz, and negative/adversarial tests (`docs/security/THREAT_MODEL.md`) for all contract and SDK changes.
 4. **Licensing**: By submitting a contribution, you agree that your contribution is licensed under the repository's [MIT License](LICENSE) (`ADR-0013`).
+
+## Versions and releases
+
+- The project uses [Semantic Versioning](https://semver.org/). While the version is `0.x`, any release may contain breaking changes.
+- Everything is at `0.1.0`: the root `package.json`, `@16ane/sdk` (`packages/sdk-ts`), `16ane-sdk` (`packages/sdk-py`) and the CLI. No version is tagged, and no package is published to npm or PyPI. Publishing is a separate maintainer decision.
+- Record user-visible changes under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) in the same pull request.
+- A release bumps every version above together, moves **Unreleased** to a dated version heading, and tags the merge commit `v<version>`.

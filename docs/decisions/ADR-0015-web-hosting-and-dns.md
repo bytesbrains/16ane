@@ -60,12 +60,11 @@ Adopt **Option A**:
 
    No Firebase records remain: the `A` records were deleted at cutover, and the `hosting-site` TXT record should be deleted too.
 5. **Remaining steps.**
-   1. Add the `www` record and the redirect rule, then check that `curl -sI 'https://www.16ane.com/x?y'` returns `301` to `https://16ane.com/x?y`.
-   2. Add the `_dmarc` record and delete the `hosting-site` TXT record.
-   3. Merge this ADR and `web/` to `main` and connect Workers Builds, so the live site is built from `main`.
-   4. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
-   5. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
-   6. Delete the old Google Cloud DNS zone and the Firebase site.
+   1. Delete the `hosting-site` TXT record.
+   2. Merge this ADR and `web/` to `main` and connect Workers Builds, so the live site is built from `main`.
+   3. Make `bytesbrains/16ane` public (#32). Until then, every GitHub link on the page is a 404 for visitors; the maintainer accepted that on 2026-10-19.
+   4. Enable DNSSEC in Cloudflare and add its `DS` record at Squarespace. Do this last.
+   5. Delete the old Google Cloud DNS zone and the Firebase site.
 
 ## Cutover log (2026-10-19)
 - 17:14 UTC: the maintainer moved the nameservers to Cloudflare. Firebase records were imported unchanged.
@@ -73,6 +72,7 @@ Adopt **Option A**:
 - The first `wrangler deploy` uploaded `16ane-site` to the personal account and failed to attach the domain (`Can't infer zone from route`, code 10082). That stray Worker was deleted.
 - `wrangler deploy` with the `bytesbrains` profile from branch `feat/iss-036-site` (`4145bf0`) attached `16ane.com` as a Custom Domain. Version `5d5a0d7f-c69e-4bbc-8897-c2f2e7065572`. Checked: HTTPS 200, CSP and HSTS present, 404 page served, `http://` redirects to `https://`.
 - The maintainer added the Google Workspace records. Checked on `kirk.ns.cloudflare.com`: verification TXT, MX `1 smtp.google.com`, SPF and DKIM present; `_dmarc` and `www` not yet present.
+- The maintainer added `_dmarc` (`p=none`), the proxied `www` record and the "Redirect from WWW to root" Redirect Rule. Checked through the Cloudflare edge: `https://www.16ane.com/a/b?x=1&y=2` and `http://www.16ane.com/z` both return `301` to the same path on `https://16ane.com`, with the query string kept.
 
 ## Consequences
 - The site costs nothing to serve and has no runtime code to patch.

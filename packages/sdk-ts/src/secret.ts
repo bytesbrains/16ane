@@ -2,8 +2,6 @@ import util from "node:util";
 
 export const REDACTED_PRIVATE_KEY = "[REDACTED_PRIVATE_KEY]";
 
-const HEX_PRIVATE_KEY_REGEX = /\b(?:0x)?[0-9a-fA-F]{64}\b/g;
-
 /**
  * Redacts 32-byte hex strings when they appear next to key-like field names,
  * or redacts a known set of secret hex strings from arbitrary log/error text.

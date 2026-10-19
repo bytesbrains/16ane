@@ -1,7 +1,9 @@
 name: CI
 
 on:
+  # PR commits are covered by pull_request; push only runs for main so each commit runs CI once.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -29,6 +31,15 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
+          cache: npm
+
+      - name: Install Node dev dependencies (TypeScript type-checker)
+        run: npm ci --ignore-scripts
+
+      - name: Install Python lint and packaging tools
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/pytools"
+          "${RUNNER_TEMP}/pytools/bin/pip" install --disable-pip-version-check ruff==0.16.10 build==1.6.1
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
@@ -53,14 +64,54 @@ jobs:
           PRIVATE_KEY: '1'
         run: forge script script/DeploySandbox.s.sol:DeploySandbox --chain-id 84532
 
+      - name: Type-check TypeScript (SDK, CLI, server, E2E)
+        run: npm run typecheck
+
+      - name: Lint Python SDK
+        run: '"${RUNNER_TEMP}/pytools/bin/ruff" check packages/sdk-py'
+
+      - name: Build Python SDK sdist and wheel
+        run: '"${RUNNER_TEMP}/pytools/bin/python" -m build --sdist --wheel --outdir "${RUNNER_TEMP}/dist" packages/sdk-py'
+
       - name: Run TypeScript SDK unit tests
         run: npm run test:sdk-ts
+
+      - name: Run CLI unit tests
+        run: npm run test:cli
+
+      - name: Run sandbox server unit tests
+        run: npm run test:server
 
       - name: Run Python SDK unit tests
         run: npm run test:sdk-py
 
       - name: Run E2E Scenarios S1-S6 & Threat Model T1-T10
         run: npm run test:e2e
+
+  slither:
+    name: Slither static analysis (medium+)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+
+      - name: Install Slither
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/slither"
+          "${RUNNER_TEMP}/slither/bin/pip" install --disable-pip-version-check slither-analyzer==0.11.6
+
+      # Reviewed false positives are suppressed inline with `slither-disable-next-line` and a reason.
+      - name: Run Slither on src/
+        run: '"${RUNNER_TEMP}/slither/bin/slither" . --filter-paths "lib/|test/|script/" --exclude-informational --exclude-low --fail-medium'
 
   committed-files:
     name: Committed files hygiene

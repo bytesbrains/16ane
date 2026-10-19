@@ -14,7 +14,7 @@ import {
   type ServiceManifestPayload,
   type X402Receipt,
 } from "../../../packages/sdk-ts/src/index.ts";
-import { readRequestBody, sendError, sendJson } from "./http.ts";
+import { clientIp, readRequestBody, sendError, sendJson } from "./http.ts";
 
 const ONE_TANE = 10n ** 18n;
 const PRICE_SUMMARIZE = 16n * ONE_TANE; // 16 tANE (= 1 simulated INR)
@@ -36,6 +36,8 @@ export interface DemoContext {
   providerKey: SecretKey;
   providerAddress: string;
   contracts: AneContractAddresses;
+  trustProxy: boolean;
+  maxBodyBytes: number;
 }
 
 export function isDemoRoute(method: string, pathname: string): boolean {
@@ -128,7 +130,7 @@ export async function handleDemoRequest(
   fullUrl: URL,
 ): Promise<void> {
   const { client, verifier, trialTracker, providerKey, providerAddress, contracts } = ctx;
-  const rawBody = await readRequestBody(req);
+  const rawBody = await readRequestBody(req, ctx.maxBodyBytes);
   const requestHash = computeRequestHash(rawBody);
   const idempotencyKey = req.headers["idempotency-key"] as string | undefined;
 
@@ -157,16 +159,15 @@ export async function handleDemoRequest(
 
   const paymentSignatureHeader = req.headers["payment-signature"] as string | undefined;
   const trialRequested = req.headers["x-trial-request"] === "true";
-  const callerId =
-    (req.headers["x-agent-vault"] as string | undefined) ??
-    (req.headers["x-agent-session"] as string | undefined) ??
-    req.socket.remoteAddress ??
-    "anonymous";
+  // Trial quota is keyed on the network address: the vault/session headers are unauthenticated
+  // and rotating them must not mint extra sponsored calls (#31).
+  const trialQuotaKey = clientIp(req, ctx.trustProxy);
+  const claimedVault = (req.headers["x-agent-vault"] as string | undefined) ?? "";
 
   // If no PAYMENT-SIGNATURE header, check if a provider-sponsored trial call was requested
   if (!paymentSignatureHeader) {
     if (pathname === "/v1/demo/summarize" && trialRequested) {
-      const trial = trialTracker.checkAndConsume(callerId);
+      const trial = trialTracker.checkAndConsume(trialQuotaKey);
       if (trial.allowed) {
         const trialReceipt: X402Receipt = {
           x402Version: 2,
@@ -176,8 +177,8 @@ export async function handleDemoRequest(
           txHash: "0x" + "00".repeat(32),
           blockNumber: 0,
           payer: toChecksumAddress(
-            /^0x[0-9a-fA-F]{40}$/.test(callerId)
-              ? callerId
+            /^0x[0-9a-fA-F]{40}$/.test(claimedVault)
+              ? claimedVault
               : "0x0000000000000000000000000000000000000000",
           ),
           payTo: providerAddress,

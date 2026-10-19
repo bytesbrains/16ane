@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.16ane.com/schemas/payment-payload.schema.json",
+  "title": "16ane x402 v2 PaymentPayload Schema",
+  "type": "object",
+  "required": ["x402Version", "scheme", "network", "quote_id", "payload"],
+  "properties": {
+    "x402Version": {
+      "type": "integer",
+      "const": 2
+    },
+    "scheme": {
+      "type": "string",
+      "enum": ["ane-vault-v1", "exact", "ane-txproof-v1"]
+    },
+    "network": {
+      "type": "string",
+      "pattern": "^eip155:[0-9]+$"
+    },
+    "quote_id": {
+      "type": "string"
+    },
+    "idempotency_key": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["signature"],
+      "properties": {
+        "intent": {
+          "type": "object",
+          "required": [
+            "vault",
+            "merchant",
+            "amount",
+            "quoteId",
+            "serviceIdHash",
+            "validAfter",
+            "validBefore",
+            "nonce",
+            "policyVersion"
+          ],
+          "properties": {
+            "vault": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+            "merchant": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+            "amount": { "type": "string", "pattern": "^[0-9]+$" },
+            "quoteId": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+            "serviceIdHash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+            "validAfter": { "type": "integer", "minimum": 0 },
+            "validBefore": { "type": "integer", "minimum": 1 },
+            "nonce": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+            "policyVersion": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "authorization": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+            "to": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+            "value": { "type": "string", "pattern": "^[0-9]+$" },
+            "validAfter": { "type": "integer", "minimum": 0 },
+            "validBefore": { "type": "integer", "minimum": 1 },
+            "nonce": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" }
+          }
+        },
+        "tx_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]+$"
+        }
+      }
+    }
+  }
+}

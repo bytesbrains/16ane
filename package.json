@@ -1,0 +1,12 @@
+{
+  "name": "16ane-agent-economy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts",
+    "test:sdk-py": "python3 -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' -v",
+    "test:e2e": "node --experimental-strip-types --test e2e/run-scenarios.ts"
+  }
+}

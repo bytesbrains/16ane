@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.16ane.com/schemas/errors.schema.json",
+  "title": "16ane Error Taxonomy Catalog",
+  "type": "object",
+  "required": ["error", "code", "message", "retryable"],
+  "properties": {
+    "error": { "type": "boolean", "const": true },
+    "code": {
+      "type": "string",
+      "enum": [
+        "PAYMENT_REQUIRED",
+        "INSUFFICIENT_VAULT_BUDGET",
+        "EXCEEDS_PER_TX_LIMIT",
+        "EXCEEDS_DAILY_LIMIT",
+        "DELEGATION_INACTIVE_OR_REVOKED",
+        "QUOTE_EXPIRED",
+        "QUOTE_ALREADY_SETTLED",
+        "NONCE_REPLAY_DETECTED",
+        "RECIPIENT_MISMATCH",
+        "UNSUPPORTED_NETWORK_OR_ASSET",
+        "INVALID_SIGNATURE",
+        "FAUCET_COOLDOWN_ACTIVE",
+        "FAUCET_DAILY_CAP_EXCEEDED",
+        "SPONSOR_QUOTA_EXHAUSTED",
+        "UPSTREAM_DELIVERY_FAILED_REFUNDED",
+        "RATE_LIMIT_EXCEEDED"
+      ]
+    },
+    "message": { "type": "string" },
+    "retryable": { "type": "boolean" },
+    "correlation_id": { "type": "string" },
+    "details": { "type": "object" }
+  }
+}

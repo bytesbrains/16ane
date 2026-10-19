@@ -1,12 +1,23 @@
-.PHONY: all build test fmt fmt-check lint clean deploy-dry-run
+.PHONY: all build test test-contracts test-sdk-ts test-sdk-py test-e2e fmt fmt-check lint clean deploy-dry-run
 
 all: build test lint
 
 build:
 	forge build --sizes
 
-test:
+test: test-contracts test-sdk-ts test-sdk-py test-e2e
+
+test-contracts:
 	forge test -vvv
+
+test-sdk-ts:
+	npm run test:sdk-ts
+
+test-sdk-py:
+	npm run test:sdk-py
+
+test-e2e:
+	npm run test:e2e
 
 fmt:
 	forge fmt

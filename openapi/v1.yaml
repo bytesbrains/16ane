@@ -1,0 +1,157 @@
+openapi: 3.1.0
+info:
+  title: 16ane Agent Economy Sandbox API
+  version: 0.1.0
+  description: >
+    OpenAPI v1 specification for the 16ane Agent Economy Public Sandbox.
+    All settlements use simulated tANE ("TEST TOKENS (tANE) - NO CASH VALUE").
+    1 INR = 16 Annas (1 Anna = 1/16 Rupee = 6.25 paise).
+  license:
+    name: MIT
+servers:
+  - url: http://127.0.0.1:8787
+    description: Local Anvil + Reference Sandbox Server
+paths:
+  /.well-known/16ane-service.json:
+    get:
+      summary: Fetch EIP-712 signed ServiceManifest (16ane-manifest-v0)
+      operationId: getServiceManifest
+      responses:
+        "200":
+          description: Signed ServiceManifest
+  /v1/networks:
+    get:
+      summary: List supported sandbox networks and AneRegistry addresses
+      operationId: listNetworks
+      responses:
+        "200":
+          description: Network list
+  /v1/assets:
+    get:
+      summary: List tANE sandbox token metadata and explicit no-cash-value notice
+      operationId: listAssets
+      responses:
+        "200":
+          description: Asset metadata
+  /v1/faucet/claims:
+    post:
+      summary: Claim simulated tANE from the gasless sandbox faucet (max 1,600 tANE / 24h)
+      operationId: createFaucetClaim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipient]
+              properties:
+                recipient:
+                  type: string
+                amount:
+                  type: string
+      responses:
+        "201":
+          description: Claim settled on-chain
+        "429":
+          description: Cooldown or quota active
+  /v1/faucet/claims/{id}:
+    get:
+      summary: Get faucet claim status by claimId
+      operationId: getFaucetClaim
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Claim status record
+        "404":
+          description: Claim not found
+  /v1/wallets/{address}/balances:
+    get:
+      summary: Get tANE balance and AneAgentVault accounting summary
+      operationId: getWalletBalances
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Balance and accounting breakdown
+  /v1/payments/{id}:
+    get:
+      summary: Get verified payment receipt by txHash or intentId
+      operationId: getPaymentReceipt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Verified x402 v2 receipt
+        "404":
+          description: Receipt not found
+  /v1/x402/supported:
+    get:
+      summary: List supported x402 v2 payment schemes and assets
+      operationId: getSupportedX402Schemes
+      responses:
+        "200":
+          description: Supported schemes (ane-vault-v1, exact)
+  /v1/services:
+    get:
+      summary: List registered service manifests
+      operationId: listServices
+      responses:
+        "200":
+          description: Registered services
+    post:
+      summary: Verify and publish a signed 16ane-manifest-v0 ServiceManifest
+      operationId: publishService
+      responses:
+        "201":
+          description: Service manifest verified and indexed
+        "400":
+          description: Invalid manifest signature
+  /v1/campaigns:
+    get:
+      summary: List active provider-sponsored trial quota campaigns
+      operationId: listCampaigns
+      responses:
+        "200":
+          description: Sponsored trial campaigns
+  /v1/demo/summarize:
+    post:
+      summary: Deterministic text summarization (16 tANE via x402 v2, or 1 free sponsored trial call)
+      operationId: demoSummarize
+      responses:
+        "200":
+          description: Summary result with PAYMENT-RESPONSE receipt header
+        "402":
+          description: Payment Required with PAYMENT-REQUIRED base64 quote header
+        "409":
+          description: Idempotency-Key conflict or replay rejected
+  /v1/demo/clean-data:
+    post:
+      summary: Deterministic JSON array deduplication and normalization (32 tANE via x402 v2)
+      operationId: demoCleanData
+      responses:
+        "200":
+          description: Cleaned data with PAYMENT-RESPONSE receipt header
+        "402":
+          description: Payment Required
+  /v1/demo/simulate-failure:
+    post:
+      summary: Settles 16 tANE then simulates downstream failure and executes on-chain refundPayment
+      operationId: demoSimulateFailure
+      responses:
+        "402":
+          description: Payment Required
+        "502":
+          description: Downstream failure with automatic on-chain refundTxHash

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docs.16ane.com/schemas/receipt.schema.json",
+  "title": "16ane Verifiable Payment & Delivery Receipt Schema",
+  "type": "object",
+  "required": [
+    "receipt_id",
+    "payment_id",
+    "quote_id",
+    "service_id",
+    "network",
+    "asset",
+    "payer_vault",
+    "merchant",
+    "amount_base_units",
+    "tx_hash",
+    "block_number",
+    "status",
+    "settled_at",
+    "delivery_hash",
+    "disclaimer"
+  ],
+  "properties": {
+    "receipt_id": { "type": "string" },
+    "payment_id": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+    "quote_id": { "type": "string" },
+    "service_id": { "type": "string" },
+    "network": { "type": "string", "pattern": "^eip155:[0-9]+$" },
+    "asset": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "payer_vault": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "agent_signer": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "merchant": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
+    "amount_base_units": { "type": "string", "pattern": "^[0-9]+$" },
+    "tx_hash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+    "refund_tx_hash": { "type": ["string", "null"], "pattern": "^0x[0-9a-fA-F]{64}$" },
+    "block_number": { "type": "integer", "minimum": 0 },
+    "status": {
+      "type": "string",
+      "enum": ["SETTLED", "REFUNDED", "PENDING"]
+    },
+    "settled_at": { "type": "string", "format": "date-time" },
+    "delivery_hash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
+    "merchant_signature": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+    "disclaimer": { "type": "string", "pattern": "NO CASH VALUE" }
+  }
+}

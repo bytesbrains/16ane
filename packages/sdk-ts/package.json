@@ -1,0 +1,14 @@
+{
+  "name": "@16ane/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript/JavaScript SDK for the 16ane Agent Economy (tANE Sandbox)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "license": "MIT"
+}

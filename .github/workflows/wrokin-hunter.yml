@@ -1,0 +1,78 @@
+# wrokin Verified Security Hunter — added for you by "Enable" in the wrokin
+# dashboard. Advisory: it comments findings and NEVER blocks your PR (exits 0).
+#
+# The trigger fires on every pull request, but WHETHER a hunt actually runs — and how
+# deep — is decided by the policy you set in the wrokin dashboard (base branches and
+# scan level, or on-demand only). Set the repo to on-demand and the job below is
+# skipped outright: no runner is scheduled and no Actions minutes are used. Otherwise
+# the job starts and check-in applies your branch rules, stopping in a few seconds when
+# a PR is out of scope. Change the policy in the dashboard; you never need to
+# edit this file. On-demand hunts: `/pi hunter <level>` on a PR, the dashboard's
+# "Run hunt now", or Run workflow below.
+#
+# It runs the signed wrokin-hunter image directly (`docker run`) rather than
+# `uses:`-ing an action, because the action lives in a PRIVATE repo that your repo
+# can't resolve — and running the image with the Docker socket mounted also lets a
+# proof-of-concept detonate (a container action never gets the socket).
+name: wrokin security hunter
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to hunt"
+        required: false
+      level:
+        description: "Scan level"
+        required: false
+        default: "stakeout"
+        type: choice
+        options: [foray, stakeout, expedition]
+
+permissions:
+  contents: read
+  packages: read # pull the wrokin-hunter image from GHCR
+  id-token: write # prove identity to wrokin via OIDC
+  pull-requests: write # post the advisory comment
+
+jobs:
+  hunt:
+    # Don't even start a runner for an automatic PR run on a repo set to on-demand
+    # (#450). wrokin keeps ${{ vars.WROKIN_HUNT_AUTO }} in step with your dashboard
+    # setting; a job skipped by `if:` is never scheduled, so an on-demand repo costs
+    # you nothing per PR. Unset means "on" — if the variable is missing or stale the
+    # hunt still starts and check-in decides, so this can only ever save a run that
+    # would have been declined anyway. `workflow_dispatch` ignores it entirely:
+    # asking for a hunt explicitly always runs one.
+    if: github.event_name != 'pull_request' || vars.WROKIN_HUNT_AUTO != 'off'
+    # Runs on GitHub's hosted Linux runner unless you set a RUNNER_LINUX repository or
+    # organisation variable to a self-hosted runner label (it needs Docker). The image is
+    # published for amd64 and arm64, so either kind of runner runs it natively.
+    runs-on: ${{ vars.RUNNER_LINUX || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Log in to GHCR (pull the wrokin-hunter image)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Hunt (Docker socket mounted so a PoC can detonate)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          INPUT_API_BASE: https://api.wrok.in
+          INPUT_PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          INPUT_LEVEL: ${{ inputs.level }}
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$GITHUB_WORKSPACE":"$GITHUB_WORKSPACE" \
+            -v "$RUNNER_TEMP":"$RUNNER_TEMP" \
+            -v "$GITHUB_EVENT_PATH":"$GITHUB_EVENT_PATH":ro \
+            -w "$GITHUB_WORKSPACE" \
+            -e TMPDIR="$RUNNER_TEMP" \
+            -e GITHUB_REPOSITORY -e GITHUB_SHA -e GITHUB_WORKSPACE \
+            -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_REF_NAME \
+            -e ACTIONS_ID_TOKEN_REQUEST_URL -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            -e GITHUB_TOKEN \
+            -e INPUT_API_BASE \
+            -e INPUT_PR_NUMBER \
+            -e INPUT_LEVEL \
+            ghcr.io/bytesbrains/wrokin-hunter@sha256:c80bea8d9e4e8185cb44f31880f0aa7301c8062fa48bbd30abab5797b33d8fbc

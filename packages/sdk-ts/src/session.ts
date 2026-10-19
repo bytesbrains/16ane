@@ -239,7 +239,7 @@ export class AgentSession {
     const validBefore =
       requirement.extra?.expiresAt ?? nowSec + (requirement.maxTimeoutSeconds || 300);
 
-    let paymentPayload: Record<string, unknown>;
+    let payload: Record<string, unknown>;
 
     if (options.settleDirectOnChain) {
       const direct = await this.settleDirectSpend({
@@ -248,30 +248,20 @@ export class AgentSession {
         quoteId: quoteIdB32,
         serviceIdHash,
       });
-      paymentPayload = {
-        x402Version: 2,
-        scheme: "ane-vault-v1",
-        network: requirement.network,
-        accepted: {
-          asset: requirement.asset,
-          amount: requirement.amount,
-          payTo: requirement.payTo,
-        },
-        payload: {
-          vault: this.vaultAddress,
-          merchant: toChecksumAddress(requirement.payTo),
-          amount: requiredAmount.toString(),
-          quoteId: quoteIdB32,
-          serviceIdHash,
-          validAfter: 0,
-          validBefore,
-          nonce: direct.nonce,
-          policyVersion: summary.policyVersion,
-          resourceHash,
-          requestHash,
-          signature: "0x" + "00".repeat(65),
-          txHash: direct.txHash,
-        },
+      payload = {
+        vault: this.vaultAddress,
+        merchant: toChecksumAddress(requirement.payTo),
+        amount: requiredAmount.toString(),
+        quoteId: quoteIdB32,
+        serviceIdHash,
+        validAfter: 0,
+        validBefore,
+        nonce: direct.nonce,
+        policyVersion: summary.policyVersion,
+        resourceHash,
+        requestHash,
+        signature: "0x" + "00".repeat(65),
+        txHash: direct.txHash,
       };
     } else {
       const signed = this.signSpendIntent({
@@ -282,23 +272,25 @@ export class AgentSession {
         validBefore,
         policyVersion: summary.policyVersion,
       });
-      paymentPayload = {
-        x402Version: 2,
-        scheme: "ane-vault-v1",
-        network: requirement.network,
-        accepted: {
-          asset: requirement.asset,
-          amount: requirement.amount,
-          payTo: requirement.payTo,
-        },
-        payload: {
-          ...signed.intent,
-          resourceHash,
-          requestHash,
-          signature: signed.signature,
-        },
+      payload = {
+        ...signed.intent,
+        resourceHash,
+        requestHash,
+        signature: signed.signature,
       };
     }
+
+    const paymentPayload = {
+      x402Version: 2,
+      scheme: "ane-vault-v1",
+      network: requirement.network,
+      accepted: {
+        asset: requirement.asset,
+        amount: requirement.amount,
+        payTo: requirement.payTo,
+      },
+      payload,
+    };
 
     const paymentSignatureB64 = Buffer.from(JSON.stringify(paymentPayload), "utf8").toString(
       "base64",

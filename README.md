@@ -39,7 +39,7 @@ Prerequisites: [Foundry](https://book.getfoundry.sh/getting-started/installation
 ```bash
 git clone --recurse-submodules https://github.com/bytesbrains/16ane.git
 cd 16ane
-scripts/setup_hooks.sh   # optional: gitleaks + forge fmt pre-commit, tests pre-push
+scripts/setup_hooks.sh   # optional: gitleaks + forge fmt pre-commit; gitleaks + tests pre-push
 npm ci                   # dev-only: TypeScript type-checker (the SDKs have no runtime deps)
 
 make build               # forge build --sizes

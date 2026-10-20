@@ -118,6 +118,17 @@ test("link previews point at a real image with its true size (Open Graph)", () =
   assert.equal(meta("og:url"), "https://16ane.com/");
 });
 
+test("the cross-provider tANE section keeps its no-value qualifiers (AGENTS.md, REQ-012)", () => {
+  const html = read("index.html");
+  const section = html.match(/<section[^>]*aria-labelledby="network-title"[\s\S]*?<\/section>/)?.[0] ?? "";
+  assert.ok(section, "the network section exists");
+  const body = text(section).replace(/\s+/g, " ");
+  assert.match(body, /no cash value/i);
+  assert.match(body, /cannot be bought or sold/i);
+  assert.match(body, /never turns into money or ANE/i);
+  assert.match(body, /voluntarily/i, "provider participation is voluntary");
+});
+
 test("security.txt names a contact and has not expired (RFC 9116)", () => {
   const body = read(".well-known/security.txt");
   assert.match(body, new RegExp(`^Contact: ${REPO}/security/advisories/new$`, "m"));

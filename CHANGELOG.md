@@ -21,6 +21,7 @@ Nothing has been released yet: no version is tagged, and no package is published
 
 ### Changed
 - Faucet and relayer limits sized for agent-speed use (#61): faucet defaults 16,000 tANE per claim, 1 hour cooldown per recipient, 160 M tANE per day (were 1,600 / 24 h / 1.6 M); ADR-0006, ADR-0008 and ADR-0010 amended so the payment path carries no protocol rate limits or count caps, and operator-paid resources are limited by cost only.
+- tANE described as the shared sandbox currency across platforms: providers can price sandbox, demo and introductory/offer-credit tiers in tANE, and agents pay every participating provider from one balance (README, VISION, TOKENOMICS, SANDBOX_AND_CREDITS, 16ane.com). No change to tANE's no-value status.
 
 ### Security
 - Sandbox server: request bodies capped at 1 MiB, trial quota keyed on the connection address, and `X-Forwarded-For` trusted only with `trustProxy` (#31).

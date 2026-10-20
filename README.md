@@ -4,7 +4,7 @@
 
 # 16ane — Open Agent Economy
 
-**Status:** Product vision, planning specification, and a sandbox implementation (contracts, SDKs, CLI, reference server) that is tested locally and in CI only, v0.1.0 (2026-10-19). **Nothing is deployed to a public network, no hosted faucet or API exists, and this is not a regulatory authorization.** See [launch readiness](docs/planning/LAUNCH_READINESS.md).
+**Status:** Product vision, planning specification, and a sandbox implementation (contracts, SDKs, CLI, reference server) that is tested locally and in CI only, v0.1.0 (2026-10-19). **The sandbox contracts are live on the Base Sepolia testnet** (registry `0x01d5daB670DE5868305eB862721ebE62772C3Df3`, all addresses in [`networks/sandbox-sepolia.json`](networks/sandbox-sepolia.json)); **no hosted faucet or API exists yet, and this is not a regulatory authorization.** Check contract addresses here or on 16ane.com, never by the `tANE` symbol. See [launch readiness](docs/planning/LAUNCH_READINESS.md).
 
 > **16 Aane = 1 Rupee.** Give an agent a budget. Let it discover, spend, earn, and return value.
 

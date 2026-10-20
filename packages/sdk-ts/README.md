@@ -10,8 +10,8 @@ on-chain receipt verification.
 > backed by INR, not redeemable, and not convertible to any future `ANE`.
 
 Status: `0.1.0`, not published to npm. The `@16ane` npm scope belongs to the project; nothing is released under
-it yet. Nothing is deployed to a public network; use a local Anvil chain (see the repository's E2E harness) or
-your own Base Sepolia deployment.
+it yet. The sandbox contracts are live on Base Sepolia: pass `registryAddress: "0x01d5daB670DE5868305eB862721ebE62772C3Df3"`
+(all addresses in [`networks/sandbox-sepolia.json`](https://github.com/bytesbrains/16ane/blob/main/networks/sandbox-sepolia.json)), or use a local Anvil chain.
 
 ## Requirements
 

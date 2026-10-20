@@ -54,7 +54,12 @@ forge script script/DeploySandbox.s.sol:DeploySandbox \
   --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
 ```
 The console prints the five addresses (`AneRegistry: 0x…` and so on). The transaction log is in
-`broadcast/DeploySandbox.s.sol/84532/run-latest.json`, which git ignores.
+`broadcast/DeploySandbox.s.sol/84532/run-latest.json`, which git ignores. **Copy it somewhere safe straight away:** the
+E2E suite and local tests run Anvil with chain id `84532` too, so the next local run overwrites that file, and
+`--resume` would then pick up the wrong deployment. The chain stays the source of truth: the deployer's nonces 0–6
+are the deployment's transactions.
+- **Public-RPC lag.** Load-balanced endpoints can briefly answer from a node that hasn't seen your last
+  transaction. The SDK retries stale-nonce rejections (#68), and the smoke test waits for its own writes.
 - **If verification fails or times out,** rerun the same command with `--resume --verify`. It doesn't redeploy.
 - **If a broadcast fails partway,** use `--resume`. Don't start again from scratch: `AneRegistry` is deployed
   with `CREATE2`, so a fresh run would collide with the registry that's already there.

@@ -15,6 +15,23 @@ RPC provider and alternate, contract explorer, faucet wallet and mint authority,
 - Contract vulnerability: publish impact, admin capabilities, pause/migration plan, independent review and user notices.
 - Chain reset: publish migration/version strategy; testnet tokens carry no value or continuity guarantee.
 
+## Hosted sandbox API (`api.16ane.com`, #78)
+The [API monitor](../../.github/workflows/api-monitor.yml) reads `/healthz` every 30 minutes and keeps one open
+`api-alert` issue while anything below is wrong; it closes the issue itself once the API is healthy again. Run
+the same check by hand with `node --experimental-strip-types scripts/api-health.ts https://api.16ane.com`.
+Deployment, secrets and rollback: `DEPLOY_API.md`.
+
+| Alert | Meaning | Action |
+|---|---|---|
+| `… is unreachable` | No answer from the API | `fly status` / `fly logs --app 16ane-sandbox-api`; restart with `fly apps restart 16ane-sandbox-api`; roll back if a deploy caused it |
+| `/healthz answered 503` | The server can't reach its RPC | Check Base Sepolia status; point `ANE_RPC_URL` at the fallback in `networks/sandbox-sepolia.json` (`fly secrets set` or `fly.toml`) and redeploy |
+| `relayer … top it up` | The relayer holds less than what's left of today's gas budget | Send Base Sepolia ETH to the address in the alert. Only the relayer's address is needed; never move its key |
+| `gas budget … used up` | Sponsorship is paused until 00:00 UTC; transfers and self-paid claims still work | Look at `fly logs` and the faucet's `FaucetClaimed` events for one actor rotating keys; raise `ANE_RELAYER_GAS_BUDGET_WEI` only if the use is legitimate |
+| `registry is …, expected …` | The server points at another deployment | Fix `ANE_REGISTRY_ADDRESS` in `fly.toml` and redeploy |
+
+A relayer or provider key that may be exposed: generate a new one into Fly secrets (`DEPLOY_API.md` step 1),
+redeploy, and move any remaining test ETH from the old address. Both hold only test assets.
+
 ## Metrics and dashboards
 On-chain transfer counts, unique wallets (not unique humans), agent task completion, payments verified, merchant delivery success, provider sponsored actual costs, faucet claims/abuse rate, RPC latency, revocations, refunds and unresolved disputes. Clearly separate testnet activity from real economic transactions.
 

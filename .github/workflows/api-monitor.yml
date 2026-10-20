@@ -1,0 +1,76 @@
+name: API monitor
+
+# Watches the hosted sandbox API (#78): every 30 minutes it reads /healthz and, if the RPC is unreachable, the
+# relayer is running low, today's gas budget is used up or the server points at another deployment, it opens
+# one `api-alert` issue (kept up to date while the problem lasts) and closes it once the API is healthy again.
+# Runbook: docs/operations/OPERATIONS.md. Off until the repository variable SANDBOX_API_URL is set
+# (e.g. https://api.16ane.com). Holds no secrets: /healthz is public.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  health:
+    name: Check /healthz
+    if: vars.SANDBOX_API_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    env:
+      API_URL: ${{ vars.SANDBOX_API_URL }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Read /healthz
+        id: health
+        run: |
+          registry=$(jq -r .registryAddress networks/sandbox-sepolia.json)
+          set +e
+          node --experimental-strip-types scripts/api-health.ts "$API_URL" "$registry" > "$RUNNER_TEMP/report.txt" 2>&1
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/report.txt"
+
+      - name: Open or update the alert issue
+        if: steps.health.outputs.code != '0'
+        run: |
+          gh label create api-alert --color d93f0b --description "The sandbox API monitor found a problem" 2>/dev/null || true
+          {
+            echo "The [API monitor](https://github.com/${GH_REPO}/actions/workflows/api-monitor.yml) found a problem with \`${API_URL}\`:"
+            echo
+            sed 's/^/- /' "$RUNNER_TEMP/report.txt"
+            echo
+            echo "Last checked $(date -u +%Y-%m-%dT%H:%M:%SZ). Runbook: \`docs/operations/OPERATIONS.md\`. This issue closes itself once \`/healthz\` is healthy again."
+          } > "$RUNNER_TEMP/body.md"
+          n=$(gh issue list --label api-alert --state open --json number --jq '.[0].number // empty')
+          if [ -n "$n" ]; then
+            gh issue edit "$n" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --title "Sandbox API alert: ${API_URL}" --label api-alert --body-file "$RUNNER_TEMP/body.md"
+          fi
+          exit 1
+
+      - name: Close the alert issue on recovery
+        if: steps.health.outputs.code == '0'
+        run: |
+          for n in $(gh issue list --label api-alert --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Healthy again at $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+          done

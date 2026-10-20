@@ -57,16 +57,15 @@ curl -s https://16ane-sandbox-api.fly.dev/healthz
 address and balance, and its daily gas budget. Fly's health check uses the same endpoint.
 
 ## 3. Check it end to end
+From a checkout of this repo (no key needed):
 ```bash
-# A gasless claim, signed by a fresh throwaway key: its address must receive 16,000 tANE and still hold 0 ETH.
-ANE_OWNER_PRIVATE_KEY=$(cast wallet new --json | jq -r '.[0].private_key') \
-  node --experimental-strip-types packages/cli/bin/ane.mjs wallet fund --test --api-url https://16ane-sandbox-api.fly.dev
-# Without a proof, the faucet must refuse: 401.
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://16ane-sandbox-api.fly.dev/v1/faucet/claims \
-  -H 'content-type: application/json' -d '{"recipient":"0x0000000000000000000000000000000000000001"}'
+API_URL=https://16ane-sandbox-api.fly.dev node --experimental-strip-types scripts/smoke-api.ts
 ```
-(From a checkout of this repo. The throwaway key exists only in that one command's environment.)
-Then check the balance on Basescan, and run `scripts/smoke-sandbox.ts` against Base Sepolia as before.
+It checks `/healthz` (RPC, relayer balance, gas budget, the registry in `networks/sandbox-sepolia.json`); that a
+claim with no proof gets `401`; that a claim signed by a fresh in-memory key gets `201` and lands on-chain, with
+the recipient holding 0 ETH; the claim's status; `429` inside the cooldown; the `402` quote on a demo endpoint;
+and the service manifest's signature. It ends with `[smoke-api] PASS`. Then run `scripts/smoke-sandbox.ts`
+against Base Sepolia as before.
 
 **Check that clients can't forge `Fly-Client-IP`.** Fly's docs say the header holds the client address "from the
 perspective of Fly Proxy" but don't say a client-sent value is replaced, so test it. Each address gets one
@@ -91,12 +90,20 @@ so Fly terminates TLS and its `Fly-Client-IP` header carries the real client add
 (`ANE_CLIENT_IP_HEADER` in `fly.toml`). Through Cloudflare's proxy, every request would appear to come from
 Cloudflare, and per-client trial quotas would stop working.
 
-Then: `fly certs check api.16ane.com`, `curl -s https://api.16ane.com/healthz`, set **G1-13** to PASS, and
-update the site and README.
+Then: `fly certs check api.16ane.com`, run `scripts/smoke-api.ts` with `API_URL=https://api.16ane.com`, set
+**G1-13** to PASS, and update the site and README.
+
+## 5. Turn on the monitor
+Set the repository variable `SANDBOX_API_URL` to `https://api.16ane.com` (Settings → Secrets and variables →
+Actions → Variables, or `gh variable set SANDBOX_API_URL --body https://api.16ane.com`). The
+[API monitor](../../.github/workflows/api-monitor.yml) then reads `/healthz` every 30 minutes and opens an
+`api-alert` issue when something needs you; watch the repository's issues to be notified. Run it once by hand
+(`gh workflow run api-monitor.yml`) to check it.
 
 ## Operations
+What to do for each alert is in `docs/operations/OPERATIONS.md` ("Hosted sandbox API").
 - **Watch `/healthz`:** `relayer.lowBalance` turns true when the balance can't cover what's left of today's
-  gas budget. Top up the relayer before it empties.
+  gas budget. Top up the relayer before it empties. The monitor (step 5) alerts on it.
 - **Logs:** `fly logs --app 16ane-sandbox-api`. They never contain keys (`ADR-0010`); errors show an
   `errorId` that matches the client's response.
 - **One machine only:** state and the payment-replay guard assume a single process (#82). Don't

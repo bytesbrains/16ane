@@ -18,6 +18,7 @@
     "services/sandbox-server/src",
     "services/sandbox-server/test",
     "e2e",
+    "scripts",
     "test/web"
   ]
 }

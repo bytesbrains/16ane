@@ -8,6 +8,7 @@ import {
   type TransferWithAuthorization,
 } from "./crypto.ts";
 import { keccak256Utf8 } from "./keccak.ts";
+import { withTemporaryKeystore } from "./keystore.ts";
 import { redactSecrets, SecretKey } from "./secret.ts";
 import { recoverAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
 import {
@@ -203,8 +204,8 @@ export class AneClient {
   }
 
   /**
-   * Executes a state-changing contract call using `cast send`. The key is redacted from error messages, but
-   * it is passed to `cast` as `--private-key`, so it appears in the child's process arguments (#67).
+   * Executes a state-changing contract call using `cast send`. The key never appears in `cast`'s arguments:
+   * it reaches `cast` as a temporary encrypted keystore (#67), and it is redacted from error messages.
    */
   async sendContractTx(
     signer: SecretKey,
@@ -234,22 +235,13 @@ export class AneClient {
     signature: string,
     args: string[],
   ): Promise<{ txHash: string; blockNumber: number; status: number }> {
-    const cmdArgs = [
-      "send",
-      "--rpc-url",
-      this.rpcUrl,
-      "--private-key",
-      rawKey,
-      "--json",
-      to,
-      signature,
-      ...args,
-    ];
-    const { stdout } = await execFileAsync("cast", cmdArgs, {
-      env: {
-        ...process.env,
-        FOUNDRY_DISABLE_NIGHTLY_WARNING: "1",
-      },
+    const cmdArgs = ["send", "--rpc-url", this.rpcUrl, "--json", to, signature, ...args];
+    const { stdout } = await withTemporaryKeystore(rawKey, (keystoreEnv) => {
+      // Signer settings inherited from the caller's shell would override or conflict with the keystore.
+      const { ETH_KEYSTORE_ACCOUNT: _account, ETH_FROM: _from, ...inherited } = process.env;
+      return execFileAsync("cast", cmdArgs, {
+        env: { ...inherited, ...keystoreEnv, FOUNDRY_DISABLE_NIGHTLY_WARNING: "1" },
+      });
     });
     const parsed = JSON.parse(stdout.trim()) as {
       transactionHash: string;

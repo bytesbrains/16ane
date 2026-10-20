@@ -1,4 +1,5 @@
 export * from "./secret.ts";
+export * from "./keystore.ts";
 export * from "./keccak.ts";
 export * from "./secp256k1.ts";
 export * from "./abi.ts";

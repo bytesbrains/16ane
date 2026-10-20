@@ -65,5 +65,5 @@ test("concurrent sponsored claims can't overspend the budget", async (t) => {
         ).status,
     ),
   );
-  assert.deepEqual(statuses.sort(), [201, 503, 503]);
+  assert.deepEqual(statuses.sort((x, y) => x - y), [201, 503, 503]);
 });

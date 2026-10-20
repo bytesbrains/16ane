@@ -55,8 +55,14 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/v1/faucet/claims" -H
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/v1/demo/summarize" -H 'content-type: application/json' -d '{"text":"hi"}')
 [[ "$code" == "402" ]] || fail "expected a 402 x402 quote, got $code"
 
+# State survives a container restart (#75): the same recipient is still inside its cooldown.
+docker restart -t 10 "$CID" >/dev/null
+for _ in $(seq 1 60); do curl -sf "$API/healthz" >/dev/null && break; sleep 0.5; done
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/v1/faucet/claims" -H 'content-type: application/json' -d "{\"recipient\":\"$USER_ADDR\"}")
+[[ "$code" == "429" ]] || fail "cooldown was lost on restart (got $code; is ANE_STATE_PATH set?)"
+
 docker stop -t 10 "$CID" >/dev/null
 [[ "$(docker inspect "$CID" --format '{{.State.ExitCode}}')" == "0" ]] || fail "unclean shutdown"
 docker logs "$CID" 2>&1 | grep -qE '0x[0-9a-fA-F]{64}' && fail "a 32-byte hex value (key?) appeared in the logs"
 
-echo "PASS: image $IMAGE - healthz, gasless claim (16,000 tANE, user paid no gas), 429 cooldown, 402 quote, clean stop"
+echo "PASS: image $IMAGE - healthz, gasless claim (16,000 tANE, user paid no gas), 429 cooldown, 402 quote, state kept across restart, clean stop"

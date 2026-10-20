@@ -8,6 +8,8 @@ import {
   SecretKey,
   toChecksumAddress,
   TrialQuotaTracker,
+  type KeyValueStore,
+  MemoryKeyValueStore,
   type ServiceManifestPayload,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } from "./demo.ts";
@@ -25,6 +27,8 @@ export interface SandboxServerConfig {
   port?: number;
   /** Address to listen on; "0.0.0.0" in a container. Defaults to 127.0.0.1. */
   host?: string;
+  /** State that must survive restarts (#75). Defaults to memory; main.ts passes SQLite. */
+  store?: KeyValueStore;
   rpcUrl: string;
   chainId?: number;
   registryAddress: string;
@@ -78,19 +82,22 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   });
   const contracts = await client.resolveContracts();
   const faucetConfig = await readFaucetConfig(client, contracts.aneFaucet);
-  const faucetCooldowns = new RecipientCooldowns(faucetConfig.cooldownSeconds);
-  const verifier = new AnePaymentVerifier({ client, relayerKey });
+  const store = config.store ?? new MemoryKeyValueStore();
+  const faucetCooldowns = new RecipientCooldowns(faucetConfig.cooldownSeconds, store);
+  const verifier = new AnePaymentVerifier({ client, relayerKey, store });
 
-  const trialTracker = new TrialQuotaTracker({
-    enabled: true,
-    freeCallsPerCaller: config.trialFreeCallsPerCaller ?? 1,
-    globalDailyCap: config.trialGlobalDailyCap ?? 50,
-    sponsorDisclosure:
-      "Provider-sponsored sandbox trial (0 tANE charged; capped at 1 call/caller and 50 calls/day)",
-  });
-
-  const claimsById = new Map<string, ClaimStatusRecord>();
-  const directoryManifests = new Map<string, ServiceManifestPayload>();
+  const freeCallsPerCaller = config.trialFreeCallsPerCaller ?? 1;
+  const globalDailyCap = config.trialGlobalDailyCap ?? 50;
+  const trialTracker = new TrialQuotaTracker(
+    {
+      enabled: true,
+      freeCallsPerCaller,
+      globalDailyCap,
+      // The disclosure states the configured quotas, not fixed numbers (AGENTS.md: disclose sponsorship and quotas).
+      sponsorDisclosure: `Provider-sponsored sandbox trial (0 tANE charged; capped at ${freeCallsPerCaller} call(s)/caller and ${globalDailyCap} calls/day)`,
+    },
+    store,
+  );
 
   const demo: DemoContext = {
     client,
@@ -109,7 +116,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       providerKey,
       contracts.aneServiceDirectory,
     );
-    directoryManifests.set(signed.serviceId, signed);
+    store.set("directory.services", signed.serviceId, signed);
     return signed;
   };
 
@@ -234,7 +241,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
             createdAt: new Date().toISOString(),
             disclaimer: SANDBOX_DISCLAIMER,
           };
-          claimsById.set(claimId, record);
+          store.set("faucet.claims", claimId, record);
           sendJson(res, 201, record);
           return;
         } catch (err) {
@@ -252,7 +259,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
 
       if (method === "GET" && pathname.startsWith("/v1/faucet/claims/")) {
         const claimId = pathname.slice("/v1/faucet/claims/".length);
-        const record = claimsById.get(claimId);
+        const record = store.get<ClaimStatusRecord>("faucet.claims", claimId);
         if (!record) {
           sendError(res, 404, "ANE-E-1005", `Faucet claim ${claimId} not found`, false);
           return;
@@ -345,7 +352,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       if (method === "GET" && pathname === "/v1/services") {
         buildSignedManifest();
         sendJson(res, 200, {
-          services: Array.from(directoryManifests.values()),
+          services: store.values<ServiceManifestPayload>("directory.services"),
           disclaimer: SANDBOX_DISCLAIMER,
         });
         return;
@@ -365,7 +372,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
           );
           return;
         }
-        directoryManifests.set(manifest.serviceId, manifest);
+        store.set("directory.services", manifest.serviceId, manifest);
         sendJson(res, 201, {
           registered: true,
           serviceId: manifest.serviceId,

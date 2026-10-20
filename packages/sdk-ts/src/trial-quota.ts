@@ -1,3 +1,5 @@
+import { type KeyValueStore, MemoryKeyValueStore } from "./store.ts";
+
 export interface TrialQuotaConfig {
   enabled: boolean;
   freeCallsPerCaller: number;
@@ -5,23 +7,15 @@ export interface TrialQuotaConfig {
   sponsorDisclosure?: string;
 }
 
+// Counts are keyed by UTC day, so a new day starts from zero without any reset step, and a persistent store
+// (#75) keeps them across restarts.
 export class TrialQuotaTracker {
   readonly config: TrialQuotaConfig;
-  private callerCounts = new Map<string, number>();
-  private globalUsedToday = 0;
-  private currentDayKey = new Date().toISOString().slice(0, 10);
+  readonly store: KeyValueStore;
 
-  constructor(config: TrialQuotaConfig) {
+  constructor(config: TrialQuotaConfig, store: KeyValueStore = new MemoryKeyValueStore()) {
     this.config = config;
-  }
-
-  private rollDayIfNeeded(): void {
-    const today = new Date().toISOString().slice(0, 10);
-    if (today !== this.currentDayKey) {
-      this.currentDayKey = today;
-      this.globalUsedToday = 0;
-      this.callerCounts.clear();
-    }
+    this.store = store;
   }
 
   checkAndConsume(callerId: string): {
@@ -30,7 +24,10 @@ export class TrialQuotaTracker {
     remainingGlobalQuota: number;
     disclosure: string;
   } {
-    this.rollDayIfNeeded();
+    const day = new Date().toISOString().slice(0, 10);
+    const callerKey = `${day}:caller:${callerId.toLowerCase()}`;
+    const globalKey = `${day}:global`;
+    const globalUsedToday = this.store.get<number>("trial.quota", globalKey) ?? 0;
     const disclosure =
       this.config.sponsorDisclosure ??
       "Provider-sponsored sandbox compute trial (0 tANE charged; strict per-caller & global daily cap)";
@@ -42,25 +39,22 @@ export class TrialQuotaTracker {
         disclosure,
       };
     }
-    const usedByCaller = this.callerCounts.get(callerId.toLowerCase()) ?? 0;
-    if (
-      usedByCaller >= this.config.freeCallsPerCaller ||
-      this.globalUsedToday >= this.config.globalDailyCap
-    ) {
+    const usedByCaller = this.store.get<number>("trial.quota", callerKey) ?? 0;
+    if (usedByCaller >= this.config.freeCallsPerCaller || globalUsedToday >= this.config.globalDailyCap) {
       return {
         allowed: false,
         remainingCallerQuota: Math.max(0, this.config.freeCallsPerCaller - usedByCaller),
-        remainingGlobalQuota: Math.max(0, this.config.globalDailyCap - this.globalUsedToday),
+        remainingGlobalQuota: Math.max(0, this.config.globalDailyCap - globalUsedToday),
         disclosure,
       };
     }
     const nextCaller = usedByCaller + 1;
-    this.callerCounts.set(callerId.toLowerCase(), nextCaller);
-    this.globalUsedToday += 1;
+    this.store.set("trial.quota", callerKey, nextCaller);
+    this.store.set("trial.quota", globalKey, globalUsedToday + 1);
     return {
       allowed: true,
       remainingCallerQuota: Math.max(0, this.config.freeCallsPerCaller - nextCaller),
-      remainingGlobalQuota: Math.max(0, this.config.globalDailyCap - this.globalUsedToday),
+      remainingGlobalQuota: Math.max(0, this.config.globalDailyCap - globalUsedToday - 1),
       disclosure,
     };
   }

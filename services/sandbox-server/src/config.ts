@@ -17,6 +17,8 @@ const PRIVATE_KEY = /^0x[0-9a-fA-F]{64}$/;
 export function parseServerConfig(env: Record<string, string | undefined>): SandboxServerConfig & {
   port: number;
   host: string;
+  /** SQLite file for state that must survive restarts (#75); unset means memory only. */
+  statePath?: string;
 } {
   const problems: string[] = [];
   const get = (name: string) => env[name]?.trim() || undefined;
@@ -57,6 +59,7 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
   const trialGlobalDailyCap = integer("ANE_TRIAL_GLOBAL_DAILY_CAP", 50, 0, 1_000_000_000);
 
   const host = get("ANE_HOST") ?? "127.0.0.1";
+  const statePath = get("ANE_STATE_PATH");
   const trustProxyRaw = get("ANE_TRUST_PROXY") ?? "false";
   if (!["true", "false"].includes(trustProxyRaw)) problems.push("ANE_TRUST_PROXY must be true or false");
 
@@ -68,6 +71,7 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     providerPrivateKey,
     port,
     host,
+    statePath,
     chainId,
     trustProxy: trustProxyRaw === "true",
     trialFreeCallsPerCaller,

@@ -9,6 +9,7 @@ import {
   type TransferWithAuthorization,
 } from "./crypto.ts";
 import { type SecretKey } from "./secret.ts";
+import { type KeyValueStore, MemoryKeyValueStore } from "./store.ts";
 import { recoverAddress, toChecksumAddress } from "./secp256k1.ts";
 import {
   type X402PaymentRequirements,
@@ -39,34 +40,43 @@ export interface MerchantEndpointConfig {
 export class AnePaymentVerifier {
   readonly client: AneClient;
   readonly relayerKey: SecretKey;
-  private idempotencyStore = new Map<string, CachedIdempotentResponse>();
-  private consumedProofs = new Set<string>();
-  private receiptsById = new Map<string, X402Receipt>();
+  // Idempotency records, consumed payment proofs and receipts. A hosted server passes a persistent store
+  // (#75): losing consumed proofs on restart would let a used proof buy a service again.
+  readonly store: KeyValueStore;
 
-  constructor(params: { client: AneClient; relayerKey: SecretKey }) {
+  constructor(params: { client: AneClient; relayerKey: SecretKey; store?: KeyValueStore }) {
     this.client = params.client;
     this.relayerKey = params.relayerKey;
+    this.store = params.store ?? new MemoryKeyValueStore();
+  }
+
+  #consumed(id: string): boolean {
+    return this.store.has("x402.proofs", id.toLowerCase());
+  }
+
+  #consume(...ids: string[]): void {
+    for (const id of ids) this.store.set("x402.proofs", id.toLowerCase(), true);
   }
 
   getReceipt(idOrTxHash: string): X402Receipt | undefined {
-    return this.receiptsById.get(idOrTxHash.toLowerCase());
+    return this.store.get<X402Receipt>("x402.receipts", idOrTxHash.toLowerCase());
   }
 
   listReceipts(): X402Receipt[] {
     const unique = new Map<string, X402Receipt>();
-    for (const r of this.receiptsById.values()) {
+    for (const r of this.store.values<X402Receipt>("x402.receipts")) {
       unique.set(r.txHash.toLowerCase(), r);
     }
     return Array.from(unique.values());
   }
 
   recordReceipt(receipt: X402Receipt): void {
-    this.receiptsById.set(receipt.txHash.toLowerCase(), receipt);
+    this.store.set("x402.receipts", receipt.txHash.toLowerCase(), receipt);
     if (receipt.intentId) {
-      this.receiptsById.set(receipt.intentId.toLowerCase(), receipt);
+      this.store.set("x402.receipts", receipt.intentId.toLowerCase(), receipt);
     }
     if (receipt.paymentId) {
-      this.receiptsById.set(receipt.paymentId.toLowerCase(), receipt);
+      this.store.set("x402.receipts", receipt.paymentId.toLowerCase(), receipt);
     }
   }
 
@@ -80,7 +90,7 @@ export class AnePaymentVerifier {
     if (!idempotencyKey) {
       return { status: "MISS" };
     }
-    const existing = this.idempotencyStore.get(idempotencyKey);
+    const existing = this.store.get<CachedIdempotentResponse>("x402.idempotency", idempotencyKey);
     if (!existing) {
       return { status: "MISS" };
     }
@@ -98,7 +108,7 @@ export class AnePaymentVerifier {
     entry: CachedIdempotentResponse,
   ): void {
     if (idempotencyKey) {
-      this.idempotencyStore.set(idempotencyKey, entry);
+      this.store.set("x402.idempotency", idempotencyKey, entry);
     }
   }
 
@@ -265,8 +275,8 @@ export class AnePaymentVerifier {
         paymentId,
       } = hashSpendIntent(this.client.chainId, p);
       if (
-        this.consumedProofs.has(intentId.toLowerCase()) ||
-        this.consumedProofs.has(paymentId.toLowerCase())
+        this.#consumed(intentId) ||
+        this.#consumed(paymentId)
       ) {
         return {
           ok: false,
@@ -280,7 +290,7 @@ export class AnePaymentVerifier {
       let blockNumber: number;
 
       if (p.txHash && p.txHash !== "0x" + "00".repeat(32)) {
-        if (this.consumedProofs.has(p.txHash.toLowerCase())) {
+        if (this.#consumed(p.txHash)) {
           return {
             ok: false,
             status: 409,
@@ -338,9 +348,7 @@ export class AnePaymentVerifier {
         }
       }
 
-      this.consumedProofs.add(intentId.toLowerCase());
-      this.consumedProofs.add(paymentId.toLowerCase());
-      this.consumedProofs.add(txHash.toLowerCase());
+      this.#consume(intentId, paymentId, txHash);
 
       const receipt: X402Receipt = {
         x402Version: 2,
@@ -390,7 +398,7 @@ export class AnePaymentVerifier {
         expectedAsset,
         p,
       );
-      if (this.consumedProofs.has(structHash.toLowerCase())) {
+      if (this.#consumed(structHash)) {
         return {
           ok: false,
           status: 409,
@@ -412,8 +420,7 @@ export class AnePaymentVerifier {
         p,
         p.signature,
       );
-      this.consumedProofs.add(structHash.toLowerCase());
-      this.consumedProofs.add(settled.txHash.toLowerCase());
+      this.#consume(structHash, settled.txHash);
 
       const receipt: X402Receipt = {
         x402Version: 2,

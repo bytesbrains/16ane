@@ -1,7 +1,7 @@
 # 16ane sandbox API on Fly.io (ADR-0016, #78): the gasless faucet, x402 demo API and directory, from the same
 # portable image anyone can self-host (docs/operations/SELF_HOSTING.md). Organisation: bytesbrains.
 # Keys are Fly secrets, never in this file or on a command line (docs/operations/DEPLOY_API.md).
-# Do not deploy publicly before the abuse controls (#79) land.
+# Do not publish (api.16ane.com) before the abuse controls (#79) land; stop the machine between tests.
 app = "16ane-sandbox-api"
 primary_region = "sin" # closest Fly region to India-first users (no Mumbai region is listed today)
 
@@ -15,7 +15,8 @@ primary_region = "sin" # closest Fly region to India-first users (no Mumbai regi
   ANE_STATE_PATH = "/data/sandbox.sqlite"
   ANE_RELAYER_GAS_BUDGET_WEI = "50000000000000000" # 0.05 Base Sepolia ETH per UTC day (ADR-0006)
   # Set by Fly's proxy to the client's address. api.16ane.com is DNS-only (no Cloudflare proxy) so it stays the
-  # real client; behind another proxy it would be that proxy's address.
+  # real client; behind another proxy it would be that proxy's address. DEPLOY_API.md step 3 checks a client
+  # can't forge it.
   ANE_CLIENT_IP_HEADER = "fly-client-ip"
 
 # One always-on machine: the faucet cooldowns, idempotency records and consumed proofs live in SQLite on the

@@ -4,8 +4,11 @@ Runbook for #78 (`ADR-0016`): the reference server (gasless faucet, x402 demo AP
 `bytesbrains` organisation, from the same Docker image self-hosters run (`docs/operations/SELF_HOSTING.md`).
 Configuration lives in `fly.toml`; keys live only in Fly secrets.
 
-> **Gate:** don't make it public until the relayer gas budget (#76) and the abuse controls (#79) are merged.
-> Until then, deploying is fine for testing, but don't publish `api.16ane.com` or link to it.
+> **Gate:** don't make it public until the abuse controls (#79) are merged (the relayer gas budget, #76, is
+> already in). Until then, deploying is fine for testing, but don't publish `api.16ane.com` or link to it.
+> `16ane-sandbox-api.fly.dev` is reachable by anyone who finds the name, so **stop the machine after testing**
+> (`fly scale count 0 --app 16ane-sandbox-api`; `fly scale count 1` brings it back with its volume). While it
+> runs, the daily gas budget (`ANE_RELAYER_GAS_BUDGET_WEI`) caps what the relayer can spend.
 
 ## 0. Once: account and app
 1. A card on the `bytesbrains` organisation: https://fly.io/dashboard/bytesbrains/billing
@@ -52,6 +55,19 @@ curl -s -X POST https://16ane-sandbox-api.fly.dev/v1/faucet/claims \
   -H 'content-type: application/json' -d '{"recipient":"0x…"}'
 ```
 Then check the balance on Basescan, and run `scripts/smoke-sandbox.ts` against Base Sepolia as before.
+
+**Check that clients can't forge `Fly-Client-IP`.** Fly's docs say the header holds the client address "from the
+perspective of Fly Proxy" but don't say a client-sent value is replaced, so test it. Each address gets one
+sponsored trial call (`ANE_TRIAL_FREE_CALLS_PER_CALLER`, default 1). Spend yours, then claim another with a
+forged header:
+```bash
+for ip in 192.0.2.1 192.0.2.2; do
+  curl -s -o /dev/null -w '%{http_code}\n' -X POST https://16ane-sandbox-api.fly.dev/v1/demo/summarize \
+    -H 'x-trial-request: true' -H "Fly-Client-IP: $ip" -H 'content-type: text/plain' -d 'hello'
+done
+```
+The first may return `200`; the second must return `402`. If both return `200`, the forged header reached the
+server: remove `ANE_CLIENT_IP_HEADER` from `fly.toml` and redeploy before going public.
 
 ## 4. `api.16ane.com` (only after the gate above)
 ```bash

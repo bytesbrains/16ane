@@ -45,8 +45,17 @@ test("clientIp uses the right-most X-Forwarded-For entry behind a trusted proxy"
 });
 
 test("clientIp reads the platform proxy's header when one is configured (Fly-Client-IP on Fly.io)", () => {
-  const req = fakeRequest([], { "fly-client-ip": "198.51.100.9", "x-forwarded-for": "6.6.6.6" }, "172.16.0.2");
+  const req = fakeRequest([], { "fly-client-ip": "198.51.100.9", "x-forwarded-for": "192.0.2.66" }, "172.16.0.2");
   assert.equal(clientIp(req, false, "Fly-Client-IP"), "198.51.100.9");
   assert.equal(clientIp(req, false), "172.16.0.2", "ignored unless configured");
   assert.equal(clientIp(fakeRequest([], {}, "172.16.0.2"), false, "fly-client-ip"), "172.16.0.2", "falls back when absent");
+});
+
+test("clientIp ignores a configured header that doesn't hold an IP address", () => {
+  for (const forged of ["not-an-ip", "198.51.100.9, 192.0.2.66", "0x" + "ab".repeat(20)]) {
+    const req = fakeRequest([], { "fly-client-ip": forged }, "172.16.0.2");
+    assert.equal(clientIp(req, false, "fly-client-ip"), "172.16.0.2", forged);
+  }
+  const v6 = fakeRequest([], { "fly-client-ip": "2001:db8::1" }, "172.16.0.2");
+  assert.equal(clientIp(v6, false, "fly-client-ip"), "2001:db8::1");
 });

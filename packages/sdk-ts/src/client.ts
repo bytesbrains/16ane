@@ -20,6 +20,13 @@ import {
 
 const execFileAsync = promisify(execFile);
 
+// Load-balanced public RPCs (e.g. sepolia.base.org) can lag for a moment after a transaction confirms: the
+// next `cast send` gets a stale nonce and is rejected with "nonce too low", or with "replacement transaction
+// underpriced" by a node still holding the confirmed transaction as pending. Each send waits for its receipt,
+// so a rejected transaction was never broadcast, and retrying after a short wait cannot send it twice.
+const STALE_NONCE = /nonce too low|replacement transaction underpriced/i;
+const NONCE_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+
 function splitWords(hexData: string): string[] {
   const clean = hexData.startsWith("0x") ? hexData.slice(2) : hexData;
   const words: string[] = [];
@@ -196,8 +203,8 @@ export class AneClient {
   }
 
   /**
-   * Executes a state-changing contract call using `cast send` with ETH_PRIVATE_KEY
-   * passed only in the child process environment (never on the command line or in logs).
+   * Executes a state-changing contract call using `cast send`. The key is redacted from error messages, but
+   * it is passed to `cast` as `--private-key`, so it appears in the child's process arguments (#67).
    */
   async sendContractTx(
     signer: SecretKey,
@@ -206,47 +213,63 @@ export class AneClient {
     args: string[] = [],
   ): Promise<{ txHash: string; blockNumber: number; status: number }> {
     const rawKey = signer.unsafeUnwrap();
-    try {
-      const cmdArgs = [
-        "send",
-        "--rpc-url",
-        this.rpcUrl,
-        "--private-key",
-        rawKey,
-        "--json",
-        to,
-        signature,
-        ...args,
-      ];
-      const { stdout } = await execFileAsync("cast", cmdArgs, {
-        env: {
-          ...process.env,
-          FOUNDRY_DISABLE_NIGHTLY_WARNING: "1",
-        },
-      });
-      const parsed = JSON.parse(stdout.trim()) as {
-        transactionHash: string;
-        blockNumber: string | number;
-        status: string | number;
-      };
-      const blockNumber =
-        typeof parsed.blockNumber === "string"
-          ? Number(BigInt(parsed.blockNumber))
-          : parsed.blockNumber;
-      const status =
-        typeof parsed.status === "string" ? Number(BigInt(parsed.status)) : parsed.status;
-      if (status !== 1) {
-        throw new Error(`Transaction reverted: ${parsed.transactionHash}`);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.#castSend(rawKey, to, signature, args);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const delay = NONCE_RETRY_DELAYS_MS[attempt];
+        if (STALE_NONCE.test(msg) && delay !== undefined) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        throw new Error(redactSecrets(msg, [rawKey]));
       }
-      return {
-        txHash: parsed.transactionHash,
-        blockNumber,
-        status,
-      };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(redactSecrets(msg, [rawKey]));
     }
+  }
+
+  async #castSend(
+    rawKey: string,
+    to: string,
+    signature: string,
+    args: string[],
+  ): Promise<{ txHash: string; blockNumber: number; status: number }> {
+    const cmdArgs = [
+      "send",
+      "--rpc-url",
+      this.rpcUrl,
+      "--private-key",
+      rawKey,
+      "--json",
+      to,
+      signature,
+      ...args,
+    ];
+    const { stdout } = await execFileAsync("cast", cmdArgs, {
+      env: {
+        ...process.env,
+        FOUNDRY_DISABLE_NIGHTLY_WARNING: "1",
+      },
+    });
+    const parsed = JSON.parse(stdout.trim()) as {
+      transactionHash: string;
+      blockNumber: string | number;
+      status: string | number;
+    };
+    const blockNumber =
+      typeof parsed.blockNumber === "string"
+        ? Number(BigInt(parsed.blockNumber))
+        : parsed.blockNumber;
+    const status =
+      typeof parsed.status === "string" ? Number(BigInt(parsed.status)) : parsed.status;
+    if (status !== 1) {
+      throw new Error(`Transaction reverted: ${parsed.transactionHash}`);
+    }
+    return {
+      txHash: parsed.transactionHash,
+      blockNumber,
+      status,
+    };
   }
 
   async settleSpendIntentOnChain(

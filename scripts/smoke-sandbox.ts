@@ -16,6 +16,33 @@ import { readFaucetConfig } from "../services/sandbox-server/src/faucet.ts";
 const ONE_TANE = 10n ** 18n;
 const PAYMENT = 16n * ONE_TANE;
 
+// Public load-balanced RPCs can answer a read from a node that hasn't seen our latest confirmed transaction
+// yet, or fail a read outright (rate limits, a node mid-sync). Poll until the read reflects our own write
+// instead of trusting the first answer; if every attempt fails, report the last error.
+export async function waitFor<T>(
+  read: () => Promise<T>,
+  done: (value: T) => boolean,
+  what: string,
+  { attempts = 15, delayMs = 1000 } = {},
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const value = await read();
+      if (done(value)) return value;
+      lastError = undefined;
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  if (lastError !== undefined) {
+    const reason = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(`gave up waiting for ${what}: ${reason}`);
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
 export interface SmokeOptions {
   rpcUrl: string;
   registryAddress: string;
@@ -53,6 +80,7 @@ export async function runSmoke(opts: SmokeOptions): Promise<SmokeResult> {
   const { vaultAddress } = await owner.ensureVaultDeployed(0n);
   await owner.fundVault(vaultAddress, PAYMENT);
   const session = new AgentSession({ client, vaultAddress, sessionKey: generateKeypair().secretKey });
+  const versionBefore = await client.getPolicyVersion(vaultAddress);
   await owner.delegateSession(vaultAddress, session.sessionAddress, {
     mode: "FIXED",
     allowanceCap: PAYMENT,
@@ -69,16 +97,28 @@ export async function runSmoke(opts: SmokeOptions): Promise<SmokeResult> {
     quoteId: keccak256Utf8(`smoke-${Date.now()}`),
     serviceIdHash: keccak256Utf8("16ane.smoke.v1"),
     validBefore: Math.floor(Date.now() / 1000) + 300,
-    policyVersion: await client.getPolicyVersion(vaultAddress),
+    policyVersion: await waitFor(
+      () => client.getPolicyVersion(vaultAddress),
+      (version) => version > versionBefore,
+      "the new delegation's policy version",
+    ),
   });
   const settled = await client.settleSpendIntentOnChain(opts.ownerKey, signed.intent, signed.signature);
-  const check = await client.verifySettlementOnChain({
-    txHash: settled.txHash,
-    expectedPayee: merchant,
-    expectedAmount: PAYMENT,
-    expectedVault: vaultAddress,
-    expectedPaymentId: signed.paymentId,
-  });
+  const check = await waitFor(
+    () =>
+      client.verifySettlementOnChain({
+        txHash: settled.txHash,
+        expectedPayee: merchant,
+        expectedAmount: PAYMENT,
+        expectedVault: vaultAddress,
+        expectedPaymentId: signed.paymentId,
+      }),
+    // Both reasons can be a lagging node that hasn't seen the settlement yet; anything else is a real failure.
+    (result) =>
+      result.verified ||
+      !["Transaction receipt not found", "Payment ID not recorded in AneAgentVault"].includes(result.reason ?? ""),
+    "the payment receipt and record",
+  );
   if (!check.verified) throw new Error(`payment ${settled.txHash} did not verify: ${check.reason ?? "unknown"}`);
   log(`paid 16 tANE to ${merchant} in ${settled.txHash}; verified on-chain`);
 

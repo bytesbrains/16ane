@@ -113,6 +113,24 @@ export class RelayerGasBudget {
   }
 }
 
+/**
+ * The relayer's maxFeePerGas ceiling (ADR-0006): while the network's gas price is above it, sponsored sends wait
+ * instead of paying a spike. Answers 503 with Retry-After and returns true when the caller must not send.
+ */
+export async function refuseAboveFeeCeiling(
+  rpcCall: <T>(method: string, params: unknown[]) => Promise<T>,
+  maxFeeWei: bigint | undefined,
+  res: http.ServerResponse,
+  selfServe: string,
+): Promise<boolean> {
+  if (maxFeeWei === undefined) return false;
+  const gasPrice = BigInt(await rpcCall<string>("eth_gasPrice", []));
+  if (gasPrice <= maxFeeWei) return false;
+  res.setHeader("retry-after", "60");
+  sendError(res, 503, "ANE-E-1205", `The network's gas price (${gasPrice} wei) is above the relayer's ceiling (${maxFeeWei} wei); retry in a minute or ${selfServe}`, true);
+  return true;
+}
+
 /** 503 with Retry-After (until 00:00 UTC) and how to proceed without the relayer. */
 export function sendBudgetExhausted(
   res: http.ServerResponse,

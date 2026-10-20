@@ -66,6 +66,12 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     if (/^\d+$/.test(budgetRaw)) relayerGasBudgetWei = BigInt(budgetRaw);
     else problems.push("ANE_RELAYER_GAS_BUDGET_WEI must be a whole number of wei");
   }
+  const maxFeeRaw = get("ANE_RELAYER_MAX_FEE_WEI");
+  let relayerMaxFeeWei: bigint | undefined;
+  if (maxFeeRaw !== undefined) {
+    if (/^\d+$/.test(maxFeeRaw)) relayerMaxFeeWei = BigInt(maxFeeRaw);
+    else problems.push("ANE_RELAYER_MAX_FEE_WEI must be a whole number of wei");
+  }
   const trustProxyRaw = get("ANE_TRUST_PROXY") ?? "false";
   const clientIpHeader = get("ANE_CLIENT_IP_HEADER");
   if (clientIpHeader !== undefined && !/^[A-Za-z0-9-]+$/.test(clientIpHeader)) {
@@ -90,6 +96,7 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     host,
     statePath,
     relayerGasBudgetWei,
+    relayerMaxFeeWei,
     chainId,
     trustProxy: trustProxyRaw === "true",
     clientIpHeader,

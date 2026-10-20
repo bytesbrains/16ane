@@ -33,6 +33,45 @@ paths:
       responses:
         "200":
           description: Asset metadata
+  /v1/relay:
+    post:
+      summary: Submit an owner-signed action; the relayer pays the gas, so the owner never needs ETH (#77)
+      description: >-
+        One of four actions: `transfer` (EIP-3009 transferWithAuthorization of tANE; funding a vault is a
+        transfer to it), `createVault` (EIP-712 CreateVault(owner,salt,deadline), domain "16ane Relay" bound to the
+        factory), `setPolicy` (AneAgentVault.setPolicyWithSig) and `revoke` (revokeWithSig). The SDK's
+        OwnerWallet.signTransfer / signVaultCreation / signPolicy / signRevoke produce the fields. Shape, deadline
+        (30 s to 1 h ahead), signer, target (the tANE token, the factory, or a vault it created), the gas-price
+        ceiling and a simulation from the relayer's address are all checked before anything is sent, so a refused
+        request costs no gas. The relayer's daily gas budget is the only limit.
+      operationId: relaySignedAction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, signature]
+              properties:
+                action:
+                  type: string
+                  enum: [transfer, createVault, setPolicy, revoke]
+                signature:
+                  type: string
+                  description: 65-byte signature by the token holder (transfer) or vault owner
+      responses:
+        "201":
+          description: Sent and mined; returns txHash, blockNumber and, for createVault, vaultAddress
+        "400":
+          description: Unknown action or malformed field (ANE-E-1201)
+        "403":
+          description: Wrong signer, deadline out of range, or a target the relayer won't call (ANE-E-1202)
+        "409":
+          description: The same signed action is already being relayed (ANE-E-1203)
+        "422":
+          description: The simulation reverts, so nothing was sent (ANE-E-1204)
+        "503":
+          description: Gas price above the relayer's ceiling (ANE-E-1205) or today's gas budget used up (ANE-E-1006)
   /v1/faucet/claims:
     post:
       summary: Claim simulated tANE from the gasless sandbox faucet (max 16,000 tANE per recipient per hour)

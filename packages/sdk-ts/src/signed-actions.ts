@@ -3,7 +3,7 @@
 // (revokeWithSig) and a vault creation. The first three are checked by the contracts; createVault needs no
 // signature on-chain, so its signature is checked by the relay server only, to stop anyone spending the
 // relayer's budget on vaults for addresses that didn't ask for one.
-import { abiWordAddress, abiWordBytes32, abiWordUint } from "./abi.ts";
+import { abiWordAddress, abiWordBytes32, abiWordUint, encodeCallWithTrailingBytes, functionSelector } from "./abi.ts";
 import type { AneClient } from "./client.ts";
 import { hashEip712Domain, hashTypedDataDigest, type TransferWithAuthorization } from "./crypto.ts";
 import { keccak256, keccak256Utf8 } from "./keccak.ts";
@@ -123,6 +123,61 @@ export function hashVaultCreation(chainId: number | bigint, factory: string, own
   return hashTypedDataDigest(domain, structHash);
 }
 
+// ---- calldata, for a relay to simulate (eth_call) a submission before paying for it -------------------------
+
+export const TRANSFER_WITH_AUTHORIZATION_SIG =
+  "transferWithAuthorization(address,address,uint256,uint256,uint256,bytes32,bytes)";
+export const SET_POLICY_WITH_SIG_SIG =
+  "setPolicyWithSig((address,uint256,uint256,uint256,uint64,uint8,uint256),uint64,uint256,bytes)";
+export const REVOKE_WITH_SIG_SIG = "revokeWithSig(uint64,uint256,bytes)";
+export const CREATE_VAULT_SIG = "createVault(address,bytes32)";
+
+export function transferCalldata(t: SignedTransfer): string {
+  return encodeCallWithTrailingBytes(
+    TRANSFER_WITH_AUTHORIZATION_SIG,
+    [
+      abiWordAddress(t.from),
+      abiWordAddress(t.to),
+      abiWordUint(t.value),
+      abiWordUint(t.validAfter),
+      abiWordUint(t.validBefore),
+      abiWordBytes32(t.nonce),
+    ],
+    t.signature,
+  );
+}
+
+export function setPolicyCalldata(s: SignedPolicy): string {
+  const p = s.policy;
+  return encodeCallWithTrailingBytes(
+    SET_POLICY_WITH_SIG_SIG,
+    [
+      abiWordAddress(p.agentSigner),
+      abiWordUint(p.maxTotalSpend),
+      abiWordUint(p.maxPerTx),
+      abiWordUint(p.dailyLimit),
+      abiWordUint(p.expiry),
+      abiWordUint(p.budgetMode),
+      abiWordUint(p.revolvingTreasuryCeiling),
+      abiWordUint(s.expectedPolicyVersion),
+      abiWordUint(s.deadline),
+    ],
+    s.signature,
+  );
+}
+
+export function revokeCalldata(r: SignedRevoke): string {
+  return encodeCallWithTrailingBytes(
+    REVOKE_WITH_SIG_SIG,
+    [abiWordUint(r.expectedPolicyVersion), abiWordUint(r.deadline)],
+    r.signature,
+  );
+}
+
+export function createVaultCalldata(owner: string, salt: string): string {
+  return functionSelector(CREATE_VAULT_SIG) + abiWordAddress(owner) + abiWordBytes32(salt);
+}
+
 // ---- submitting (the relayer pays the gas) ----------------------------------------------------------------
 
 // The factory accepts createVault from anyone, so the check that the owner asked for this vault happens here,
@@ -148,7 +203,7 @@ export async function relayCreateVault(
     throw new Error("Vault creation refused: not signed by the owner");
   }
   const vaultAddress = await client.computeVaultAddress(creation.owner, creation.salt);
-  const res = await client.sendContractTx(relayerKey, aneVaultFactory, "createVault(address,bytes32)", [
+  const res = await client.sendContractTx(relayerKey, aneVaultFactory, CREATE_VAULT_SIG, [
     toChecksumAddress(creation.owner),
     creation.salt,
   ]);
@@ -163,7 +218,7 @@ export async function relaySetPolicy(
   const res = await client.sendContractTx(
     relayerKey,
     signed.vault,
-    "setPolicyWithSig((address,uint256,uint256,uint256,uint64,uint8,uint256),uint64,uint256,bytes)",
+    SET_POLICY_WITH_SIG_SIG,
     [policyTupleArg(signed.policy), String(signed.expectedPolicyVersion), String(signed.deadline), signed.signature],
   );
   return { txHash: res.txHash, blockNumber: res.blockNumber };
@@ -174,7 +229,7 @@ export async function relayRevoke(
   relayerKey: SecretKey,
   signed: SignedRevoke,
 ): Promise<{ txHash: string; blockNumber: number }> {
-  const res = await client.sendContractTx(relayerKey, signed.vault, "revokeWithSig(uint64,uint256,bytes)", [
+  const res = await client.sendContractTx(relayerKey, signed.vault, REVOKE_WITH_SIG_SIG, [
     String(signed.expectedPolicyVersion),
     String(signed.deadline),
     signed.signature,

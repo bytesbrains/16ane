@@ -119,6 +119,11 @@ export class AneClient {
     return this.#reads.read<string>("eth_call", [{ to, data }]);
   }
 
+  /** eth_call as `from` (no state change): what sending this call would do, including whether it reverts. */
+  async simulateCall(from: string, to: string, data: string): Promise<string> {
+    return this.#reads.read<string>("eth_call", [{ from, to, data }]);
+  }
+
   async getEthBalance(account: string): Promise<bigint> {
     return BigInt(await this.#reads.read<string>("eth_getBalance", [account]));
   }

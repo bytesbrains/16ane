@@ -3,6 +3,7 @@
 //   RPC_URL=... REGISTRY_ADDRESS=0x... SMOKE_OWNER_KEY=0x... \
 //     node --experimental-strip-types scripts/smoke-sandbox.ts
 // Optional: CHAIN_ID (default 84532). Needs Foundry's `cast` on PATH, like the SDK.
+import { pathToFileURL } from "node:url";
 import {
   AgentSession,
   AneClient,
@@ -127,7 +128,7 @@ export async function runSmoke(opts: SmokeOptions): Promise<SmokeResult> {
   return { contracts, vaultAddress, merchant, paymentTxHash: settled.txHash };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { RPC_URL, REGISTRY_ADDRESS, SMOKE_OWNER_KEY, CHAIN_ID } = process.env;
   if (!RPC_URL || !REGISTRY_ADDRESS || !SMOKE_OWNER_KEY) {
     console.error("Set RPC_URL, REGISTRY_ADDRESS and SMOKE_OWNER_KEY (see docs/operations/DEPLOY_SANDBOX.md).");

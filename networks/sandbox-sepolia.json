@@ -18,7 +18,8 @@
     "aneTestToken": "0x5848C9935C1cA2D2a93329DFd31f0883277b8335",
     "aneVaultFactory": "0x7df7eb00d57B6B8E07966cD92417b4aCCD53520E",
     "aneFaucet": "0xB1dAb3B54170b667Ac92aa7e584D0bf8570ffE1a",
-    "aneServiceDirectory": "0xD491B5b7dbCA7245cB12Aa0CcBfAB56722141Ec5"
+    "aneServiceDirectory": "0xD491B5b7dbCA7245cB12Aa0CcBfAB56722141Ec5",
+    "aneAgentVaultImplementation": "0xC8Db7C69970b6Cec4Cc897EF513968C4cde59Ae8"
   },
   "deployment": {
     "deployedAt": "2026-10-20T10:11:42Z",
@@ -27,6 +28,6 @@
     "firstBlock": 48361407,
     "lastBlock": 48361414,
     "registryTx": "0xcb499d5a71e2c5047409034ade63d51d43bacaad14c94b87799a9e8b6340c049",
-    "explorerVerified": false
+    "explorerVerified": true
   }
 }

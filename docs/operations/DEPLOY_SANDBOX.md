@@ -61,6 +61,14 @@ are the deployment's transactions.
 - **Public-RPC lag.** Load-balanced endpoints can briefly answer from a node that hasn't seen your last
   transaction. The SDK retries stale-nonce rejections (#68), and the smoke test waits for its own writes.
 - **If verification fails or times out,** rerun the same command with `--resume --verify`. It doesn't redeploy.
+  If the broadcast record has been overwritten (see above), verify each contract directly with its constructor
+  arguments, as the 2026-10-20 deployment was, and remember the `AneAgentVault` implementation that
+  `AneVaultFactory` deploys in its constructor (`cast call <factory> 'vaultImplementation()(address)'`):
+  ```bash
+  forge verify-contract <address> src/AneFaucet.sol:AneFaucet --chain 84532 --watch \
+    --constructor-args $(cast abi-encode 'c(address,address,uint256,uint64,uint256)' <tANE> <deployer> <claim> <cooldown> <dailyCap>)
+  ```
+  `ETHERSCAN_API_KEY` in `.env` is picked up automatically; Etherscan API v2 uses one key for Basescan too.
 - **If a broadcast fails partway,** use `--resume`. Don't start again from scratch: `AneRegistry` is deployed
   with `CREATE2`, so a fresh run would collide with the registry that's already there.
 

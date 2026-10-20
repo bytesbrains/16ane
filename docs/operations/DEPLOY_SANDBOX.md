@@ -53,7 +53,9 @@ forge script script/DeploySandbox.s.sol:DeploySandbox \
   --rpc-url $RPC_URL --account sandbox-deployer --sender $DEPLOYER \
   --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
 ```
-The console prints the five addresses (`AneRegistry: 0x…` and so on). The transaction log is in
+The console prints the five addresses (`AneRegistry: 0x…` and so on). It doesn't print the sixth contract, the
+`AneAgentVault` implementation that `AneVaultFactory` deploys in its constructor; read it with
+`cast call <factory> 'vaultImplementation()(address)' --rpc-url $RPC_URL`. The transaction log is in
 `broadcast/DeploySandbox.s.sol/84532/run-latest.json`, which git ignores. **Copy it somewhere safe straight away:** the
 E2E suite and local tests run Anvil with chain id `84532` too, so the next local run overwrites that file, and
 `--resume` would then pick up the wrong deployment. The chain stays the source of truth: the deployer's nonces 0–6
@@ -61,6 +63,14 @@ are the deployment's transactions.
 - **Public-RPC lag.** Load-balanced endpoints can briefly answer from a node that hasn't seen your last
   transaction. The SDK retries stale-nonce rejections (#68), and the smoke test waits for its own writes.
 - **If verification fails or times out,** rerun the same command with `--resume --verify`. It doesn't redeploy.
+  If the broadcast record has been overwritten (see above), verify each contract directly with its constructor
+  arguments, as the 2026-10-20 deployment was, and remember the `AneAgentVault` implementation that
+  `AneVaultFactory` deploys in its constructor (`cast call <factory> 'vaultImplementation()(address)' --rpc-url $RPC_URL`):
+  ```bash
+  forge verify-contract <address> src/AneFaucet.sol:AneFaucet --chain 84532 --watch \
+    --constructor-args $(cast abi-encode 'c(address,address,uint256,uint64,uint256)' <tANE> <deployer> <claim> <cooldown> <dailyCap>)
+  ```
+  `ETHERSCAN_API_KEY` in `.env` is picked up automatically; Etherscan API v2 uses one key for Basescan too.
 - **If a broadcast fails partway,** use `--resume`. Don't start again from scratch: `AneRegistry` is deployed
   with `CREATE2`, so a fresh run would collide with the registry that's already there.
 
@@ -83,7 +93,8 @@ It prints `[smoke] PASS` on success. The same script runs in the E2E suite again
 (`e2e/smoke-script.ts`), so it stays in step with the contracts and SDK.
 
 ## 6. Publish (one PR)
-- **`networks/sandbox-sepolia.json`:** add `"registryAddress"` and a `"contracts"` object with the five addresses,
+- **`networks/sandbox-sepolia.json`:** add `"registryAddress"` and a `"contracts"` object with the six addresses (the five above plus
+  `aneAgentVaultImplementation`),
   plus the deployment block number and the commit it was deployed from.
 - **`docs/planning/LAUNCH_READINESS.md`:** set **G1-12** to PASS, with Basescan links for each contract.
 - **README status line and 16ane.com:** move "Contracts on the Base Sepolia testnet" from *Not live yet* to live,

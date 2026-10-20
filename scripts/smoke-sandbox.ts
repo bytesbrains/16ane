@@ -17,12 +17,28 @@ const ONE_TANE = 10n ** 18n;
 const PAYMENT = 16n * ONE_TANE;
 
 // Public load-balanced RPCs can answer a read from a node that hasn't seen our latest confirmed transaction
-// yet. Poll until the read reflects our own write instead of trusting the first answer.
-async function waitFor<T>(read: () => Promise<T>, done: (value: T) => boolean, what: string): Promise<T> {
-  for (let attempt = 0; attempt < 15; attempt++) {
-    const value = await read();
-    if (done(value)) return value;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+// yet, or fail a read outright (rate limits, a node mid-sync). Poll until the read reflects our own write
+// instead of trusting the first answer; if every attempt fails, report the last error.
+export async function waitFor<T>(
+  read: () => Promise<T>,
+  done: (value: T) => boolean,
+  what: string,
+  { attempts = 15, delayMs = 1000 } = {},
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const value = await read();
+      if (done(value)) return value;
+      lastError = undefined;
+    } catch (err) {
+      lastError = err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  if (lastError !== undefined) {
+    const reason = lastError instanceof Error ? lastError.message : String(lastError);
+    throw new Error(`gave up waiting for ${what}: ${reason}`);
   }
   throw new Error(`timed out waiting for ${what}`);
 }

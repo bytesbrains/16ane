@@ -1,6 +1,6 @@
 # ADR-0016: Hosting the public faucet and reference demo server
 
-- **Status:** Proposed (2026-10-20). Needs a maintainer decision on the host (see *Decision needed*).
+- **Status:** Accepted (2026-10-20). The maintainer chose **Option A (Fly.io)**, built as a portable Docker image so it can move to another platform if needed.
 - **Date and owners:** 2026-10-20 | 16ane Maintainers
 - **Related requirements:** REQ-001 (no hosted dependency for core transfers), REQ-002 (faucet), REQ-011 (five-minute quickstart), REQ-012 (no-value disclosures), REQ-014 (sponsored-compute caps), REQ-105 (metered relayer)
 - **Related issues:** #36 (sandbox go-live), #18 (self-hostable facilitator and indexer), #16 (sponsored trials), #61 (agent-speed limits), #67 (SDK read consistency)
@@ -61,15 +61,18 @@ signing lands.
 If the maintainer prefers a single vendor, **B** is the alternative: the same image, plus a Durable Object state
 adapter instead of SQLite.
 
-## Decision needed (maintainer)
-1. **Host:** A (Fly.io or a similar VM with a volume) or B (Cloudflare Containers). This also decides who owns the
-   account and the bill.
-2. **Monthly budget ceiling** for hosting, and for relayer gas (ADR-0006 starts at 0.05 Base Sepolia ETH/day).
-3. **Hostnames:** `api.16ane.com` for the API and gasless faucet; `faucet.16ane.com` only if a web faucet page is
-   wanted (#17 covers the dashboard).
-4. **Keys:** separate, dedicated relayer and provider keys, created for the host and never reused from the deployer.
+## Decision (maintainer, 2026-10-20)
+1. **Host: Option A, Fly.io:** a small always-on VM with a volume for SQLite state, behind Cloudflare for DNS and
+   TLS. It's built as a **portable Docker image**, so the same service can move to Cloudflare Containers, Cloud Run
+   or a self-hosted machine without code changes. The maintainer owns the Fly.io account and its bill.
 
-## Work (to become issues once the host is chosen)
+**Still open:**
+1. **Monthly budget ceiling** for hosting, and for relayer gas (ADR-0006 starts at 0.05 Base Sepolia ETH/day).
+2. **Hostnames:** `api.16ane.com` for the API and gasless faucet; `faucet.16ane.com` only if a web faucet page is
+   wanted (#17 covers the dashboard).
+3. **Keys:** separate, dedicated relayer and provider keys, created for the host and never reused from the deployer.
+
+## Work (tracked as issues)
 1. **Entrypoint and config:** a `services/sandbox-server` start command reading env (RPC URL, registry, keys from
    secrets, port), listening on a configurable host (`0.0.0.0` in containers), plus a health endpoint.
 2. **Persistent state:** a storage interface for cooldowns, claims, directory, trial quotas and idempotency/receipts,

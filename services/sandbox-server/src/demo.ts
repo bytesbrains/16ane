@@ -116,6 +116,8 @@ function summarize(rawBody: string): { summary: string; wordCount: number; conte
 function cleanData(rawBody: string): { inputCount: number; outputCount: number; items: string[] } {
   const parsedInput = rawBody ? (JSON.parse(rawBody) as { items?: string[] }) : { items: [] };
   const items = Array.isArray(parsedInput.items) ? parsedInput.items : [];
+  // Default (code-unit) order, not localeCompare: the same input must give the same output on every server,
+  // and locale order depends on the host's locale and ICU data.
   const normalized = Array.from(
     new Set(items.map((item) => String(item).trim().toLowerCase()).filter(Boolean)),
   ).sort();

@@ -243,7 +243,7 @@ test("a concurrent duplicate claim for the same recipient is refused with 409 be
       claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY))),
       claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY))),
     ]);
-    assert.deepEqual([a.status, b.status].sort(), [409, 502]);
+    assert.deepEqual([a.status, b.status].sort((x, y) => x - y), [409, 502]);
     assert.ok([a, b].some((r) => r.code === "ANE-E-1009"));
     assert.equal(methods.filter((m) => m === "relayedNonceUsed").length, 1, "only one claim got past the guard");
   });

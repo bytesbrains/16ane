@@ -32,12 +32,18 @@ contract DeploySandbox is Script {
 
     function run() external returns (DeployedStack memory stack) {
         _requireTestnetChain(block.chainid);
-
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerKey);
         bytes32 registrySalt = _resolveRegistrySalt();
 
-        vm.startBroadcast(deployerKey);
+        // Preferred for Base Sepolia: an encrypted keystore (`--account <name> --sender <address>`), so the
+        // key never sits in the environment (docs/operations/DEPLOY_SANDBOX.md). PRIVATE_KEY remains for
+        // CI's dry run and the local E2E harness.
+        uint256 deployerKey = vm.envOr("PRIVATE_KEY", uint256(0));
+        if (deployerKey != 0) {
+            vm.startBroadcast(deployerKey);
+        } else {
+            vm.startBroadcast();
+        }
+        (, address deployer,) = vm.readCallers();
         stack = _deployAll(deployer, registrySalt);
         vm.stopBroadcast();
     }

@@ -35,6 +35,7 @@ environment), never in a command you'd keep in shell history.
 | `ANE_CHAIN_ID` | no | Defaults to `84532` |
 | `ANE_TRUST_PROXY` | no | `true` only behind a reverse proxy that sets `X-Forwarded-For` |
 | `ANE_TRIAL_FREE_CALLS_PER_CALLER`, `ANE_TRIAL_GLOBAL_DAILY_CAP` | no | Sponsored-trial quotas (ADR-0008) |
+| `ANE_STATE_PATH` | no | SQLite file for state that must survive restarts: faucet cooldowns and claims, the service directory, trial quotas, x402 idempotency records, consumed payment proofs and receipts. The image sets `/data/sandbox.sqlite`; mount a volume at `/data` to keep it across container re-creation. Unset outside the image: memory only, with a startup warning |
 
 A bad configuration exits with code 2 and lists every problem, without printing key values.
 
@@ -64,5 +65,4 @@ Until the relayer gas budget (#76) and the abuse controls (#79) land, a public i
 - `scripts/docker-smoke.sh` runs the whole check against a local Anvil chain. CI runs it on every PR.
 
 ## Not yet
-State (cooldowns, claims, x402 idempotency and receipts) is in memory until #75 adds SQLite, so a restart forgets
-it. The relayer's daily gas budget (#76) and faucet abuse controls (#79) are also still to come.
+The relayer's daily gas budget (#76) and faucet abuse controls (#79) are still to come.

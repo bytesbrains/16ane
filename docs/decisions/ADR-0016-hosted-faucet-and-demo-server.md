@@ -87,6 +87,13 @@ adapter instead of SQLite.
 8. **Go-live** (#78): DNS, a smoke test against the hosted API, `G1-13` → PASS, and site and README updates.
 9. **Gasless use** (#77): sponsored signed actions (EIP-3009 transfers, vault signatures), so `tANE` holders never need ETH.
 
+## Implementation notes
+- **State store (#75):** a synchronous `KeyValueStore` interface (SDK) with a SQLite implementation in the server,
+  using Node's built-in `node:sqlite`, so there's no npm dependency or native build. Node 24 still labels
+  `node:sqlite` experimental; the image pins the exact Node version by digest, so its behaviour can't change
+  under us, and the interface lets the backend be swapped. The file lives at `/data/sandbox.sqlite`, the Fly.io
+  volume mount (`synchronous = FULL`, so recorded idempotency entries and consumed proofs survive a crash).
+
 ## Security and legal impacts
 - **Hot keys on a hosted machine:** keep relayer and provider balances small, set the gas budget, rotate the keys
   if the host is compromised, and never reuse the deployer or admin key.

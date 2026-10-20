@@ -21,3 +21,14 @@ updates:
     directory: /packages/sdk-py
     schedule:
       interval: weekly
+
+  # The sandbox server image (Dockerfile) pins Node by tag and digest; Dependabot updates both. Major versions
+  # stay a deliberate change (Node 24 is the LTS the image and CI use). The Foundry release and its SHA-256
+  # checksums in the Dockerfile are not something Dependabot can update; bump those by hand.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

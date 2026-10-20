@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { abiWordAddress, abiWordBytes32, abiWordUint, functionSelector } from "./abi.ts";
 import {
   hashServiceManifest,
@@ -8,18 +6,18 @@ import {
   type TransferWithAuthorization,
 } from "./crypto.ts";
 import { keccak256Utf8 } from "./keccak.ts";
-import { withTemporaryKeystore } from "./keystore.ts";
+import { castSend, type CastSendResult } from "./cast.ts";
 import { redactSecrets, SecretKey } from "./secret.ts";
-import { recoverAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
+import { privateKeyToAddress, recoverAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
 import {
   BUDGET_MODE,
   type AneClientOptions,
   type AneContractAddresses,
   type PaymentRecordView,
+  type SendHooks,
   type VaultAccountingSummary,
 } from "./types.ts";
 
-const execFileAsync = promisify(execFile);
 
 // Load-balanced public RPCs (e.g. sepolia.base.org) can lag for a moment after a transaction confirms: the
 // next `cast send` gets a stale nonce and is rejected with "nonce too low", or with "replacement transaction
@@ -58,12 +56,14 @@ export class AneClient {
   readonly facilitatorUrl?: string;
   private registryAddress?: string;
   private cachedContracts?: AneContractAddresses;
+  readonly #sendHooks?: SendHooks;
 
   constructor(options: AneClientOptions) {
     this.rpcUrl = options.rpcUrl;
     this.chainId = options.chainId ?? 84532;
     this.registryAddress = options.registryAddress;
     this.facilitatorUrl = options.facilitatorUrl;
+    this.#sendHooks = options.sendHooks;
     if (
       options.contracts?.aneTestToken &&
       options.contracts?.aneVaultFactory &&
@@ -214,9 +214,13 @@ export class AneClient {
     args: string[] = [],
   ): Promise<{ txHash: string; blockNumber: number; status: number }> {
     const rawKey = signer.unsafeUnwrap();
+    const from = privateKeyToAddress(signer);
+    // Outside the try: a refusal (e.g. the relayer's gas budget is used up) reaches the caller unchanged.
+    this.#sendHooks?.before?.(from);
     for (let attempt = 0; ; attempt++) {
+      let sent: CastSendResult;
       try {
-        return await this.#castSend(rawKey, to, signature, args);
+        sent = await castSend(this.rpcUrl, rawKey, to, signature, args);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const delay = NONCE_RETRY_DELAYS_MS[attempt];
@@ -226,45 +230,12 @@ export class AneClient {
         }
         throw new Error(redactSecrets(msg, [rawKey]));
       }
+      this.#sendHooks?.after?.(from, sent.feeWei, sent.txHash);
+      if (sent.status !== 1) throw new Error(`Transaction reverted: ${sent.txHash}`);
+      return { txHash: sent.txHash, blockNumber: sent.blockNumber, status: sent.status };
     }
   }
 
-  async #castSend(
-    rawKey: string,
-    to: string,
-    signature: string,
-    args: string[],
-  ): Promise<{ txHash: string; blockNumber: number; status: number }> {
-    // "--" ends cast's options: a contract argument such as "--value=1ether" must stay an argument, never
-    // become an option that changes the transaction (it would send ETH from the signer).
-    const cmdArgs = ["send", "--rpc-url", this.rpcUrl, "--json", "--", to, signature, ...args];
-    const { stdout } = await withTemporaryKeystore(rawKey, (keystoreEnv) => {
-      // Signer settings inherited from the caller's shell would override or conflict with the keystore.
-      const { ETH_KEYSTORE_ACCOUNT: _account, ETH_FROM: _from, ...inherited } = process.env;
-      return execFileAsync("cast", cmdArgs, {
-        env: { ...inherited, ...keystoreEnv, FOUNDRY_DISABLE_NIGHTLY_WARNING: "1" },
-      });
-    });
-    const parsed = JSON.parse(stdout.trim()) as {
-      transactionHash: string;
-      blockNumber: string | number;
-      status: string | number;
-    };
-    const blockNumber =
-      typeof parsed.blockNumber === "string"
-        ? Number(BigInt(parsed.blockNumber))
-        : parsed.blockNumber;
-    const status =
-      typeof parsed.status === "string" ? Number(BigInt(parsed.status)) : parsed.status;
-    if (status !== 1) {
-      throw new Error(`Transaction reverted: ${parsed.transactionHash}`);
-    }
-    return {
-      txHash: parsed.transactionHash,
-      blockNumber,
-      status,
-    };
-  }
 
   async settleSpendIntentOnChain(
     relayerKey: SecretKey,

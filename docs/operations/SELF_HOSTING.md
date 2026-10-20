@@ -35,6 +35,7 @@ environment), never in a command you'd keep in shell history.
 | `ANE_CHAIN_ID` | no | Defaults to `84532` |
 | `ANE_TRUST_PROXY` | no | `true` only behind a reverse proxy that sets `X-Forwarded-For` |
 | `ANE_TRIAL_FREE_CALLS_PER_CALLER`, `ANE_TRIAL_GLOBAL_DAILY_CAP` | no | Sponsored-trial quotas (ADR-0008) |
+| `ANE_RELAYER_GAS_BUDGET_WEI` | no | Most the relayer may spend on gas per UTC day, in wei (default `50000000000000000` = 0.05 ETH, `ADR-0006`). Counts the full fee, including Base's L1 data fee. Once reached, sponsored claims and settlements get `503 ANE-E-1006` with `Retry-After` until 00:00 UTC and a hint to pay their own gas |
 | `ANE_STATE_PATH` | no | SQLite file for state that must survive restarts: faucet cooldowns and claims, the service directory, trial quotas, x402 idempotency records, consumed payment proofs and receipts. The image sets `/data/sandbox.sqlite`; mount a volume at `/data` to keep it across container re-creation. Unset outside the image: memory only, with a startup warning |
 
 A bad configuration exits with code 2 and lists every problem, without printing key values.
@@ -50,12 +51,14 @@ addresses can make the relayer pay for up to the cap's worth of claims per day: 
 sandbox defaults, about 0.02 Base Sepolia ETH at 2026-10-20 gas prices. That empties a small relayer and stops the
 faucet for everyone else. Core transfers are unaffected.
 
-Until the relayer gas budget (#76) and the abuse controls (#79) land, a public instance should:
-- fund the relayer with only what you're prepared to lose, and watch its balance;
+The relayer gas budget (`ANE_RELAYER_GAS_BUDGET_WEI`, #76) caps that loss per day: once it's spent, the
+server stops sponsoring until 00:00 UTC, and `GET /healthz` shows the budget, today's spend, the relayer's
+balance and a `lowBalance` flag. Until the abuse controls (#79) land, a public instance should also:
+- fund the relayer with only what you're prepared to lose, and watch `/healthz`;
 - sit behind a reverse proxy or platform rate limit (with `ANE_TRUST_PROXY=true` only if that proxy sets
   `X-Forwarded-For`).
 
-16ane's own hosted instance (#78) waits for both.
+16ane's own hosted instance (#78) also waits for #79.
 
 ## Check it
 - `GET /healthz`: `200 {"status":"ok", …}` when the RPC answers, `503` otherwise. The image's Docker
@@ -65,4 +68,4 @@ Until the relayer gas budget (#76) and the abuse controls (#79) land, a public i
 - `scripts/docker-smoke.sh` runs the whole check against a local Anvil chain. CI runs it on every PR.
 
 ## Not yet
-The relayer's daily gas budget (#76) and faucet abuse controls (#79) are still to come.
+Faucet abuse controls (#79) are still to come.

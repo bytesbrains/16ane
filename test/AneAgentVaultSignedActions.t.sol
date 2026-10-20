@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {AneTestToken} from "../src/AneTestToken.sol";
 import {AneAgentVault} from "../src/AneAgentVault.sol";
 import {AneVaultFactory} from "../src/AneVaultFactory.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 /// @notice The owner-signed vault actions a relayer submits so an owner never needs ETH (#77, ADR-0006):
 /// setPolicyWithSig, revokeWithSig, and funding by an EIP-3009 transfer into the vault. The relayer here holds
@@ -249,7 +250,9 @@ contract AneAgentVaultSignedActionsTest is Test {
     }
 
     function test_FundWithPermit_CannotBeRelayed() public {
-        // The finding on #77: fundWithPermit treats msg.sender as the permit owner, so a relayer can't use it.
+        // The finding on #77: fundWithPermit treats msg.sender as the permit owner, so a relayer can't use it. The
+        // vault's permit(relayer, …) fails on the owner's signature and is swallowed by its try/catch; the transfer
+        // from the relayer then has no allowance. Pinning that error is what shows the cause.
         uint256 value = 100e18;
         uint256 deadline = block.timestamp + 1 hours;
         bytes32 permitTypehash =
@@ -259,7 +262,9 @@ contract AneAgentVaultSignedActionsTest is Test {
         (uint8 v, bytes32 r, bytes32 s) =
             vm.sign(ownerPk, keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)));
         vm.prank(relayer);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(vault), 0, value)
+        );
         vault.fundWithPermit(value, deadline, v, r, s);
         assertEq(token.balanceOf(owner), 10_000e18);
     }

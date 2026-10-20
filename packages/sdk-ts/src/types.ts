@@ -38,12 +38,20 @@ export interface PaymentRecordView {
   settledAt: number;
 }
 
-/** Hooks around every transaction an AneClient sends, e.g. a relayer gas budget (#76). */
+/**
+ * Hooks around every transaction an AneClient sends, e.g. a relayer gas budget (#76). Each runs once per
+ * transaction, not per retry: retries follow a node rejecting the send, which costs no fee.
+ */
 export interface SendHooks {
-  /** Before sending; throw to refuse the transaction. `from` is the signer's checksummed address. */
-  before?(from: string): void;
+  /**
+   * Before sending; throw to refuse the transaction. `from` is the signer's checksummed address. Whatever it
+   * returns (e.g. a budget reservation) is handed to `after` or `failed`.
+   */
+  before?(from: string): unknown;
   /** After it is mined, with the fee actually paid. Also called for a reverted transaction, which still paid. */
-  after?(from: string, feeWei: bigint, txHash: string): void;
+  after?(from: string, feeWei: bigint, txHash: string, ticket: unknown): void;
+  /** When sending failed without a receipt, so no fee is known. */
+  failed?(from: string, ticket: unknown): void;
 }
 
 export interface AneClientOptions {

@@ -168,3 +168,42 @@ test(
     assert.equal(fee, PAID_FEE);
   }, REVERTED),
 );
+
+test(
+  "before runs once per transaction, not per retry, and its return value reaches after",
+  withFakeCast(2, "Error: server returned an error response: error code -32000: nonce too low", async (calls) => {
+    const events: string[] = [];
+    const hooked = new AneClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: 84532,
+      contracts: {},
+      sendHooks: {
+        before: () => { events.push("before"); return "hold-1"; },
+        after: (_from, _fee, _hash, ticket) => events.push(`after:${String(ticket)}`),
+        failed: () => events.push("failed"),
+      },
+    });
+    await hooked.sendContractTx(key, to, "fund(uint256)", ["1"]);
+    assert.equal(calls(), 3);
+    assert.deepEqual(events, ["before", "after:hold-1"]);
+  }, PAID),
+);
+
+test(
+  "a send that fails without a receipt calls failed with the ticket, never after",
+  withFakeCast(1, "Error: execution reverted", async () => {
+    const events: string[] = [];
+    const hooked = new AneClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: 84532,
+      contracts: {},
+      sendHooks: {
+        before: () => "hold-1",
+        after: () => events.push("after"),
+        failed: (_from, ticket) => events.push(`failed:${String(ticket)}`),
+      },
+    });
+    await assert.rejects(hooked.sendContractTx(key, to, "fund(uint256)", ["1"]), /execution reverted/);
+    assert.deepEqual(events, ["failed:hold-1"]);
+  }, PAID),
+);

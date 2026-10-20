@@ -38,3 +38,30 @@ test("the relayer stops sponsoring gas once today's budget is spent", async (t) 
   assert.equal(health.relayer.remainingTodayWei, "0");
   assert.equal(health.relayer.dailyGasBudgetWei, "1");
 });
+
+// The race both #83 reviews found: concurrent claims must not all pass the check before any fee is recorded.
+test("concurrent sponsored claims can't overspend the budget", async (t) => {
+  const { rpcUrl, registryAddress } = await startSandboxStack(t);
+  const server = await createSandboxServer({
+    rpcUrl,
+    chainId: 84532,
+    registryAddress,
+    relayerPrivateKey: DEPLOYER_KEY,
+    providerPrivateKey: PROVIDER_KEY,
+    relayerGasBudgetWei: 1n,
+  });
+  t.after(() => server.close());
+  const statuses = await Promise.all(
+    ["0x00000000000000000000000000000000000BdE11", "0x00000000000000000000000000000000000BdE12", "0x00000000000000000000000000000000000BdE13"].map(
+      async (recipient) =>
+        (
+          await fetch(`${server.url}/v1/faucet/claims`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ recipient }),
+          })
+        ).status,
+    ),
+  );
+  assert.deepEqual(statuses.sort(), [201, 503, 503]);
+});

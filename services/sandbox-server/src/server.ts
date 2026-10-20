@@ -16,6 +16,7 @@ import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } f
 import { readFaucetConfig, RecipientCooldowns } from "./faucet.ts";
 import {
   DEFAULT_RELAYER_GAS_BUDGET_WEI,
+  type GasReservation,
   RelayerGasBudget,
   RelayerGasBudgetExceededError,
   sendBudgetExhausted,
@@ -85,19 +86,20 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   const providerAddress = privateKeyToAddress(providerKey);
   const relayerAddress = privateKeyToAddress(relayerKey);
   const store = config.store ?? new MemoryKeyValueStore();
-  // Every transaction the relayer pays for (faucet claims, x402 settlements) is checked against and counted
-  // toward its daily gas budget.
+  // Every transaction the relayer pays for (faucet claims, x402 settlements) reserves gas from its daily budget
+  // before it is sent, and is counted at its actual fee once mined.
   const gasBudget = new RelayerGasBudget(store, config.relayerGasBudgetWei ?? DEFAULT_RELAYER_GAS_BUDGET_WEI);
   const client = new AneClient({
     rpcUrl: config.rpcUrl,
     chainId,
     registryAddress: config.registryAddress,
     sendHooks: {
-      before: (from) => {
-        if (from === relayerAddress) gasBudget.check();
+      before: (from) => (from === relayerAddress ? gasBudget.reserve() : undefined),
+      after: (_from, feeWei, _txHash, ticket) => {
+        if (ticket) gasBudget.settle(ticket as GasReservation, feeWei);
       },
-      after: (from, feeWei) => {
-        if (from === relayerAddress) gasBudget.record(feeWei);
+      failed: (_from, ticket) => {
+        if (ticket) gasBudget.release(ticket as GasReservation);
       },
     },
   });
@@ -162,7 +164,6 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
         try {
           const blockHex = await client.rpcCall<string>("eth_blockNumber", []);
           const balanceWei = BigInt(await client.rpcCall<string>("eth_getBalance", [relayerAddress, "latest"]));
-          const remainingTodayWei = gasBudget.remainingTodayWei();
           sendJson(res, 200, {
             status: "ok",
             chainId,
@@ -173,9 +174,9 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
               balanceWei: balanceWei.toString(),
               dailyGasBudgetWei: gasBudget.dailyBudgetWei.toString(),
               spentTodayWei: gasBudget.spentTodayWei().toString(),
-              remainingTodayWei: remainingTodayWei.toString(),
-              // The balance can't cover what's left of today's budget: time to top up the relayer.
-              lowBalance: balanceWei < remainingTodayWei,
+              reservedTodayWei: gasBudget.reservedTodayWei().toString(),
+              remainingTodayWei: gasBudget.remainingTodayWei().toString(),
+              lowBalance: gasBudget.isLowBalance(balanceWei),
             },
             disclaimer: SANDBOX_DISCLAIMER,
           });

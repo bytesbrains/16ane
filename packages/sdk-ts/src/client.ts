@@ -216,7 +216,7 @@ export class AneClient {
     const rawKey = signer.unsafeUnwrap();
     const from = privateKeyToAddress(signer);
     // Outside the try: a refusal (e.g. the relayer's gas budget is used up) reaches the caller unchanged.
-    this.#sendHooks?.before?.(from);
+    const ticket = this.#sendHooks?.before?.(from);
     for (let attempt = 0; ; attempt++) {
       let sent: CastSendResult;
       try {
@@ -228,9 +228,10 @@ export class AneClient {
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
+        this.#sendHooks?.failed?.(from, ticket);
         throw new Error(redactSecrets(msg, [rawKey]));
       }
-      this.#sendHooks?.after?.(from, sent.feeWei, sent.txHash);
+      this.#sendHooks?.after?.(from, sent.feeWei, sent.txHash, ticket);
       if (sent.status !== 1) throw new Error(`Transaction reverted: ${sent.txHash}`);
       return { txHash: sent.txHash, blockNumber: sent.blockNumber, status: sent.status };
     }

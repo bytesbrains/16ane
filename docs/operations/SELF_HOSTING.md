@@ -52,8 +52,9 @@ sandbox defaults, about 0.02 Base Sepolia ETH at 2026-10-20 gas prices. That emp
 faucet for everyone else. Core transfers are unaffected.
 
 The relayer gas budget (`ANE_RELAYER_GAS_BUDGET_WEI`, #76) caps that loss per day: once it's spent, the
-server stops sponsoring until 00:00 UTC, and `GET /healthz` shows the budget, today's spend, the relayer's
-balance and a `lowBalance` flag. Until the abuse controls (#79) land, a public instance should also:
+server stops sponsoring until 00:00 UTC. Each sponsored send holds back up to 0.0001 ETH of the budget while it
+waits for its receipt, so concurrent requests can't overshoot it. `GET /healthz` shows the budget, today's spend
+and holds, the relayer's balance, and `lowBalance` (the balance is below one day's budget). Until the abuse controls (#79) land, a public instance should also:
 - fund the relayer with only what you're prepared to lose, and watch `/healthz`;
 - sit behind a reverse proxy or platform rate limit (with `ANE_TRUST_PROXY=true` only if that proxy sets
   `X-Forwarded-For`).

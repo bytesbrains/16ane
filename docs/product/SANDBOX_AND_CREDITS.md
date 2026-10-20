@@ -8,7 +8,7 @@
 Public web/API + CLI. Request input: wallet address, optional campaign code, captcha/proof-of-personhood or signed challenge. Configurable claim size (default 16,000 tANE, #61), cooldown, IP/device/wallet/risk quotas, abuse appeals, availability dashboard. Never require a paid deposit to claim. Publish faucet funding/minting authority. Do not make wallet identity claims stronger than Sybil defenses warrant.
 
 ## One sandbox currency across providers
-The public sandbox is meant to be a full ecosystem across platforms, not a single demo. Any platform that runs a sandbox, demo, trial or introductory/offer-credit tier can accept tANE for it:
+The public sandbox is meant to be a shared playground across platforms, not a single demo: platforms, service providers, agent developers and researchers use it to test an economy that agents run themselves, buying from, selling to and paying each other across services. Any platform that runs a sandbox, demo, trial or introductory/offer-credit tier can accept tANE for it:
 - **Providers** publish a signed service manifest with prices in tANE (`DISCOVERY.md`) and accept x402 payments. They choose which tiers accept tANE, at what price and within which limits, and they bear any real compute they sponsor (`ADR-0008`).
 - **Agents** pay every participating provider from one vault and one tANE balance, within the budget their owner set. tANE claimed from the faucet or received for serving other agents can be spent at any participating provider.
 - **Separate credits stay separate.** A provider may also grant its own off-chain introductory credits; those are metering entitlements on its side, not tANE (`TOKENOMICS.md`, "Separate accounting systems").

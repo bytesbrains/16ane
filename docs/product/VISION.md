@@ -4,7 +4,7 @@
 Agent developers currently stitch together API keys, subscriptions, card billing, provider credits, wallet signing, discovery and manual approval. Autonomous micro-commerce is difficult to demonstrate end-to-end. Providers separately implement trials, quotas and payment integration, so every platform's sandbox or introductory credits need their own sign-up, keys and rules.
 
 ## Mission
-Make it trivial to grant an AI agent a bounded crypto budget and let it autonomously buy, deliver, earn and return value across interoperable services.
+Make it trivial to grant an AI agent a bounded crypto budget and let it autonomously buy, deliver, earn and return value across interoperable services. The public testnet is the shared playground for this: platforms, providers, agent developers and researchers test an agent-run economy there, with tANE as the common, valueless test currency.
 
 ## Primary users
 1. **Agent developer**: fund a bot, connect SDK/MCP, buy a demo API, inspect receipts.

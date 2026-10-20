@@ -1,9 +1,11 @@
 # Reference sandbox server: gasless faucet, x402 demo API and directory (ADR-0016, #74).
 # One portable image for the hosted service (Fly.io) and for self-hosting (#18). It holds no secrets: keys
-# come from the environment at run time (see services/sandbox-server/src/main.ts).
+# come from the environment at run time (see services/sandbox-server/src/main.ts). The server listens on
+# 0.0.0.0 inside the container; publish the port to 127.0.0.1 unless you mean to expose the gasless faucet
+# (docs/operations/SELF_HOSTING.md, "Before exposing it publicly").
 #
 #   docker build -t 16ane-sandbox .
-#   docker run --rm -p 8787:8787 -e ANE_RPC_URL=... -e ANE_REGISTRY_ADDRESS=0x... \
+#   docker run --rm -p 127.0.0.1:8787:8787 -e ANE_RPC_URL=... -e ANE_REGISTRY_ADDRESS=0x... \
 #     -e ANE_RELAYER_PRIVATE_KEY=0x... 16ane-sandbox
 
 # --- Foundry's `cast` (the SDK sends transactions with it), pinned and checksum-verified per architecture.

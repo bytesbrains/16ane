@@ -17,7 +17,7 @@ USER_ADDR=0x00000000000000000000000000000000000AbC01
 if [[ "$(uname -s)" == "Linux" ]]; then
   NET=(--network host); RPC_FROM_CONTAINER="http://127.0.0.1:${PORT}"; API="http://127.0.0.1:8787"
 else
-  NET=(-p "${API_PORT}:8787"); RPC_FROM_CONTAINER="http://host.docker.internal:${PORT}"; API="http://127.0.0.1:${API_PORT}"
+  NET=(-p "127.0.0.1:${API_PORT}:8787"); RPC_FROM_CONTAINER="http://host.docker.internal:${PORT}"; API="http://127.0.0.1:${API_PORT}"
 fi
 RPC="http://127.0.0.1:${PORT}"
 

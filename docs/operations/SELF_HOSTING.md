@@ -16,7 +16,7 @@ secrets**: `.dockerignore` lets only `packages/sdk-ts/src` and `services/sandbox
 
 ## Run
 ```bash
-docker run --rm -p 8787:8787 \
+docker run --rm -p 127.0.0.1:8787:8787 \
   -e ANE_RPC_URL=https://sepolia.base.org \
   -e ANE_REGISTRY_ADDRESS=0x01d5daB670DE5868305eB862721ebE62772C3Df3 \
   -e ANE_RELAYER_PRIVATE_KEY \
@@ -37,6 +37,24 @@ environment), never in a command you'd keep in shell history.
 | `ANE_TRIAL_FREE_CALLS_PER_CALLER`, `ANE_TRIAL_GLOBAL_DAILY_CAP` | no | Sponsored-trial quotas (ADR-0008) |
 
 A bad configuration exits with code 2 and lists every problem, without printing key values.
+
+Inside the container the server listens on `0.0.0.0`; it has to, or the published port can't reach it.
+**Who can reach it is decided by how you publish the port.** `-p 127.0.0.1:8787:8787` (above) keeps it on your
+machine; `-p 8787:8787` or a public platform exposes it to everyone.
+
+## Before exposing it publicly
+The gasless faucet pays gas from the relayer key for every claim, and it has no login. Today the only limits are
+the faucet contract's: one claim per recipient per hour, and a daily mint cap. Someone rotating recipient
+addresses can make the relayer pay for up to the cap's worth of claims per day: **10,000 claims/day** with the
+sandbox defaults, about 0.02 Base Sepolia ETH at 2026-10-20 gas prices. That empties a small relayer and stops the
+faucet for everyone else. Core transfers are unaffected.
+
+Until the relayer gas budget (#76) and the abuse controls (#79) land, a public instance should:
+- fund the relayer with only what you're prepared to lose, and watch its balance;
+- sit behind a reverse proxy or platform rate limit (with `ANE_TRUST_PROXY=true` only if that proxy sets
+  `X-Forwarded-For`).
+
+16ane's own hosted instance (#78) waits for both.
 
 ## Check it
 - `GET /healthz`: `200 {"status":"ok", …}` when the RPC answers, `503` otherwise. The image's Docker

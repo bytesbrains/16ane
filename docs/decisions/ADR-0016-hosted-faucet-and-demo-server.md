@@ -85,7 +85,6 @@ adapter instead of SQLite.
 7. **Operations** (#78): secrets set-up, alerts on relayer balance and budget, logs without secrets (ADR-0010), and the
    runbook in `OPERATIONS.md`.
 8. **Go-live** (#78): DNS, a smoke test against the hosted API, `G1-13` → PASS, and site and README updates.
-
 9. **Gasless use** (#77): sponsored signed actions (EIP-3009 transfers, vault signatures), so `tANE` holders never need ETH.
 
 ## Security and legal impacts

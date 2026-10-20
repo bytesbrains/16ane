@@ -129,6 +129,16 @@ test("the cross-provider tANE section keeps its no-value qualifiers (AGENTS.md, 
   assert.match(body, /voluntarily/i, "provider participation is voluntary");
 });
 
+test("the published registry address matches networks/sandbox-sepolia.json", () => {
+  const network = JSON.parse(
+    readFileSync(path.resolve(import.meta.dirname, "../../networks/sandbox-sepolia.json"), "utf8"),
+  ) as { registryAddress?: string };
+  assert.match(network.registryAddress ?? "", /^0x[0-9a-fA-F]{40}$/, "the network file has a registry address");
+  const notice = read("index.html").match(/<section[^>]*data-disclaimer[\s\S]*?<\/section>/)?.[0] ?? "";
+  assert.ok(notice.includes(network.registryAddress ?? "-"), "the no-value notice shows the published registry address");
+  assert.doesNotMatch(notice, /will be published/, "the notice no longer speaks of a future deployment");
+});
+
 test("security.txt names a contact and has not expired (RFC 9116)", () => {
   const body = read(".well-known/security.txt");
   assert.match(body, new RegExp(`^Contact: ${REPO}/security/advisories/new$`, "m"));

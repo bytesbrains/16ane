@@ -48,7 +48,9 @@ export interface ClaimStatusRecord {
 }
 
 const ONE_TANE = 10n ** 18n;
-const FAUCET_DRIP_AMOUNT = 1600n * ONE_TANE; // 1,600 tANE (= 100 simulated INR)
+// Mirrors the AneFaucet defaults in script/DeploySandbox.s.sol (ADR-0006, #61).
+const FAUCET_DRIP_AMOUNT = 16_000n * ONE_TANE; // 16,000 tANE (= 1,000 simulated INR)
+const FAUCET_COOLDOWN_SECONDS = 3600; // per recipient
 
 export async function createSandboxServer(config: SandboxServerConfig): Promise<{
   server: http.Server;
@@ -183,7 +185,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
             res,
             400,
             "ANE-E-1002",
-            `Requested amount exceeds faucet cap (${FAUCET_DRIP_AMOUNT.toString()} wei = 1600 tANE)`,
+            `Requested amount exceeds faucet cap (${FAUCET_DRIP_AMOUNT.toString()} wei = 16,000 tANE)`,
             false,
           );
           return;
@@ -196,12 +198,12 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
           .digest("hex");
         const lastClaimAt = ipCooldowns.get(ipHash) ?? 0;
         const nowSec = Math.floor(Date.now() / 1000);
-        if (nowSec - lastClaimAt < 86400) {
+        if (nowSec - lastClaimAt < FAUCET_COOLDOWN_SECONDS) {
           sendError(
             res,
             429,
             "ANE-E-1003",
-            "Faucet cooldown active for this recipient (24h window)",
+            "Faucet cooldown active for this recipient (1h window)",
             true,
           );
           return;

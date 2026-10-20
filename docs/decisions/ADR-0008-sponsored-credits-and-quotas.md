@@ -1,6 +1,6 @@
 # ADR-0008: Provider-Sponsored Introductory Credits and Quota Accounting
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Accepted (2026-10-19); amended 2026-10-20 (#61)
 - **Date and owners:** 2026-10-19 | 16ane Product & Infrastructure Maintainers
 - **Related requirements:** REQ-012, REQ-014, REQ-103
 - **Related epics:** E02, E10, E14, E15
@@ -32,7 +32,7 @@ Adopt **Option A**:
    - **Tier 1 — Deterministic Zero-Cost Reference Endpoints (`E10`, P0):** Stateless, deterministic services (`demo.summarize.v1`, `demo.clean-json.v1`, `demo.price-feed.v1`) that require zero external LLM API spend, guaranteeing the 5-minute quickstart (`REQ-011`) works 24/7 even when all external sponsor budgets are `$0`.
    - **Tier 2 — Sponsored Real-Compute Campaign Engine (`E14`, P1):** Reference quota guard middleware implementing the `Campaign` schema from `SANDBOX_AND_CREDITS.md` (`campaign_id`, `provider_id`, `service_id`, `test_token_price`, `max_calls_per_wallet`, `max_tokens_per_request`, `provider_cost_budget`, `starts_at`, `expires_at`, `eligibility`, `terms_url`, `refund_policy`, `status`).
 2. **Hard Three-Level Circuit Breaker (`REQ-014`):**
-   - Level 1: Per-wallet / per-agent-vault daily call and token cap.
+   - Level 1: Per-wallet / per-agent-vault daily cap on **sponsored** calls and tokens. When it is reached the call is no longer sponsored and falls back to the endpoint's normal paid `402` quote; paid calls are never capped (#61).
    - Level 2: Per-service hourly real-cost velocity cap.
    - Level 3: Global campaign `provider_cost_budget` hard ceiling; trips atomically to `PAUSED_BUDGET_EXHAUSTED` when reached.
 

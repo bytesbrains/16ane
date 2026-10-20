@@ -37,6 +37,24 @@ contract AneRegistryTest is Test {
         assertGt(upd, 0);
     }
 
+    function test_DefaultFaucetConfigIsSizedForAgents() public {
+        // ADR-0006 (amended, #61): 16,000 tANE per claim, 1 hour per recipient, 160M tANE per day,
+        // and repeat claims from one relayer for different recipients are not throttled.
+        DeploySandbox.DeployedStack memory sandbox =
+            deployerScript.deployForTest(deployer, deployerScript.SANDBOX_REGISTRY_SALT());
+        assertEq(sandbox.faucet.claimAmount(), 16_000e18);
+        assertEq(sandbox.faucet.cooldownSeconds(), 1 hours);
+        assertEq(sandbox.faucet.maxDailyMint(), 160_000_000e18);
+
+        address relayer = makeAddr("relayer");
+        vm.startPrank(relayer);
+        for (uint160 i = 1; i <= 3; i++) {
+            sandbox.faucet.claim(address(i + 1000));
+        }
+        vm.stopPrank();
+        assertEq(sandbox.taneToken.balanceOf(address(1003)), 16_000e18);
+    }
+
     function test_MainnetChainIdRefusal() public {
         // ADR-0001 & ADR-0012: Strictly refuse Base Mainnet (8453) and Ethereum Mainnet (1)
         bytes32 salt = deployerScript.SANDBOX_REGISTRY_SALT();

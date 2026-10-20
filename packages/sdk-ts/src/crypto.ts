@@ -160,6 +160,15 @@ export interface ClaimAuthorization {
   nonce: string;
 }
 
+/** A ClaimAuthorization signed by its recipient: what AneFaucet.relayedClaim checks (ADR-0006, #79). */
+export interface SignedFaucetClaim {
+  recipient: string;
+  campaignId: string;
+  deadline: number;
+  nonce: string;
+  signature: string;
+}
+
 export function hashClaimAuthorization(
   chainId: bigint | number,
   faucetAddress: string,

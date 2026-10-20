@@ -51,6 +51,15 @@ async function waitForRpc(rpcUrl: string, timeoutMs = 10000): Promise<void> {
   throw new Error(`Timed out waiting for Anvil at ${rpcUrl}`);
 }
 
+// A faucet claim request signed by the recipient (#79): the proof agents and the CLI send.
+export async function signedClaimBody(client: AneClient, recipientKey: string): Promise<string> {
+  const c = await client.signFaucetClaim(new SecretKey(recipientKey));
+  return JSON.stringify({
+    recipient: c.recipient,
+    authorization: { deadline: c.deadline, nonce: c.nonce, signature: c.signature },
+  });
+}
+
 // Boots Anvil, deploys the sandbox contracts, starts the reference server and funds a
 // vault-backed agent session. Teardown is registered on `t`.
 export async function startSandboxStack(t: TestContext) {

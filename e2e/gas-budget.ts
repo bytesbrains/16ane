@@ -14,6 +14,7 @@ test("the relayer stops sponsoring gas once today's budget is spent", async (t) 
     relayerPrivateKey: DEPLOYER_KEY,
     providerPrivateKey: PROVIDER_KEY,
     relayerGasBudgetWei: 1n,
+    faucetOpenClaims: true, // keyless recipients; claim proofs are covered in faucet-proof.ts
   });
   t.after(() => server.close());
   const claim = (recipient: string) =>
@@ -49,6 +50,7 @@ test("concurrent sponsored claims can't overspend the budget", async (t) => {
     relayerPrivateKey: DEPLOYER_KEY,
     providerPrivateKey: PROVIDER_KEY,
     relayerGasBudgetWei: 1n,
+    faucetOpenClaims: true, // keyless recipients; claim proofs are covered in faucet-proof.ts
   });
   t.after(() => server.close());
   const statuses = await Promise.all(

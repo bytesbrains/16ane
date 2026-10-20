@@ -37,7 +37,7 @@ REGISTRY=$(PRIVATE_KEY=$KEY FOUNDRY_DISABLE_NIGHTLY_WARNING=1 forge script scrip
   || fail "deploy did not print the registry address"
 
 CID=$(docker run -d "${NET[@]}" -e ANE_RPC_URL="$RPC_FROM_CONTAINER" -e ANE_REGISTRY_ADDRESS="$REGISTRY" \
-  -e ANE_RELAYER_PRIVATE_KEY="$KEY" "$IMAGE")
+  -e ANE_RELAYER_PRIVATE_KEY="$KEY" -e ANE_FAUCET_OPEN_CLAIMS=true "$IMAGE") # keyless test address; proofs: e2e/faucet-proof.ts
 for _ in $(seq 1 60); do curl -sf "$API/healthz" >/dev/null && break; sleep 0.5; done
 curl -sf "$API/healthz" | grep -q '"status":"ok"' || { docker logs "$CID"; fail "/healthz is not ok"; }
 

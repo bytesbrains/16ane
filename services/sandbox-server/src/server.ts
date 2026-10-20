@@ -3,7 +3,6 @@ import {
   AneClient,
   AnePaymentVerifier,
   privateKeyToAddress,
-  randomBytes32Hex,
   SANDBOX_DISCLAIMER,
   SecretKey,
   toChecksumAddress,
@@ -13,7 +12,14 @@ import {
   type ServiceManifestPayload,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } from "./demo.ts";
-import { readFaucetConfig, RecipientCooldowns } from "./faucet.ts";
+import {
+  type ClaimStatusRecord,
+  type FaucetContext,
+  handleFaucetClaim,
+  readFaucetConfig,
+  RecipientCooldowns,
+  TurnstileVerifier,
+} from "./faucet.ts";
 import {
   DEFAULT_RELAYER_GAS_BUDGET_WEI,
   type GasReservation,
@@ -49,19 +55,18 @@ export interface SandboxServerConfig {
   trustProxy?: boolean;
   /** Header the platform's proxy sets to the client IP (e.g. "fly-client-ip"); overrides X-Forwarded-For. */
   clientIpHeader?: string;
+  /** Accept faucet claims with no proof (#79). Only for local or private servers; off by default. */
+  faucetOpenClaims?: boolean;
+  /** Cloudflare Turnstile secret for the web faucet; unset turns the Turnstile path off (#79). */
+  turnstileSecretKey?: string;
+  /** Hostname the Turnstile widget runs on (e.g. "app.16ane.com"); tokens from other sites are refused. */
+  turnstileExpectedHostname?: string;
+  /** Overrides Cloudflare's siteverify endpoint; for tests. */
+  turnstileSiteverifyUrl?: string;
   maxBodyBytes?: number;
 }
 
-export interface ClaimStatusRecord {
-  claimId: string;
-  recipient: string;
-  amount: string;
-  symbol: "tANE";
-  txHash: string;
-  blockNumber: number;
-  createdAt: string;
-  disclaimer: string;
-}
+export type { ClaimStatusRecord } from "./faucet.ts";
 
 export async function createSandboxServer(config: SandboxServerConfig): Promise<{
   server: http.Server;
@@ -107,8 +112,27 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   });
   const contracts = await client.resolveContracts();
   const faucetConfig = await readFaucetConfig(client, contracts.aneFaucet);
-  const faucetCooldowns = new RecipientCooldowns(faucetConfig.cooldownSeconds, store);
   const verifier = new AnePaymentVerifier({ client, relayerKey, store });
+  const faucet: FaucetContext = {
+    client,
+    relayerKey,
+    store,
+    chainId,
+    faucetAddress: contracts.aneFaucet,
+    faucetConfig,
+    cooldowns: new RecipientCooldowns(faucetConfig.cooldownSeconds, store),
+    turnstile: config.turnstileSecretKey
+      ? new TurnstileVerifier(config.turnstileSecretKey, {
+          expectedHostname: config.turnstileExpectedHostname,
+          siteverifyUrl: config.turnstileSiteverifyUrl,
+        })
+      : undefined,
+    openClaims: config.faucetOpenClaims ?? false,
+    trustProxy,
+    clientIpHeader: config.clientIpHeader,
+    maxBodyBytes,
+    inFlight: new Set(),
+  };
 
   const freeCallsPerCaller = config.trialFreeCallsPerCaller ?? 1;
   const globalDailyCap = config.trialGlobalDailyCap ?? 50;
@@ -228,72 +252,8 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
 
       // 4. Faucet Claims (POST /v1/faucet/claims & GET /v1/faucet/claims/:id)
       if (method === "POST" && pathname === "/v1/faucet/claims") {
-        const rawBody = await readRequestBody(req, maxBodyBytes);
-        const body = rawBody ? (JSON.parse(rawBody) as { recipient?: string; amount?: string }) : {};
-        if (!body.recipient) {
-          sendError(res, 400, "ANE-E-1001", "Missing recipient address", false);
-          return;
-        }
-        const recipient = toChecksumAddress(body.recipient);
-        // The contract always mints its fixed claimAmount; a smaller requested amount is accepted but ignored.
-        const amount = body.amount ? BigInt(body.amount) : faucetConfig.claimAmount;
-        if (amount <= 0n || amount > faucetConfig.claimAmount) {
-          sendError(
-            res,
-            400,
-            "ANE-E-1002",
-            `Requested amount exceeds the faucet claim (${faucetConfig.claimAmount.toString()} wei)`,
-            false,
-          );
-          return;
-        }
-
-        const nowSec = Math.floor(Date.now() / 1000);
-        const waitSeconds = faucetCooldowns.remainingSeconds(recipient, nowSec);
-        if (waitSeconds > 0) {
-          sendError(
-            res,
-            429,
-            "ANE-E-1003",
-            `Faucet cooldown active for this recipient; retry in ${waitSeconds}s`,
-            true,
-          );
-          return;
-        }
-
-        try {
-          const settled = await client.executeFaucetClaimOnChain(relayerKey, recipient);
-          faucetCooldowns.record(recipient, nowSec);
-          const nonce = randomBytes32Hex();
-          const claimId = `claim_${nonce.slice(2, 26)}`;
-          const record: ClaimStatusRecord = {
-            claimId,
-            recipient,
-            amount: faucetConfig.claimAmount.toString(),
-            symbol: "tANE",
-            txHash: settled.txHash,
-            blockNumber: settled.blockNumber,
-            createdAt: new Date().toISOString(),
-            disclaimer: SANDBOX_DISCLAIMER,
-          };
-          store.set("faucet.claims", claimId, record);
-          sendJson(res, 201, record);
-          return;
-        } catch (err) {
-          if (err instanceof RelayerGasBudgetExceededError) {
-            sendBudgetExhausted(res, err, "claim directly from the AneFaucet contract (claim(address)) with your own gas");
-            return;
-          }
-          sendLoggedError(
-            res,
-            502,
-            "ANE-E-1004",
-            "Faucet claim could not be completed on-chain; try again later",
-            true,
-            err,
-          );
-          return;
-        }
+        await handleFaucetClaim(faucet, req, res);
+        return;
       }
 
       if (method === "GET" && pathname.startsWith("/v1/faucet/claims/")) {

@@ -101,6 +101,15 @@ adapter instead of SQLite.
   (`ANE_CLIENT_IP_HEADER`). Behind Cloudflare's proxy every request would carry a Cloudflare address, and
   per-client quotas would break. Keys are generated straight into Fly secrets and never printed.
 
+- **Faucet claim proofs (#79):** the agents' "signed challenge" is the EIP-712 `FaucetClaim` that
+  `AneFaucet.relayedClaim` already verifies, signed by the recipient with a random nonce and a deadline 30 s to
+  1 h ahead. The contract enforces the nonce, so the server issues and stores nothing, and any relayer can
+  submit the same signature. Before sending, the server checks the signer, the deadline, the cooldown and
+  `relayedNonceUsed`, so a refused claim costs no gas. The web faucet sends a Turnstile token checked with
+  `siteverify` (`ANE_TURNSTILE_SECRET_KEY`, optionally `ANE_TURNSTILE_HOSTNAME`). Claims with no proof are
+  refused unless `ANE_FAUCET_OPEN_CLAIMS=true` (local or private servers). A signature proves key control, not
+  personhood, so fresh keys can still claim up to the contract's daily cap; the relayer gas budget bounds that cost.
+
 ## Security and legal impacts
 - **Hot keys on a hosted machine:** keep relayer and provider balances small, set the gas budget, rotate the keys
   if the host is compromised, and never reuse the deployer or admin key.

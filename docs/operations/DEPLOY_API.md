@@ -4,11 +4,11 @@ Runbook for #78 (`ADR-0016`): the reference server (gasless faucet, x402 demo AP
 `bytesbrains` organisation, from the same Docker image self-hosters run (`docs/operations/SELF_HOSTING.md`).
 Configuration lives in `fly.toml`; keys live only in Fly secrets.
 
-> **Gate:** don't make it public until the abuse controls (#79) are merged (the relayer gas budget, #76, is
-> already in). Until then, deploying is fine for testing, but don't publish `api.16ane.com` or link to it.
-> `16ane-sandbox-api.fly.dev` is reachable by anyone who finds the name, so **stop the machine after testing**
-> (`fly scale count 0 --app 16ane-sandbox-api`; `fly scale count 1` brings it back with its volume). While it
-> runs, the daily gas budget (`ANE_RELAYER_GAS_BUDGET_WEI`) caps what the relayer can spend.
+> **Gate:** the relayer gas budget (#76) and the faucet's claim proofs (#79) are in. Publish `api.16ane.com`
+> only after steps 2 and 3 pass, including the `Fly-Client-IP` check. `16ane-sandbox-api.fly.dev` is reachable
+> by anyone who finds the name; while it runs, the daily gas budget (`ANE_RELAYER_GAS_BUDGET_WEI`) caps what the
+> relayer can spend. `fly scale count 0 --app 16ane-sandbox-api` stops it; `fly scale count 1` brings it back
+> with its volume.
 
 ## 0. Once: account and app
 1. A card on the `bytesbrains` organisation: https://fly.io/dashboard/bytesbrains/billing
@@ -33,6 +33,14 @@ echo "provider address: $(echo "$W" | jq -r '.[0].address')"
 echo "$W" | jq -r '"ANE_PROVIDER_PRIVATE_KEY=\(.[0].private_key)"' | fly secrets import --app 16ane-sandbox-api --stage
 unset W
 ```
+Turnstile, for the web faucet page (#17), when that page exists: create a widget for `app.16ane.com` in the
+Cloudflare dashboard (`bytesbrains` account, Turnstile), then import its **secret** the same way, so it isn't
+typed on a command line, and set `ANE_TURNSTILE_HOSTNAME = "app.16ane.com"` in `fly.toml`. Until then, leave
+both unset: claims then need the recipient's signature.
+```bash
+pbpaste | sed 's/^/ANE_TURNSTILE_SECRET_KEY=/' | fly secrets import --app 16ane-sandbox-api --stage
+```
+
 Fly can't show secrets back. If a key is lost or exposed, generate a new one the same way and redeploy;
 both keys hold only test assets.
 
@@ -50,10 +58,14 @@ address and balance, and its daily gas budget. Fly's health check uses the same 
 
 ## 3. Check it end to end
 ```bash
-# A gasless claim for a fresh address: it must receive 16,000 tANE and still hold 0 ETH.
-curl -s -X POST https://16ane-sandbox-api.fly.dev/v1/faucet/claims \
-  -H 'content-type: application/json' -d '{"recipient":"0x…"}'
+# A gasless claim, signed by a fresh throwaway key: its address must receive 16,000 tANE and still hold 0 ETH.
+ANE_OWNER_PRIVATE_KEY=$(cast wallet new --json | jq -r '.[0].private_key') \
+  node --experimental-strip-types packages/cli/bin/ane.mjs wallet fund --test --api-url https://16ane-sandbox-api.fly.dev
+# Without a proof, the faucet must refuse: 401.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://16ane-sandbox-api.fly.dev/v1/faucet/claims \
+  -H 'content-type: application/json' -d '{"recipient":"0x0000000000000000000000000000000000000001"}'
 ```
+(From a checkout of this repo. The throwaway key exists only in that one command's environment.)
 Then check the balance on Basescan, and run `scripts/smoke-sandbox.ts` against Base Sepolia as before.
 
 **Check that clients can't forge `Fly-Client-IP`.** Fly's docs say the header holds the client address "from the
@@ -69,7 +81,7 @@ done
 The first may return `200`; the second must return `402`. If both return `200`, the forged header reached the
 server: remove `ANE_CLIENT_IP_HEADER` from `fly.toml` and redeploy before going public.
 
-## 4. `api.16ane.com` (only after the gate above)
+## 4. `api.16ane.com` (only after steps 2 and 3 pass)
 ```bash
 fly certs add api.16ane.com --app 16ane-sandbox-api
 ```

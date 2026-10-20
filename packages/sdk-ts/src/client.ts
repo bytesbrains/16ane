@@ -1,7 +1,10 @@
 import { abiWordAddress, abiWordBytes32, abiWordUint, functionSelector } from "./abi.ts";
 import {
+  hashClaimAuthorization,
   hashServiceManifest,
+  randomBytes32Hex,
   type ServiceManifestPayload,
+  type SignedFaucetClaim,
   type SpendIntent,
   type TransferWithAuthorization,
 } from "./crypto.ts";
@@ -306,6 +309,40 @@ export class AneClient {
       aneFaucet,
       "claim(address)",
       [toChecksumAddress(recipient)],
+    );
+    return { txHash: res.txHash, blockNumber: res.blockNumber };
+  }
+
+  /**
+   * Signs a faucet claim for the key's own address, so a relayer can claim for it without the recipient paying
+   * gas (AneFaucet.relayedClaim). The nonce is random and burned on-chain when used; the deadline defaults to
+   * 10 minutes from now.
+   */
+  async signFaucetClaim(
+    recipientKey: SecretKey,
+    options: { deadline?: number; nonce?: string } = {},
+  ): Promise<SignedFaucetClaim> {
+    const { aneFaucet } = await this.resolveContracts();
+    const claim = {
+      recipient: privateKeyToAddress(recipientKey),
+      campaignId: "0x" + "00".repeat(32),
+      deadline: options.deadline ?? Math.floor(Date.now() / 1000) + 600,
+      nonce: options.nonce ?? randomBytes32Hex(),
+    };
+    const { digest } = hashClaimAuthorization(this.chainId, aneFaucet, claim);
+    return { ...claim, signature: signDigest(digest, recipientKey).serialized };
+  }
+
+  async executeRelayedFaucetClaimOnChain(
+    relayerKey: SecretKey,
+    claim: SignedFaucetClaim,
+  ): Promise<{ txHash: string; blockNumber: number }> {
+    const { aneFaucet } = await this.resolveContracts();
+    const res = await this.sendContractTx(
+      relayerKey,
+      aneFaucet,
+      "relayedClaim(address,bytes32,uint256,bytes32,bytes)",
+      [toChecksumAddress(claim.recipient), claim.campaignId, claim.deadline.toString(), claim.nonce, claim.signature],
     );
     return { txHash: res.txHash, blockNumber: res.blockNumber };
   }

@@ -107,3 +107,14 @@ test(
     }
   }),
 );
+
+test(
+  "contract arguments that look like options can't become cast options",
+  withFakeCast(0, "", async (_calls, recorded) => {
+    await client.sendContractTx(key, to, "fund(uint256)", ["5", "--value=1ether"]);
+    const args = recorded()[0].args.split(" ");
+    const end = args.indexOf("--");
+    assert.ok(end >= 0 && end < args.indexOf(to), `"--" precedes the target and its arguments: ${args.join(" ")}`);
+    assert.ok(args.indexOf("--value=1ether") > end, "the option-looking argument stays a positional argument");
+  }),
+);

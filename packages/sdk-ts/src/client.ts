@@ -235,7 +235,9 @@ export class AneClient {
     signature: string,
     args: string[],
   ): Promise<{ txHash: string; blockNumber: number; status: number }> {
-    const cmdArgs = ["send", "--rpc-url", this.rpcUrl, "--json", to, signature, ...args];
+    // "--" ends cast's options: a contract argument such as "--value=1ether" must stay an argument, never
+    // become an option that changes the transaction (it would send ETH from the signer).
+    const cmdArgs = ["send", "--rpc-url", this.rpcUrl, "--json", "--", to, signature, ...args];
     const { stdout } = await withTemporaryKeystore(rawKey, (keystoreEnv) => {
       // Signer settings inherited from the caller's shell would override or conflict with the keystore.
       const { ETH_KEYSTORE_ACCOUNT: _account, ETH_FROM: _from, ...inherited } = process.env;

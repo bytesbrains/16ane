@@ -30,5 +30,6 @@ Nothing has been released yet: no version is tagged, and no package is published
 
 ### Security
 - SDK: private keys no longer appear in `cast`'s process arguments (#67). Each `sendContractTx` writes the key as a temporary encrypted V3 keystore (scrypt, aes-128-ctr) with a random password in a private temporary directory, passes it to `cast` as `ETH_KEYSTORE` / `ETH_PASSWORD`, and deletes it afterwards. The CLI, which reads keys from `ANE_*_PRIVATE_KEY`, gets this through the SDK.
+- SDK: contract arguments passed to `sendContractTx` can no longer be read by `cast` as options. A value such as `--value=1ether` used to make `cast` send ETH from the signer; `--` now ends the option list before the target and its arguments.
 - Sandbox server: request bodies capped at 1 MiB, trial quota keyed on the connection address, and `X-Forwarded-For` trusted only with `trustProxy` (#31).
 - Sandbox server: error responses no longer echo internal error text, which could include the RPC URL and the `cast send` command line (#52). Failures that may carry internal detail return a fixed message and an `errorId`; the detail is logged server-side with URLs redacted. A failed faucet claim is now `502` (was `429`), and a malformed JSON body is `400 ANE-E-4000` (was `500`).

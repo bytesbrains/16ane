@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc -p .",
-    "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts",
+    "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts",
     "test:sdk-py": "python3 -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' -v",
     "test:cli": "node --experimental-strip-types --test packages/cli/test/*.test.ts",
     "test:server": "node --experimental-strip-types --test services/sandbox-server/test/*.test.ts",

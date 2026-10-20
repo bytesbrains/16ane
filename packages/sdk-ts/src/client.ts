@@ -1,18 +1,17 @@
 import { abiWordAddress, abiWordBytes32, abiWordUint, functionSelector } from "./abi.ts";
 import {
-  hashClaimAuthorization,
-  hashServiceManifest,
-  randomBytes32Hex,
   type ServiceManifestPayload,
   type SignedFaucetClaim,
   type SpendIntent,
   type TransferWithAuthorization,
 } from "./crypto.ts";
-import { keccak256Utf8 } from "./keccak.ts";
 import { castSend, type CastSendResult } from "./cast.ts";
-import { ReadFloor, RECEIPT_RETRY_DELAYS_MS, sleep } from "./read-floor.ts";
+import { signServiceManifest, verifyServiceManifest } from "./manifest.ts";
+import { ReadFloor } from "./read-floor.ts";
+import { type SettlementCheck, type SettlementVerdict, verifySettlementOnChain } from "./settlement.ts";
+import * as tx from "./transactions.ts";
 import { redactSecrets, SecretKey } from "./secret.ts";
-import { privateKeyToAddress, recoverAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
+import { privateKeyToAddress, toChecksumAddress } from "./secp256k1.ts";
 import {
   BUDGET_MODE,
   type AneClientOptions,
@@ -262,14 +261,7 @@ export class AneClient {
     intent: SpendIntent,
     signatureHex: string,
   ): Promise<{ txHash: string; blockNumber: number }> {
-    const tupleArg = `(${intent.vault},${intent.merchant},${intent.amount.toString()},${intent.quoteId},${intent.serviceIdHash},${intent.validAfter.toString()},${intent.validBefore.toString()},${intent.nonce},${intent.policyVersion.toString()})`;
-    const res = await this.sendContractTx(
-      relayerKey,
-      intent.vault,
-      "settlePayment((address,address,uint256,bytes32,bytes32,uint256,uint256,bytes32,uint64),bytes)",
-      [tupleArg, signatureHex],
-    );
-    return { txHash: res.txHash, blockNumber: res.blockNumber };
+    return tx.settleSpendIntentOnChain(this, relayerKey, intent, signatureHex);
   }
 
   async settleExactAuthorizationOnChain(
@@ -277,22 +269,7 @@ export class AneClient {
     auth: TransferWithAuthorization,
     signatureHex: string,
   ): Promise<{ txHash: string; blockNumber: number }> {
-    const { aneTestToken } = await this.resolveContracts();
-    const res = await this.sendContractTx(
-      relayerKey,
-      aneTestToken,
-      "transferWithAuthorization(address,address,uint256,uint256,uint256,bytes32,bytes)",
-      [
-        auth.from,
-        auth.to,
-        auth.value.toString(),
-        auth.validAfter.toString(),
-        auth.validBefore.toString(),
-        auth.nonce,
-        signatureHex,
-      ],
-    );
-    return { txHash: res.txHash, blockNumber: res.blockNumber };
+    return tx.settleExactAuthorizationOnChain(this, relayerKey, auth, signatureHex);
   }
 
   async refundPaymentOnChain(
@@ -301,32 +278,11 @@ export class AneClient {
     paymentId: string,
     amount: bigint | string,
   ): Promise<{ txHash: string; blockNumber: number }> {
-    const { aneTestToken } = await this.resolveContracts();
-    await this.sendContractTx(merchantKey, aneTestToken, "approve(address,uint256)", [
-      vaultAddress,
-      amount.toString(),
-    ]);
-    const res = await this.sendContractTx(
-      merchantKey,
-      vaultAddress,
-      "refundPayment(bytes32,uint256)",
-      [paymentId, amount.toString()],
-    );
-    return { txHash: res.txHash, blockNumber: res.blockNumber };
+    return tx.refundPaymentOnChain(this, merchantKey, vaultAddress, paymentId, amount);
   }
 
-  async executeFaucetClaimOnChain(
-    relayerKey: SecretKey,
-    recipient: string,
-  ): Promise<{ txHash: string; blockNumber: number }> {
-    const { aneFaucet } = await this.resolveContracts();
-    const res = await this.sendContractTx(
-      relayerKey,
-      aneFaucet,
-      "claim(address)",
-      [toChecksumAddress(recipient)],
-    );
-    return { txHash: res.txHash, blockNumber: res.blockNumber };
+  async executeFaucetClaimOnChain(relayerKey: SecretKey, recipient: string): Promise<{ txHash: string; blockNumber: number }> {
+    return tx.executeFaucetClaimOnChain(this, relayerKey, recipient);
   }
 
   /**
@@ -338,132 +294,22 @@ export class AneClient {
     recipientKey: SecretKey,
     options: { deadline?: number; nonce?: string } = {},
   ): Promise<SignedFaucetClaim> {
-    const { aneFaucet } = await this.resolveContracts();
-    const claim = {
-      recipient: privateKeyToAddress(recipientKey),
-      campaignId: "0x" + "00".repeat(32),
-      deadline: options.deadline ?? Math.floor(Date.now() / 1000) + 600,
-      nonce: options.nonce ?? randomBytes32Hex(),
-    };
-    const { digest } = hashClaimAuthorization(this.chainId, aneFaucet, claim);
-    return { ...claim, signature: signDigest(digest, recipientKey).serialized };
+    return tx.signFaucetClaim(this, recipientKey, options);
   }
 
   async executeRelayedFaucetClaimOnChain(
     relayerKey: SecretKey,
     claim: SignedFaucetClaim,
   ): Promise<{ txHash: string; blockNumber: number }> {
-    const { aneFaucet } = await this.resolveContracts();
-    const res = await this.sendContractTx(
-      relayerKey,
-      aneFaucet,
-      "relayedClaim(address,bytes32,uint256,bytes32,bytes)",
-      [toChecksumAddress(claim.recipient), claim.campaignId, claim.deadline.toString(), claim.nonce, claim.signature],
-    );
-    return { txHash: res.txHash, blockNumber: res.blockNumber };
+    return tx.executeRelayedFaucetClaimOnChain(this, relayerKey, claim);
   }
 
   /**
    * Verifies a settlement transaction hash directly against JSON-RPC without relying
    * on any hosted facilitator (REQ-005, ADR-0005).
    */
-  async verifySettlementOnChain(params: {
-    txHash: string;
-    expectedAsset?: string;
-    expectedPayee: string;
-    expectedAmount: bigint | string;
-    expectedVault?: string;
-    expectedPaymentId?: string;
-  }): Promise<{
-    verified: boolean;
-    blockNumber: number;
-    txHash: string;
-    reason?: string;
-  }> {
-    type Receipt = {
-      status: string;
-      blockNumber: string;
-      logs: Array<{ address: string; topics: string[]; data: string }>;
-    };
-    // A node behind the one that mined the transaction answers null (#67): ask again briefly before
-    // reporting it missing.
-    let receipt = await this.rpcCall<Receipt | null>("eth_getTransactionReceipt", [params.txHash]);
-    for (const delay of RECEIPT_RETRY_DELAYS_MS) {
-      if (receipt) break;
-      await sleep(delay);
-      receipt = await this.rpcCall<Receipt | null>("eth_getTransactionReceipt", [params.txHash]);
-    }
-
-    if (!receipt) {
-      return {
-        verified: false,
-        blockNumber: 0,
-        txHash: params.txHash,
-        reason: "Transaction receipt not found",
-      };
-    }
-    if (BigInt(receipt.status) !== 1n) {
-      return {
-        verified: false,
-        blockNumber: 0,
-        txHash: params.txHash,
-        reason: "Transaction reverted on-chain",
-      };
-    }
-
-    const { aneTestToken } = await this.resolveContracts();
-    const assetAddr = (params.expectedAsset ?? aneTestToken).toLowerCase();
-    const transferTopic = keccak256Utf8("Transfer(address,address,uint256)").toLowerCase();
-    const expectedPayeeTopic = "0x" + abiWordAddress(params.expectedPayee).toLowerCase();
-    const expectedAmt = BigInt(params.expectedAmount);
-
-    let matchedTransfer = false;
-    for (const log of receipt.logs) {
-      if (
-        log.address.toLowerCase() === assetAddr &&
-        log.topics[0]?.toLowerCase() === transferTopic &&
-        log.topics[2]?.toLowerCase() === expectedPayeeTopic
-      ) {
-        if (params.expectedVault) {
-          const expectedFromTopic = "0x" + abiWordAddress(params.expectedVault).toLowerCase();
-          if (log.topics[1]?.toLowerCase() !== expectedFromTopic) {
-            continue;
-          }
-        }
-        const value = BigInt(log.data);
-        if (value >= expectedAmt) {
-          matchedTransfer = true;
-          break;
-        }
-      }
-    }
-
-    if (!matchedTransfer) {
-      return {
-        verified: false,
-        blockNumber: Number(BigInt(receipt.blockNumber)),
-        txHash: params.txHash,
-        reason: "Matching ERC-20 Transfer log to expectedPayee not found in receipt",
-      };
-    }
-
-    if (params.expectedVault && params.expectedPaymentId) {
-      const rec = await this.getPaymentRecord(params.expectedVault, params.expectedPaymentId);
-      if (rec.amountPaid < expectedAmt) {
-        return {
-          verified: false,
-          blockNumber: Number(BigInt(receipt.blockNumber)),
-          txHash: params.txHash,
-          reason: "Payment ID not recorded in AneAgentVault",
-        };
-      }
-    }
-
-    return {
-      verified: true,
-      blockNumber: Number(BigInt(receipt.blockNumber)),
-      txHash: params.txHash,
-    };
+  async verifySettlementOnChain(params: SettlementCheck): Promise<SettlementVerdict> {
+    return verifySettlementOnChain(this, params);
   }
 
   signServiceManifest(
@@ -471,54 +317,17 @@ export class AneClient {
     signerKey: SecretKey,
     directoryAddress?: string,
   ): ServiceManifestPayload {
-    const dir =
-      directoryAddress ??
-      this.cachedContracts?.aneServiceDirectory ??
-      "0x0000000000000000000000000000000000000000";
-    const full: ServiceManifestPayload = {
-      ...manifest,
-      payTo: toChecksumAddress(manifest.payTo),
-      tokenAddress: toChecksumAddress(manifest.tokenAddress),
-    };
-    const { digest } = hashServiceManifest(full, dir);
-    const sig = signDigest(digest, signerKey);
-    const signer = recoverAddress(digest, sig.serialized);
-    return {
-      ...full,
-      signer,
-      signature: sig.serialized,
-    };
+    return signServiceManifest(manifest, signerKey, directoryAddress ?? this.#directoryOrZero());
   }
 
   verifyServiceManifest(
     manifest: ServiceManifestPayload,
     directoryAddress?: string,
   ): { valid: boolean; signer?: string; digest: string; reason?: string } {
-    if (!manifest.signature || !manifest.signer) {
-      return { valid: false, digest: "0x", reason: "Missing manifest signature or signer" };
-    }
-    const dir =
-      directoryAddress ??
-      this.cachedContracts?.aneServiceDirectory ??
-      "0x0000000000000000000000000000000000000000";
-    const { digest } = hashServiceManifest(manifest, dir);
-    try {
-      const recovered = recoverAddress(digest, manifest.signature);
-      if (recovered.toLowerCase() !== manifest.signer.toLowerCase()) {
-        return {
-          valid: false,
-          signer: recovered,
-          digest,
-          reason: `Manifest signature mismatch: recovered ${recovered}, expected ${manifest.signer}`,
-        };
-      }
-      return { valid: true, signer: recovered, digest };
-    } catch (err) {
-      return {
-        valid: false,
-        digest,
-        reason: err instanceof Error ? err.message : String(err),
-      };
-    }
+    return verifyServiceManifest(manifest, directoryAddress ?? this.#directoryOrZero());
+  }
+
+  #directoryOrZero(): string {
+    return this.cachedContracts?.aneServiceDirectory ?? "0x0000000000000000000000000000000000000000";
   }
 }

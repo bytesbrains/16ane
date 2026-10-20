@@ -15,6 +15,7 @@ import {
   type X402Receipt,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { clientIp, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
+import { RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
 
 const ONE_TANE = 10n ** 18n;
 const PRICE_SUMMARIZE = 16n * ONE_TANE; // 16 tANE (= 1 simulated INR)
@@ -236,6 +237,10 @@ export async function handleDemoRequest(
   });
 
   if (!settled.ok) {
+    if (settled.cause instanceof RelayerGasBudgetExceededError) {
+      sendBudgetExhausted(res, settled.cause, "pay and settle on-chain yourself, then send the transaction hash");
+      return;
+    }
     if (settled.cause !== undefined) {
       const retryable = settled.status >= 500;
       sendLoggedError(res, settled.status, settled.code, settled.message, retryable, settled.cause);

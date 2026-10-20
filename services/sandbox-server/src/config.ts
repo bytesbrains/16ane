@@ -60,6 +60,12 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
 
   const host = get("ANE_HOST") ?? "127.0.0.1";
   const statePath = get("ANE_STATE_PATH");
+  const budgetRaw = get("ANE_RELAYER_GAS_BUDGET_WEI");
+  let relayerGasBudgetWei: bigint | undefined;
+  if (budgetRaw !== undefined) {
+    if (/^\d+$/.test(budgetRaw)) relayerGasBudgetWei = BigInt(budgetRaw);
+    else problems.push("ANE_RELAYER_GAS_BUDGET_WEI must be a whole number of wei");
+  }
   const trustProxyRaw = get("ANE_TRUST_PROXY") ?? "false";
   if (!["true", "false"].includes(trustProxyRaw)) problems.push("ANE_TRUST_PROXY must be true or false");
 
@@ -72,6 +78,7 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     port,
     host,
     statePath,
+    relayerGasBudgetWei,
     chainId,
     trustProxy: trustProxyRaw === "true",
     trialFreeCallsPerCaller,

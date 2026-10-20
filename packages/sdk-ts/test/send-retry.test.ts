@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { AneClient, keccak256Utf8, SecretKey } from "../src/index.ts";
+import { AneClient, keccak256Utf8, privateKeyToAddress, SecretKey } from "../src/index.ts";
 
 // A fake `cast` first on PATH: fails with `failure` for the first `failures` calls, then prints a receipt.
 // Every call appends one line to `record`: its arguments, then the keystore and password paths it was given
@@ -18,6 +18,7 @@ function withFakeCast(
   failures: number,
   failure: string,
   run: (calls: () => number, recorded: () => CastCall[]) => Promise<void>,
+  receipt = `{"transactionHash":"0x${"ab".repeat(32)}","blockNumber":"0x5","status":"0x1"}`,
 ) {
   return async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "fake-cast-"));
@@ -32,7 +33,7 @@ n=$(($(cat "${counter}") + 1)); echo $n > "${counter}"
 ks=no; [ -f "$ETH_KEYSTORE" ] && ks=yes; pw=no; [ -f "$ETH_PASSWORD" ] && pw=yes
 printf '%s\t%s\t%s\t%s\n' "$*" "$ETH_KEYSTORE" "$ks" "$pw" >> "${record}"
 if [ $n -le ${failures} ]; then echo "${failure} (args: $*)" >&2; exit 1; fi
-echo '{"transactionHash":"0x${"ab".repeat(32)}","blockNumber":"0x5","status":"0x1"}'
+echo '${receipt}'
 `,
     );
     chmodSync(path.join(dir, "cast"), 0o755);
@@ -117,4 +118,92 @@ test(
     assert.ok(end >= 0 && end < args.indexOf(to), `"--" precedes the target and its arguments: ${args.join(" ")}`);
     assert.ok(args.indexOf("--value=1ether") > end, "the option-looking argument stays a positional argument");
   }),
+);
+
+const PAID = `{"transactionHash":"0x${"ab".repeat(32)}","blockNumber":"0x5","status":"0x1","gasUsed":"0x3f4ad","effectiveGasPrice":"0x5b8d80","l1Fee":"0xf5"}`;
+const REVERTED = PAID.replace('"status":"0x1"', '"status":"0x0"');
+// From a real Base Sepolia receipt: 0x3f4ad gas x 0x5b8d80 wei + 0xf5 wei L1 fee.
+const PAID_FEE = 0x3f4adn * 0x5b8d80n + 0xf5n;
+
+test(
+  "send hooks see the full fee (L2 gas + L1 data fee) for every transaction (#76)",
+  withFakeCast(0, "", async () => {
+    const seen: [string, bigint][] = [];
+    const hooked = new AneClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: 84532,
+      contracts: {},
+      sendHooks: { after: (from, fee) => seen.push([from, fee]) },
+    });
+    await hooked.sendContractTx(key, to, "fund(uint256)", ["1"]);
+    assert.deepEqual(seen, [[privateKeyToAddress(key), PAID_FEE]]);
+  }, PAID),
+);
+
+test(
+  "a refusal in the before hook means cast never runs",
+  withFakeCast(0, "", async (calls) => {
+    const refusing = new AneClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: 84532,
+      contracts: {},
+      sendHooks: { before: () => { throw new Error("budget used up"); } },
+    });
+    await assert.rejects(refusing.sendContractTx(key, to, "fund(uint256)", ["1"]), /budget used up/);
+    assert.equal(calls(), 0);
+  }, PAID),
+);
+
+test(
+  "a reverted transaction still reports its fee, then throws",
+  withFakeCast(0, "", async () => {
+    let fee = 0n;
+    const hooked = new AneClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: 84532,
+      contracts: {},
+      sendHooks: { after: (_from, f) => { fee = f; } },
+    });
+    await assert.rejects(hooked.sendContractTx(key, to, "fund(uint256)", ["1"]), /Transaction reverted/);
+    assert.equal(fee, PAID_FEE);
+  }, REVERTED),
+);
+
+test(
+  "before runs once per transaction, not per retry, and its return value reaches after",
+  withFakeCast(2, "Error: server returned an error response: error code -32000: nonce too low", async (calls) => {
+    const events: string[] = [];
+    const hooked = new AneClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: 84532,
+      contracts: {},
+      sendHooks: {
+        before: () => { events.push("before"); return "hold-1"; },
+        after: (_from, _fee, _hash, ticket) => events.push(`after:${String(ticket)}`),
+        failed: () => events.push("failed"),
+      },
+    });
+    await hooked.sendContractTx(key, to, "fund(uint256)", ["1"]);
+    assert.equal(calls(), 3);
+    assert.deepEqual(events, ["before", "after:hold-1"]);
+  }, PAID),
+);
+
+test(
+  "a send that fails without a receipt calls failed with the ticket, never after",
+  withFakeCast(1, "Error: execution reverted", async () => {
+    const events: string[] = [];
+    const hooked = new AneClient({
+      rpcUrl: "http://127.0.0.1:1",
+      chainId: 84532,
+      contracts: {},
+      sendHooks: {
+        before: () => "hold-1",
+        after: () => events.push("after"),
+        failed: (_from, ticket) => events.push(`failed:${String(ticket)}`),
+      },
+    });
+    await assert.rejects(hooked.sendContractTx(key, to, "fund(uint256)", ["1"]), /execution reverted/);
+    assert.deepEqual(events, ["failed:hold-1"]);
+  }, PAID),
 );

@@ -15,6 +15,13 @@ import {
 import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } from "./demo.ts";
 import { readFaucetConfig, RecipientCooldowns } from "./faucet.ts";
 import {
+  DEFAULT_RELAYER_GAS_BUDGET_WEI,
+  type GasReservation,
+  RelayerGasBudget,
+  RelayerGasBudgetExceededError,
+  sendBudgetExhausted,
+} from "./gas-budget.ts";
+import {
   DEFAULT_MAX_BODY_BYTES,
   PayloadTooLargeError,
   readRequestBody,
@@ -29,6 +36,8 @@ export interface SandboxServerConfig {
   host?: string;
   /** State that must survive restarts (#75). Defaults to memory; main.ts passes SQLite. */
   store?: KeyValueStore;
+  /** Most the relayer may spend on gas per UTC day (#76). Defaults to 0.05 ETH (ADR-0006). */
+  relayerGasBudgetWei?: bigint;
   rpcUrl: string;
   chainId?: number;
   registryAddress: string;
@@ -75,14 +84,27 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     : relayerKey;
 
   const providerAddress = privateKeyToAddress(providerKey);
+  const relayerAddress = privateKeyToAddress(relayerKey);
+  const store = config.store ?? new MemoryKeyValueStore();
+  // Every transaction the relayer pays for (faucet claims, x402 settlements) reserves gas from its daily budget
+  // before it is sent, and is counted at its actual fee once mined.
+  const gasBudget = new RelayerGasBudget(store, config.relayerGasBudgetWei ?? DEFAULT_RELAYER_GAS_BUDGET_WEI);
   const client = new AneClient({
     rpcUrl: config.rpcUrl,
     chainId,
     registryAddress: config.registryAddress,
+    sendHooks: {
+      before: (from) => (from === relayerAddress ? gasBudget.reserve() : undefined),
+      after: (_from, feeWei, _txHash, ticket) => {
+        if (ticket) gasBudget.settle(ticket as GasReservation, feeWei);
+      },
+      failed: (_from, ticket) => {
+        if (ticket) gasBudget.release(ticket as GasReservation);
+      },
+    },
   });
   const contracts = await client.resolveContracts();
   const faucetConfig = await readFaucetConfig(client, contracts.aneFaucet);
-  const store = config.store ?? new MemoryKeyValueStore();
   const faucetCooldowns = new RecipientCooldowns(faucetConfig.cooldownSeconds, store);
   const verifier = new AnePaymentVerifier({ client, relayerKey, store });
 
@@ -141,11 +163,21 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       if (method === "GET" && pathname === "/healthz") {
         try {
           const blockHex = await client.rpcCall<string>("eth_blockNumber", []);
+          const balanceWei = BigInt(await client.rpcCall<string>("eth_getBalance", [relayerAddress, "latest"]));
           sendJson(res, 200, {
             status: "ok",
             chainId,
             registry: contracts.registry,
             blockNumber: Number(BigInt(blockHex)),
+            relayer: {
+              address: relayerAddress,
+              balanceWei: balanceWei.toString(),
+              dailyGasBudgetWei: gasBudget.dailyBudgetWei.toString(),
+              spentTodayWei: gasBudget.spentTodayWei().toString(),
+              reservedTodayWei: gasBudget.reservedTodayWei().toString(),
+              remainingTodayWei: gasBudget.remainingTodayWei().toString(),
+              lowBalance: gasBudget.isLowBalance(balanceWei),
+            },
             disclaimer: SANDBOX_DISCLAIMER,
           });
         } catch {
@@ -245,6 +277,10 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
           sendJson(res, 201, record);
           return;
         } catch (err) {
+          if (err instanceof RelayerGasBudgetExceededError) {
+            sendBudgetExhausted(res, err, "claim directly from the AneFaucet contract (claim(address)) with your own gas");
+            return;
+          }
           sendLoggedError(
             res,
             502,
@@ -414,6 +450,10 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       if (err instanceof PayloadTooLargeError) {
         res.setHeader("connection", "close");
         sendError(res, 413, "ANE-E-4130", err.message, false);
+        return;
+      }
+      if (err instanceof RelayerGasBudgetExceededError) {
+        sendBudgetExhausted(res, err, "send the transaction yourself with your own gas");
         return;
       }
       // JSON.parse and BigInt throw SyntaxError on malformed client input; their messages only echo that input.

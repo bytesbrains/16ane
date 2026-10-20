@@ -43,3 +43,10 @@ test("clientIp uses the right-most X-Forwarded-For entry behind a trusted proxy"
   assert.equal(clientIp(req, true), "192.0.2.44");
   assert.equal(clientIp(fakeRequest([]), true), "203.0.113.7");
 });
+
+test("clientIp reads the platform proxy's header when one is configured (Fly-Client-IP on Fly.io)", () => {
+  const req = fakeRequest([], { "fly-client-ip": "198.51.100.9", "x-forwarded-for": "6.6.6.6" }, "172.16.0.2");
+  assert.equal(clientIp(req, false, "Fly-Client-IP"), "198.51.100.9");
+  assert.equal(clientIp(req, false), "172.16.0.2", "ignored unless configured");
+  assert.equal(clientIp(fakeRequest([], {}, "172.16.0.2"), false, "fly-client-ip"), "172.16.0.2", "falls back when absent");
+});

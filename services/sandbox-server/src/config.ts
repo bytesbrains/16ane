@@ -61,6 +61,10 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
   const host = get("ANE_HOST") ?? "127.0.0.1";
   const statePath = get("ANE_STATE_PATH");
   const trustProxyRaw = get("ANE_TRUST_PROXY") ?? "false";
+  const clientIpHeader = get("ANE_CLIENT_IP_HEADER");
+  if (clientIpHeader !== undefined && !/^[A-Za-z0-9-]+$/.test(clientIpHeader)) {
+    problems.push("ANE_CLIENT_IP_HEADER must be a header name");
+  }
   if (!["true", "false"].includes(trustProxyRaw)) problems.push("ANE_TRUST_PROXY must be true or false");
 
   if (problems.length > 0) throw new ConfigError(problems);
@@ -74,6 +78,7 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     statePath,
     chainId,
     trustProxy: trustProxyRaw === "true",
+    clientIpHeader,
     trialFreeCallsPerCaller,
     trialGlobalDailyCap,
   };

@@ -94,6 +94,13 @@ adapter instead of SQLite.
   under us, and the interface lets the backend be swapped. The file lives at `/data/sandbox.sqlite`, the Fly.io
   volume mount (`synchronous = FULL`, so recorded idempotency entries and consumed proofs survive a crash).
 
+- **Deployment (#78):** `fly.toml` (app `16ane-sandbox-api`, org `bytesbrains`, region `sin`, one always-on
+  `shared-cpu-1x` machine, volume `sandbox_state` at `/data`, health check on `/healthz`) and
+  `docs/operations/DEPLOY_API.md`. **`api.16ane.com` is DNS-only to Fly (no Cloudflare proxy),** with Fly
+  terminating TLS, so `Fly-Client-IP`, which Fly's proxy sets, is the real client address
+  (`ANE_CLIENT_IP_HEADER`). Behind Cloudflare's proxy every request would carry a Cloudflare address, and
+  per-client quotas would break. Keys are generated straight into Fly secrets and never printed.
+
 ## Security and legal impacts
 - **Hot keys on a hosted machine:** keep relayer and provider balances small, set the gas budget, rotate the keys
   if the host is compromised, and never reuse the deployer or admin key.

@@ -34,6 +34,7 @@ environment), never in a command you'd keep in shell history.
 | `ANE_HOST` / `ANE_PORT` | no | Listen address and port (`0.0.0.0` / `8787` in the image) |
 | `ANE_CHAIN_ID` | no | Defaults to `84532` |
 | `ANE_TRUST_PROXY` | no | `true` only behind a reverse proxy that sets `X-Forwarded-For` |
+| `ANE_CLIENT_IP_HEADER` | no | A header your platform's proxy itself sets to the client address, used for per-client trial quotas: `fly-client-ip` on Fly.io. Only set it when the proxy writes the header, so clients can't fake it |
 | `ANE_TRIAL_FREE_CALLS_PER_CALLER`, `ANE_TRIAL_GLOBAL_DAILY_CAP` | no | Sponsored-trial quotas (ADR-0008) |
 | `ANE_STATE_PATH` | no | SQLite file for state that must survive restarts: faucet cooldowns and claims, the service directory, trial quotas, x402 idempotency records, consumed payment proofs and receipts. The image sets `/data/sandbox.sqlite`; mount a volume at `/data` to keep it across container re-creation. Unset outside the image: memory only, with a startup warning |
 

@@ -37,6 +37,7 @@ export interface DemoContext {
   providerAddress: string;
   contracts: AneContractAddresses;
   trustProxy: boolean;
+  clientIpHeader?: string;
   maxBodyBytes: number;
 }
 
@@ -161,7 +162,7 @@ export async function handleDemoRequest(
   const trialRequested = req.headers["x-trial-request"] === "true";
   // Trial quota is keyed on the network address: the vault/session headers are unauthenticated
   // and rotating them must not mint extra sponsored calls (#31).
-  const trialQuotaKey = clientIp(req, ctx.trustProxy);
+  const trialQuotaKey = clientIp(req, ctx.trustProxy, ctx.clientIpHeader);
   const claimedVault = (req.headers["x-agent-vault"] as string | undefined) ?? "";
 
   // If no PAYMENT-SIGNATURE header, check if a provider-sponsored trial call was requested

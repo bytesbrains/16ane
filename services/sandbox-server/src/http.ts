@@ -96,9 +96,20 @@ export function readRequestBody(
   });
 }
 
-// The caller's network address. Client-supplied headers are ignored unless the server sits
-// behind a trusted reverse proxy, in which case the proxy's own (right-most) entry is used.
-export function clientIp(req: http.IncomingMessage, trustProxy: boolean): string {
+// The caller's network address. Client-supplied headers are ignored unless the deployment says which header
+// its platform proxy sets (`clientIpHeader`, e.g. "fly-client-ip" on Fly.io, which the proxy itself writes)
+// or that it sits behind a trusted reverse proxy, in which case that proxy's (right-most) X-Forwarded-For
+// entry is used.
+export function clientIp(
+  req: http.IncomingMessage,
+  trustProxy: boolean,
+  clientIpHeader?: string,
+): string {
+  if (clientIpHeader) {
+    const value = req.headers[clientIpHeader.toLowerCase()];
+    const ip = (Array.isArray(value) ? value[0] : value)?.trim();
+    if (ip) return ip;
+  }
   if (trustProxy) {
     const forwarded = req.headers["x-forwarded-for"];
     const raw = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;

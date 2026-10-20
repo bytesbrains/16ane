@@ -67,6 +67,10 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     else problems.push("ANE_RELAYER_GAS_BUDGET_WEI must be a whole number of wei");
   }
   const trustProxyRaw = get("ANE_TRUST_PROXY") ?? "false";
+  const clientIpHeader = get("ANE_CLIENT_IP_HEADER");
+  if (clientIpHeader !== undefined && !/^[A-Za-z0-9-]+$/.test(clientIpHeader)) {
+    problems.push("ANE_CLIENT_IP_HEADER must be a header name");
+  }
   if (!["true", "false"].includes(trustProxyRaw)) problems.push("ANE_TRUST_PROXY must be true or false");
 
   if (problems.length > 0) throw new ConfigError(problems);
@@ -81,6 +85,7 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     relayerGasBudgetWei,
     chainId,
     trustProxy: trustProxyRaw === "true",
+    clientIpHeader,
     trialFreeCallsPerCaller,
     trialGlobalDailyCap,
   };

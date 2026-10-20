@@ -47,6 +47,8 @@ export interface SandboxServerConfig {
   trialGlobalDailyCap?: number;
   /** Honour X-Forwarded-For only when a trusted reverse proxy sets it. */
   trustProxy?: boolean;
+  /** Header the platform's proxy sets to the client IP (e.g. "fly-client-ip"); overrides X-Forwarded-For. */
+  clientIpHeader?: string;
   maxBodyBytes?: number;
 }
 
@@ -129,6 +131,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     providerAddress,
     contracts,
     trustProxy,
+    clientIpHeader: config.clientIpHeader,
     maxBodyBytes,
   };
 

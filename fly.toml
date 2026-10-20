@@ -1,0 +1,44 @@
+# 16ane sandbox API on Fly.io (ADR-0016, #78): the gasless faucet, x402 demo API and directory, from the same
+# portable image anyone can self-host (docs/operations/SELF_HOSTING.md). Organisation: bytesbrains.
+# Keys are Fly secrets, never in this file or on a command line (docs/operations/DEPLOY_API.md).
+# Do not publish (api.16ane.com) before the abuse controls (#79) land; stop the machine between tests.
+app = "16ane-sandbox-api"
+primary_region = "sin" # closest Fly region to India-first users (no Mumbai region is listed today)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ANE_RPC_URL = "https://sepolia.base.org"
+  ANE_REGISTRY_ADDRESS = "0x01d5daB670DE5868305eB862721ebE62772C3Df3" # networks/sandbox-sepolia.json
+  ANE_CHAIN_ID = "84532"
+  ANE_STATE_PATH = "/data/sandbox.sqlite"
+  ANE_RELAYER_GAS_BUDGET_WEI = "50000000000000000" # 0.05 Base Sepolia ETH per UTC day (ADR-0006)
+  # Set by Fly's proxy to the client's address. api.16ane.com is DNS-only (no Cloudflare proxy) so it stays the
+  # real client; behind another proxy it would be that proxy's address. DEPLOY_API.md step 3 checks a client
+  # can't forge it.
+  ANE_CLIENT_IP_HEADER = "fly-client-ip"
+
+# One always-on machine: the faucet cooldowns, idempotency records and consumed proofs live in SQLite on the
+# volume, and the replay guard assumes a single process (#82). Don't scale out without a shared store.
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+
+[mounts]
+  source = "sandbox_state"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

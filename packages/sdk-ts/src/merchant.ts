@@ -50,8 +50,25 @@ export class AnePaymentVerifier {
     this.store = params.store ?? new MemoryKeyValueStore();
   }
 
+  // Proofs being verified or settled right now, in this process. #reserve checks and marks synchronously,
+  // before any await, so a concurrent request with the same proof is rejected (409) instead of also passing
+  // the consumed check while the first is still settling. One process (one Fly.io machine) is assumed;
+  // several instances sharing a store would need an atomic insert in the store instead.
+  readonly #inFlight = new Set<string>();
+
   #consumed(id: string): boolean {
     return this.store.has("x402.proofs", id.toLowerCase());
+  }
+
+  #reserve(ids: string[]): boolean {
+    const keys = ids.map((id) => id.toLowerCase());
+    if (keys.some((key) => this.#inFlight.has(key) || this.#consumed(key))) return false;
+    for (const key of keys) this.#inFlight.add(key);
+    return true;
+  }
+
+  #release(ids: string[]): void {
+    for (const id of ids) this.#inFlight.delete(id.toLowerCase());
   }
 
   #consume(...ids: string[]): void {
@@ -274,105 +291,100 @@ export class AnePaymentVerifier {
         digest,
         paymentId,
       } = hashSpendIntent(this.client.chainId, p);
-      if (
-        this.#consumed(intentId) ||
-        this.#consumed(paymentId)
-      ) {
+      const directTxHash = p.txHash && p.txHash !== "0x" + "00".repeat(32) ? p.txHash : undefined;
+      const proofIds = directTxHash ? [intentId, paymentId, directTxHash] : [intentId, paymentId];
+      if (!this.#reserve(proofIds)) {
         return {
           ok: false,
           status: 409,
           code: "ANE-E-4005",
-          message: `Replay detected: intentId ${intentId} already consumed`,
+          message: `Replay detected: payment proof for intentId ${intentId} already used or in use`,
         };
       }
 
-      let txHash: string;
-      let blockNumber: number;
+      try {
+        let txHash: string;
+        let blockNumber: number;
 
-      if (p.txHash && p.txHash !== "0x" + "00".repeat(32)) {
-        if (this.#consumed(p.txHash)) {
-          return {
-            ok: false,
-            status: 409,
-            code: "ANE-E-4005",
-            message: `Replay detected: txHash ${p.txHash} already consumed`,
-          };
-        }
-        const check = await this.client.verifySettlementOnChain({
-          txHash: p.txHash,
-          expectedAsset,
-          expectedPayee: expectedPayTo,
-          expectedAmount: requiredAmount,
-          expectedVault: p.vault,
-          expectedPaymentId: paymentId,
-        });
-        if (!check.verified) {
-          return {
-            ok: false,
-            status: 402,
-            code: "ANE-E-4009",
-            message: `Direct txHash verification failed: ${check.reason}`,
-          };
-        }
-        txHash = p.txHash;
-        blockNumber = check.blockNumber;
-      } else {
-        try {
-          recoverAddress(digest, p.signature);
-        } catch (err) {
-          return {
-            ok: false,
-            status: 401,
-            code: "ANE-E-4010",
-            message: "Signature recovery failed",
-            cause: err,
-          };
+        if (directTxHash) {
+          const check = await this.client.verifySettlementOnChain({
+            txHash: directTxHash,
+            expectedAsset,
+            expectedPayee: expectedPayTo,
+            expectedAmount: requiredAmount,
+            expectedVault: p.vault,
+            expectedPaymentId: paymentId,
+          });
+          if (!check.verified) {
+            return {
+              ok: false,
+              status: 402,
+              code: "ANE-E-4009",
+              message: `Direct txHash verification failed: ${check.reason}`,
+            };
+          }
+          txHash = directTxHash;
+          blockNumber = check.blockNumber;
+        } else {
+          try {
+            recoverAddress(digest, p.signature);
+          } catch (err) {
+            return {
+              ok: false,
+              status: 401,
+              code: "ANE-E-4010",
+              message: "Signature recovery failed",
+              cause: err,
+            };
+          }
+
+          try {
+            const settled = await this.client.settleSpendIntentOnChain(
+              this.relayerKey,
+              p,
+              p.signature,
+            );
+            txHash = settled.txHash;
+            blockNumber = settled.blockNumber;
+          } catch (err) {
+            return {
+              ok: false,
+              status: 402,
+              code: "ANE-E-4011",
+              message: "On-chain settlement failed",
+              cause: err,
+            };
+          }
         }
 
-        try {
-          const settled = await this.client.settleSpendIntentOnChain(
-            this.relayerKey,
-            p,
-            p.signature,
-          );
-          txHash = settled.txHash;
-          blockNumber = settled.blockNumber;
-        } catch (err) {
-          return {
-            ok: false,
-            status: 402,
-            code: "ANE-E-4011",
-            message: "On-chain settlement failed",
-            cause: err,
-          };
-        }
+        this.#consume(intentId, paymentId, txHash);
+
+        const receipt: X402Receipt = {
+          x402Version: 2,
+          success: true,
+          scheme: "ane-vault-v1",
+          network: decoded.network ?? "eip155:84532",
+          txHash,
+          blockNumber,
+          intentId,
+          paymentId,
+          payer: toChecksumAddress(p.vault),
+          payTo: expectedPayTo,
+          asset: expectedAsset,
+          amount: BigInt(p.amount).toString(),
+          resourceHash: expectedResourceHash,
+          requestHash: expectedRequestHash,
+          idempotencyKey: params.idempotencyKey,
+          settledAt: new Date().toISOString(),
+          sponsored: false,
+          disclaimer: SANDBOX_DISCLAIMER,
+        };
+        this.recordReceipt(receipt);
+        const receiptHeaderB64 = Buffer.from(JSON.stringify(receipt), "utf8").toString("base64");
+        return { ok: true, receipt, receiptHeaderB64 };
+      } finally {
+        this.#release(proofIds);
       }
-
-      this.#consume(intentId, paymentId, txHash);
-
-      const receipt: X402Receipt = {
-        x402Version: 2,
-        success: true,
-        scheme: "ane-vault-v1",
-        network: decoded.network ?? "eip155:84532",
-        txHash,
-        blockNumber,
-        intentId,
-        paymentId,
-        payer: toChecksumAddress(p.vault),
-        payTo: expectedPayTo,
-        asset: expectedAsset,
-        amount: BigInt(p.amount).toString(),
-        resourceHash: expectedResourceHash,
-        requestHash: expectedRequestHash,
-        idempotencyKey: params.idempotencyKey,
-        settledAt: new Date().toISOString(),
-        sponsored: false,
-        disclaimer: SANDBOX_DISCLAIMER,
-      };
-      this.recordReceipt(receipt);
-      const receiptHeaderB64 = Buffer.from(JSON.stringify(receipt), "utf8").toString("base64");
-      return { ok: true, receipt, receiptHeaderB64 };
     }
 
     if (decoded.scheme === "exact") {
@@ -398,53 +410,57 @@ export class AnePaymentVerifier {
         expectedAsset,
         p,
       );
-      if (this.#consumed(structHash)) {
+      if (!this.#reserve([structHash])) {
         return {
           ok: false,
           status: 409,
           code: "ANE-E-4005",
-          message: "Replay detected: EIP-3009 authorization already consumed",
+          message: "Replay detected: EIP-3009 authorization already used or in use",
         };
       }
-      const recovered = recoverAddress(digest, p.signature);
-      if (recovered.toLowerCase() !== p.from.toLowerCase()) {
-        return {
-          ok: false,
-          status: 401,
-          code: "ANE-E-4010",
-          message: "Invalid EIP-3009 signature",
-        };
-      }
-      const settled = await this.client.settleExactAuthorizationOnChain(
-        this.relayerKey,
-        p,
-        p.signature,
-      );
-      this.#consume(structHash, settled.txHash);
+      try {
+        const recovered = recoverAddress(digest, p.signature);
+        if (recovered.toLowerCase() !== p.from.toLowerCase()) {
+          return {
+            ok: false,
+            status: 401,
+            code: "ANE-E-4010",
+            message: "Invalid EIP-3009 signature",
+          };
+        }
+        const settled = await this.client.settleExactAuthorizationOnChain(
+          this.relayerKey,
+          p,
+          p.signature,
+        );
+        this.#consume(structHash, settled.txHash);
 
-      const receipt: X402Receipt = {
-        x402Version: 2,
-        success: true,
-        scheme: "exact",
-        network: decoded.network ?? "eip155:84532",
-        txHash: settled.txHash,
-        blockNumber: settled.blockNumber,
-        intentId: structHash,
-        paymentId: structHash,
-        payer: toChecksumAddress(p.from),
-        payTo: expectedPayTo,
-        asset: expectedAsset,
-        amount: BigInt(p.value).toString(),
-        resourceHash: expectedResourceHash,
-        requestHash: expectedRequestHash,
-        idempotencyKey: params.idempotencyKey,
-        settledAt: new Date().toISOString(),
-        sponsored: false,
-        disclaimer: SANDBOX_DISCLAIMER,
-      };
-      this.recordReceipt(receipt);
-      const receiptHeaderB64 = Buffer.from(JSON.stringify(receipt), "utf8").toString("base64");
-      return { ok: true, receipt, receiptHeaderB64 };
+        const receipt: X402Receipt = {
+          x402Version: 2,
+          success: true,
+          scheme: "exact",
+          network: decoded.network ?? "eip155:84532",
+          txHash: settled.txHash,
+          blockNumber: settled.blockNumber,
+          intentId: structHash,
+          paymentId: structHash,
+          payer: toChecksumAddress(p.from),
+          payTo: expectedPayTo,
+          asset: expectedAsset,
+          amount: BigInt(p.value).toString(),
+          resourceHash: expectedResourceHash,
+          requestHash: expectedRequestHash,
+          idempotencyKey: params.idempotencyKey,
+          settledAt: new Date().toISOString(),
+          sponsored: false,
+          disclaimer: SANDBOX_DISCLAIMER,
+        };
+        this.recordReceipt(receipt);
+        const receiptHeaderB64 = Buffer.from(JSON.stringify(receipt), "utf8").toString("base64");
+        return { ok: true, receipt, receiptHeaderB64 };
+      } finally {
+        this.#release([structHash]);
+      }
     }
 
     return {

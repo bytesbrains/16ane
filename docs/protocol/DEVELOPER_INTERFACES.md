@@ -28,7 +28,7 @@ Read-only tools: `list_services`, `get_quote`, `wallet_balance`, `payment_status
 ```python
 # Proposed API; names and signatures are not yet implemented
 wallet = ane.create_agent_wallet(owner_signer, network="sandbox")
-wallet.fund_testnet(amount="1600 tANE")
+wallet.fund_testnet(amount="16000 tANE")
 session = wallet.delegate(agent_signer, max_total="320 tANE")
 result = session.purchase("https://demo.example/summarize", max_payment="16 tANE")
 wallet.revoke(agent_signer)

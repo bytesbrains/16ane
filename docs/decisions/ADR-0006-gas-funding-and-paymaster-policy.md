@@ -1,6 +1,6 @@
 # ADR-0006: Gas Funding, Relayer Sponsorship, and Faucet Abuse Policy
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Accepted (2026-10-19); amended 2026-10-20 (#61, see *Amendments*)
 - **Date and owners:** 2026-10-19 | 16ane Protocol & Operations Maintainers
 - **Related requirements:** REQ-001, REQ-002, REQ-012, REQ-105
 - **Related epics:** E02, E05, E06, E16
@@ -21,20 +21,23 @@ New developers onboarding to the 5-minute sandbox quickstart (`README.md`) may n
   - "Sponsor or paymaster suffers gas-draining denial of service."
 
 ## Security and legal impacts
-- **Bounded relayer gas exposure (`REQ-105`, `THREAT_MODEL.md`):** Hosted relayer/faucet only calls allowlisted contract methods (`AneFaucet.drip`, `AneVaultFactory.createAndDelegateWithSig`, `AneAgentVault.settlePayment`, `tANE.transferWithAuthorization`) with a hard `maxFeePerGas` ceiling, per-wallet daily tx quota, and global daily Sepolia ETH spend circuit breaker.
-- **On-chain faucet enforcement (`REQ-002`):** Even if someone calls `AneFaucet` directly on-chain paying their own ETH gas, the smart contract enforces `claimAmount` (default `1,600 * 10^18` `tANE`), `claimCooldown` (default `24 hours` per recipient address), and `globalDailyMintCap` (default `1,600,000 * 10^18` `tANE`/day).
+- **Bounded relayer gas exposure (`REQ-105`, `THREAT_MODEL.md`):** Hosted relayer/faucet only calls allowlisted contract methods (`AneFaucet.drip`, `AneVaultFactory.createAndDelegateWithSig`, `AneAgentVault.settlePayment`, `tANE.transferWithAuthorization`) with a hard `maxFeePerGas` ceiling and a global daily Sepolia ETH spend circuit breaker. There is no per-wallet transaction quota (#61).
+- **On-chain faucet enforcement (`REQ-002`):** Even if someone calls `AneFaucet` directly on-chain paying their own ETH gas, the smart contract enforces `claimAmount` (default `16,000 * 10^18` `tANE`), `cooldownSeconds` (default `1 hour` per recipient address), and `maxDailyMint` (default `160,000,000 * 10^18` `tANE`/day).
 - **Transfer independence (`REQ-001`):** Faucet cooldowns and relayer rate limits apply exclusively to `AneFaucet` and hosted relayer endpoints; standard `tANE` transfers and self-relayed `AneAgentVault` calls remain 100% permissionless.
 
 ## Decision
 Adopt **Option A**:
 1. **On-Chain `AneFaucet` Contract (`E05`):**
    - Holds `MINTER_ROLE` on `tANE` (or draws from a pre-minted faucet reserve).
-   - Enforces on-chain `claimAmount = 1_600e18` (`1,600 tANE`), `cooldownSeconds = 86_400` (24h per `recipient` and per `msg.sender`), and `maxDailyMint = 1_600_000e18`.
+   - Enforces on-chain `claimAmount = 16_000e18` (`16,000 tANE`), `cooldownSeconds = 3_600` (1 hour per `recipient`; the contract keys the cooldown on the recipient only, so a shared relayer is not throttled), and `maxDailyMint = 160_000_000e18` (~10,000 claims/day, a runaway stop rather than a throttle). The owner can change all three with `setFaucetConfig` without a redeploy.
    - Exposes both `claim(address recipient)` (permissionless on-chain call for users who already have Base Sepolia ETH) and `relayedClaim(address recipient, bytes32 campaignId, uint256 deadline, bytes signature)` for gasless web/CLI claims.
 2. **Gasless Agent & Owner Onboarding (`E04`, `E05`, `E06`):**
    - `AneVaultFactory` and `AneAgentVault` accept EIP-712 owner signatures (`setPolicyWithSig`, `revokeWithSig`) and `agentSigner` signatures (`settlePayment`), allowing either the hosted sandbox facilitator or a self-hosted relayer to pay the L2 gas (~$0.0001 testnet ETH equivalent on Base Sepolia), while users with Base Sepolia ETH can always submit transactions directly.
 3. **Metered Relayer Quotas (`REQ-105`):**
-   - Hosted relayer enforces per-IP, per-wallet, and Turnstile/signed challenge limits, max `25` sponsored transactions per wallet per day, and a hard daily ETH gas budget cap (`0.05` Base Sepolia ETH/day) with automatic circuit-breaker fallback to self-relayed mode.
+   - The hosted relayer's only limit is cost: a hard daily ETH gas budget (`0.05` Base Sepolia ETH/day to start, resized from measured gas use after deployment) with automatic circuit-breaker fallback to self-relayed mode, plus a `maxFeePerGas` ceiling. There are no per-wallet or per-agent transaction-count limits. A CAPTCHA (Turnstile) applies only to the anonymous web faucet; agents and the CLI use a signed-challenge path. Anyone can bypass the relayer by paying their own gas.
+
+## Amendments
+- **2026-10-20 (#61): limits sized for agent-speed use.** 16ane is an economy for agents, so the payment path carries no protocol rate limits or count caps; the only spending limits are the ones a vault owner sets. Limits apply only to resources the operator pays for, and they limit cost, not actions. Changes: faucet defaults raised from 1,600 tANE / 24 h / 1.6 M per day to 16,000 tANE / 1 h / 160 M per day (claims are sized in notional rupees: 16,000 tANE is ₹1,000 at the 16 ANE = ₹1 illustration, enough for 1,000 calls at 16 tANE); the "25 sponsored transactions per wallet per day" relayer quota is removed; the cooldown is described as per recipient, which is what `AneFaucet` implements.
 
 ## Consequences
 - True 5-minute zero-ETH onboarding for developers using the CLI or web sandbox, while preserving a 100% permissionless on-chain path (`AneFaucet.claim`) if the hosted relayer is offline or rate-limited.

@@ -97,6 +97,21 @@ test("an unexpected error returns a generic 500 without the underlying message",
   });
 });
 
+test("the faucet cap is the deployed faucet's claimAmount, read from the chain", async (t) => {
+  // The fake RPC answers every eth_call with 0x11 in the first word: claimAmount() = 17 wei.
+  await withServer(t, async (url) => {
+    const res = await fetch(`${url}/v1/faucet/claims`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recipient: "0x" + "cd".repeat(20), amount: "18" }),
+    });
+    assert.equal(res.status, 400);
+    const { error } = (await res.json()) as { error: { code: string; message: string } };
+    assert.equal(error.code, "ANE-E-1002");
+    assert.match(error.message, /\(17 wei\)/);
+  });
+});
+
 test("a malformed JSON body is a 400, not a 500", async (t) => {
   await withServer(t, async (url) => {
     const res = await fetch(`${url}/v1/faucet/claims`, {

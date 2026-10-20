@@ -15,9 +15,10 @@ contract DeploySandbox is Script {
     bytes32 public constant SANDBOX_REGISTRY_SALT = keccak256("16ane.registry.sandbox.v1");
     bytes32 public constant DEV_REGISTRY_SALT = keccak256("16ane.registry.dev.v1");
 
-    uint256 public constant DEFAULT_FAUCET_CLAIM = 1_600 * 1e18; // 1,600 tANE (illustrative ₹100; ZERO cash value)
-    uint64 public constant DEFAULT_FAUCET_COOLDOWN = 24 hours;
-    uint256 public constant DEFAULT_FAUCET_DAILY_CAP = 1_600_000 * 1e18;
+    // Sized for owners funding agent workloads (ADR-0006, #61); the owner can change them with setFaucetConfig.
+    uint256 public constant DEFAULT_FAUCET_CLAIM = 16_000 * 1e18; // 16,000 tANE (illustrative ₹1,000; ZERO cash value)
+    uint64 public constant DEFAULT_FAUCET_COOLDOWN = 1 hours; // per recipient
+    uint256 public constant DEFAULT_FAUCET_DAILY_CAP = 160_000_000 * 1e18; // ~10,000 claims/day; a runaway stop, not a throttle
 
     error SandboxTestnetOnly(uint256 chainId);
 

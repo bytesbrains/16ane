@@ -1,5 +1,4 @@
 import http from "node:http";
-import crypto from "node:crypto";
 import {
   AneClient,
   AnePaymentVerifier,
@@ -12,8 +11,8 @@ import {
   type ServiceManifestPayload,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } from "./demo.ts";
+import { readFaucetConfig, RecipientCooldowns } from "./faucet.ts";
 import {
-  clientIp,
   DEFAULT_MAX_BODY_BYTES,
   PayloadTooLargeError,
   readRequestBody,
@@ -47,9 +46,6 @@ export interface ClaimStatusRecord {
   disclaimer: string;
 }
 
-const ONE_TANE = 10n ** 18n;
-const FAUCET_DRIP_AMOUNT = 1600n * ONE_TANE; // 1,600 tANE (= 100 simulated INR)
-
 export async function createSandboxServer(config: SandboxServerConfig): Promise<{
   server: http.Server;
   url: string;
@@ -79,6 +75,8 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     registryAddress: config.registryAddress,
   });
   const contracts = await client.resolveContracts();
+  const faucetConfig = await readFaucetConfig(client, contracts.aneFaucet);
+  const faucetCooldowns = new RecipientCooldowns(faucetConfig.cooldownSeconds);
   const verifier = new AnePaymentVerifier({ client, relayerKey });
 
   const trialTracker = new TrialQuotaTracker({
@@ -90,8 +88,6 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   });
 
   const claimsById = new Map<string, ClaimStatusRecord>();
-  const ipCooldowns = new Map<string, number>();
-  const ipSalt = crypto.randomBytes(16).toString("hex");
   const directoryManifests = new Map<string, ServiceManifestPayload>();
 
   const demo: DemoContext = {
@@ -177,31 +173,27 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
           return;
         }
         const recipient = toChecksumAddress(body.recipient);
-        const amount = body.amount ? BigInt(body.amount) : FAUCET_DRIP_AMOUNT;
-        if (amount <= 0n || amount > FAUCET_DRIP_AMOUNT) {
+        // The contract always mints its fixed claimAmount; a smaller requested amount is accepted but ignored.
+        const amount = body.amount ? BigInt(body.amount) : faucetConfig.claimAmount;
+        if (amount <= 0n || amount > faucetConfig.claimAmount) {
           sendError(
             res,
             400,
             "ANE-E-1002",
-            `Requested amount exceeds faucet cap (${FAUCET_DRIP_AMOUNT.toString()} wei = 1600 tANE)`,
+            `Requested amount exceeds the faucet claim (${faucetConfig.claimAmount.toString()} wei)`,
             false,
           );
           return;
         }
 
-        const ip = clientIp(req, trustProxy);
-        const ipHash = crypto
-          .createHash("sha256")
-          .update(`${ipSalt}:${ip}:${recipient.toLowerCase()}`)
-          .digest("hex");
-        const lastClaimAt = ipCooldowns.get(ipHash) ?? 0;
         const nowSec = Math.floor(Date.now() / 1000);
-        if (nowSec - lastClaimAt < 86400) {
+        const waitSeconds = faucetCooldowns.remainingSeconds(recipient, nowSec);
+        if (waitSeconds > 0) {
           sendError(
             res,
             429,
             "ANE-E-1003",
-            "Faucet cooldown active for this recipient (24h window)",
+            `Faucet cooldown active for this recipient; retry in ${waitSeconds}s`,
             true,
           );
           return;
@@ -209,13 +201,13 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
 
         try {
           const settled = await client.executeFaucetClaimOnChain(relayerKey, recipient);
-          ipCooldowns.set(ipHash, nowSec);
+          faucetCooldowns.record(recipient, nowSec);
           const nonce = randomBytes32Hex();
           const claimId = `claim_${nonce.slice(2, 26)}`;
           const record: ClaimStatusRecord = {
             claimId,
             recipient,
-            amount: amount.toString(),
+            amount: faucetConfig.claimAmount.toString(),
             symbol: "tANE",
             txHash: settled.txHash,
             blockNumber: settled.blockNumber,

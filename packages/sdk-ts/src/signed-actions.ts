@@ -8,7 +8,7 @@ import type { AneClient } from "./client.ts";
 import { hashEip712Domain, hashTypedDataDigest, type TransferWithAuthorization } from "./crypto.ts";
 import { keccak256, keccak256Utf8 } from "./keccak.ts";
 import type { SecretKey } from "./secret.ts";
-import { toChecksumAddress } from "./secp256k1.ts";
+import { recoverAddress, toChecksumAddress } from "./secp256k1.ts";
 import { BUDGET_MODE, type BudgetModeName } from "./types.ts";
 
 export const SET_POLICY_TYPEHASH = keccak256Utf8(
@@ -125,12 +125,28 @@ export function hashVaultCreation(chainId: number | bigint, factory: string, own
 
 // ---- submitting (the relayer pays the gas) ----------------------------------------------------------------
 
+// The factory accepts createVault from anyone, so the check that the owner asked for this vault happens here,
+// before any gas is spent, and every relay built on this helper gets it.
 export async function relayCreateVault(
   client: AneClient,
   relayerKey: SecretKey,
-  creation: Pick<SignedVaultCreation, "owner" | "salt">,
+  creation: SignedVaultCreation,
+  nowSec = Math.floor(Date.now() / 1000),
 ): Promise<{ txHash: string; blockNumber: number; vaultAddress: string }> {
   const { aneVaultFactory } = await client.resolveContracts();
+  if (!Number.isSafeInteger(creation.deadline) || creation.deadline <= nowSec) {
+    throw new Error("Vault creation refused: the signature's deadline has passed");
+  }
+  const digest = hashVaultCreation(client.chainId, aneVaultFactory, creation.owner, creation.salt, creation.deadline);
+  let signer: string;
+  try {
+    signer = recoverAddress(digest, creation.signature);
+  } catch {
+    throw new Error("Vault creation refused: the signature is invalid");
+  }
+  if (signer.toLowerCase() !== creation.owner.toLowerCase()) {
+    throw new Error("Vault creation refused: not signed by the owner");
+  }
   const vaultAddress = await client.computeVaultAddress(creation.owner, creation.salt);
   const res = await client.sendContractTx(relayerKey, aneVaultFactory, "createVault(address,bytes32)", [
     toChecksumAddress(creation.owner),

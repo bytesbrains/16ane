@@ -19,6 +19,9 @@ Nothing has been released yet: no version is tagged, and no package is published
 - Brand images in use: the README banner (`assets/16ane_social_preview.png`), link previews for 16ane.com (Open Graph and X/Twitter tags with `web/og-image.png`), the logo on the Python SDK's README, and homepage, source and issue links in the Python and TypeScript package metadata.
 - Community files: `LICENSE` (MIT), `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue and PR templates, `CODEOWNERS`.
 
+### Changed
+- Faucet and relayer limits sized for agent-speed use (#61): faucet defaults 16,000 tANE per claim, 1 hour cooldown per recipient, 160 M tANE per day (were 1,600 / 24 h / 1.6 M); ADR-0006, ADR-0008 and ADR-0010 amended so the payment path carries no protocol rate limits or count caps, and operator-paid resources are limited by cost only.
+
 ### Security
 - Sandbox server: request bodies capped at 1 MiB, trial quota keyed on the connection address, and `X-Forwarded-For` trusted only with `trustProxy` (#31).
 - Sandbox server: error responses no longer echo internal error text, which could include the RPC URL and the `cast send` command line (#52). Failures that may carry internal detail return a fixed message and an `errorId`; the detail is logged server-side with URLs redacted. A failed faucet claim is now `502` (was `429`), and a malformed JSON body is `400 ANE-E-4000` (was `500`).

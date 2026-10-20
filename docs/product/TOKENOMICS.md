@@ -28,7 +28,7 @@ The name **16ane** comes from the historical **anna** (*ānna*), a monetary subu
 5. **Future ANE reserve liability**: only if separately authorized and issued in production.
 
 ## Sponsored service example
-Faucet grants 1,600 tANE. Provider quotes 16 tANE for a sandbox model call but limits each wallet to 20 calls/day and sets global $20/day equivalent actual compute expense. A user with 1M tANE still cannot bypass provider compute limits. Provider accepts test token voluntarily and bears its own operating cost.
+Faucet grants 16,000 tANE. Provider quotes 16 tANE for a sandbox model call and sponsors at most 20 free calls per wallet per day; after that the call is simply paid (#61) and sets global $20/day equivalent actual compute expense. A user with 1M tANE still cannot bypass provider compute limits. Provider accepts test token voluntarily and bears its own operating cost.
 
 ## Future reserve accounting (research, not launch authorization)
 Target eligible INR reserves >= outstanding ANE / 16 **plus any separate unsettled obligations** as required by the final legal/accounting structure. Define treatment of fees, pending redemption, bank chargebacks, insolvency, liquidity, and reserves held for others. Mint only after acceptable payment finality; burn/payout needs recoverable state machine. Proof-of-reserves reports require independent bank/custodian attestations; on-chain supply alone cannot prove fiat holdings.

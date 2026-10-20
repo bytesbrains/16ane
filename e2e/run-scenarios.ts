@@ -38,7 +38,7 @@ test("16ane E2E Scenarios S1-S6, Threat Model T1-T10, Python SDK & CLI Verificat
   } = await startSandboxStack(t);
 
   await t.test("S1: Bounded Agent Sandbox Purchase, Faucet Cooldown & Idempotency (REQ-001..006, T5, T7)", async () => {
-    // 1. Claim 1,600 tANE via Faucet API
+    // 1. Claim 16,000 tANE via Faucet API
     const claimRes = await fetch(`${sandbox.url}/v1/faucet/claims`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -50,7 +50,7 @@ test("16ane E2E Scenarios S1-S6, Threat Model T1-T10, Python SDK & CLI Verificat
       amount: string;
       disclaimer: string;
     };
-    assert.equal(claimBody.amount, (1600n * ONE_TANE).toString());
+    assert.equal(claimBody.amount, (16_000n * ONE_TANE).toString());
     assert.equal(claimBody.disclaimer, SANDBOX_DISCLAIMER);
 
     // 2. Second immediate faucet claim for same recipient must be rejected with 429 (T5)

@@ -35,7 +35,7 @@ paths:
           description: Asset metadata
   /v1/faucet/claims:
     post:
-      summary: Claim simulated tANE from the gasless sandbox faucet (max 1,600 tANE / 24h)
+      summary: Claim simulated tANE from the gasless sandbox faucet (max 16,000 tANE per recipient per hour)
       operationId: createFaucetClaim
       requestBody:
         required: true

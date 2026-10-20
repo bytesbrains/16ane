@@ -31,7 +31,7 @@ COPRA is commodity-referenced and therefore has variable INR purchasing power. 1
 _Target experience once the public sandbox is deployed; none of the hosted pieces below exist yet._
 
 1. Developer opens `docs.16ane.com` and creates an agent wallet on the public sandbox.
-2. Faucet grants 1,600 **tANE** (not rupees); owner delegates a fixed budget.
+2. Faucet grants 16,000 **tANE** (not rupees); owner delegates a fixed budget.
 3. Agent discovers a paid demo API and pays 16 tANE via a supported payment adapter.
 4. Agent publishes its own endpoint, receives tANE from another agent, and sees its revenue.
 5. Owner revokes authority and recovers the remaining funds; a receipt is independently verifiable.

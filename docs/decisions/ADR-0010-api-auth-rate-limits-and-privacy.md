@@ -1,6 +1,6 @@
 # ADR-0010: API Authentication, Rate Limits, Privacy, and Log Retention
 
-- **Status:** Accepted (2026-10-19)
+- **Status:** Accepted (2026-10-19); amended 2026-10-20 (#61)
 - **Date and owners:** 2026-10-19 | 16ane Security & Operations Maintainers
 - **Related requirements:** REQ-002, REQ-003, REQ-015, REQ-PRIV, REQ-OBS
 - **Related epics:** E02, E05, E10, E11, E15
@@ -34,8 +34,8 @@ Adopt **Option A**:
    - **Faucet & Relayer Claims (`POST /v1/faucet/claims`):** Authenticated via a signed EIP-191/EIP-712 challenge from the claimant wallet address (plus optional Cloudflare Turnstile token on web UI).
 2. **Rate Limits (`E05`, `E10`, `E16`):**
    - Read APIs: `120 req/min` per IP.
-   - Facilitator `/verify` & `/settle`: `30 req/min` per agent vault address and per IP.
-   - Faucet claims: `1 claim / 24h` per recipient address and per salted IP hash.
+   - Facilitator `/verify` & `/settle`: no per-vault or per-agent request limit (#61): payments run at the agent's speed. The hosted facilitator is protected by its gas budget and circuit breaker (`ADR-0006`); agents can always verify and settle directly on-chain instead.
+   - Faucet claims: `1 claim / hour` per recipient address (matching `AneFaucet`'s on-chain cooldown); the anonymous web faucet also keys on a salted IP hash.
    - Standard `Retry-After` and `X-RateLimit-*` headers returned on `429 Too Many Requests`.
 3. **Observability & Log Retention (`REQ-OBS`, `REQ-PRIV`):**
    - Structured JSON logs correlate `correlation_id`, `quote_id`, `payment_id`, `tx_hash`, `service_id`, `latency_ms`, and `status`.

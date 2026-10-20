@@ -2,6 +2,7 @@
 // The scheduled monitor (.github/workflows/api-monitor.yml) runs it and opens an issue when it fails:
 //   node --experimental-strip-types scripts/api-health.ts https://api.16ane.com
 // Exit codes: 0 healthy, 1 a problem was found (printed one per line), 2 bad usage.
+import { pathToFileURL } from "node:url";
 
 export interface HealthReport {
   status?: string;
@@ -18,8 +19,13 @@ export interface HealthReport {
 
 // Each problem says what is wrong and what to do; docs/operations/OPERATIONS.md has the runbook.
 export function assessHealth(httpStatus: number, body: HealthReport, expectedRegistry?: string): string[] {
+  // The server itself answers 503 "unavailable" only when its RPC call fails; any other bad answer (a
+  // platform proxy's 502 with no machine running, a 404 from the wrong host) means the API isn't serving.
+  if (body.status === "unavailable") {
+    return [`/healthz answered ${httpStatus} (unavailable): the server can't reach its RPC`];
+  }
   if (httpStatus !== 200 || body.status !== "ok") {
-    return [`/healthz answered ${httpStatus} (${body.status ?? "no status"}): the server can't reach its RPC`];
+    return [`/healthz answered ${httpStatus} (${body.status ?? "no status"}): the API isn't serving`];
   }
   const problems: string[] = [];
   if (expectedRegistry && body.registry?.toLowerCase() !== expectedRegistry.toLowerCase()) {
@@ -59,7 +65,7 @@ export async function checkApiHealth(apiUrl: string, expectedRegistry?: string):
   return assessHealth(res.status, body, expectedRegistry);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const apiUrl = process.argv[2];
   if (!apiUrl) {
     console.error("Usage: api-health.ts <api-url> [expected-registry]");

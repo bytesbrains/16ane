@@ -23,8 +23,8 @@ Deployment, secrets and rollback: `DEPLOY_API.md`.
 
 | Alert | Meaning | Action |
 |---|---|---|
-| `… is unreachable` | No answer from the API | `fly status` / `fly logs --app 16ane-sandbox-api`; restart with `fly apps restart 16ane-sandbox-api`; roll back if a deploy caused it |
-| `/healthz answered 503` | The server can't reach its RPC | Check Base Sepolia status; point `ANE_RPC_URL` at the fallback in `networks/sandbox-sepolia.json` (`fly secrets set` or `fly.toml`) and redeploy |
+| `… is unreachable` or `… the API isn't serving` | No answer, or an error page from Fly's proxy (no machine running) or the wrong host | `fly status` / `fly logs --app 16ane-sandbox-api`; restart with `fly apps restart 16ane-sandbox-api`; roll back if a deploy caused it |
+| `… (unavailable): the server can't reach its RPC` | The server is up but its RPC calls fail | Check Base Sepolia status; point `ANE_RPC_URL` at the fallback in `networks/sandbox-sepolia.json` (`fly secrets set` or `fly.toml`) and redeploy |
 | `relayer … top it up` | The relayer holds less than what's left of today's gas budget | Send Base Sepolia ETH to the address in the alert. Only the relayer's address is needed; never move its key |
 | `gas budget … used up` | Sponsorship is paused until 00:00 UTC; transfers and self-paid claims still work | Look at `fly logs` and the faucet's `FaucetClaimed` events for one actor rotating keys; raise `ANE_RELAYER_GAS_BUDGET_WEI` only if the use is legitimate |
 | `registry is …, expected …` | The server points at another deployment | Fix `ANE_REGISTRY_ADDRESS` in `fly.toml` and redeploy |

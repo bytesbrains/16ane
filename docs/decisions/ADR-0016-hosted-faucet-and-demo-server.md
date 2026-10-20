@@ -73,18 +73,20 @@ adapter instead of SQLite.
 3. **Keys:** separate, dedicated relayer and provider keys, created for the host and never reused from the deployer.
 
 ## Work (tracked as issues)
-1. **Entrypoint and config:** a `services/sandbox-server` start command reading env (RPC URL, registry, keys from
+1. **Entrypoint and config** (#73): a `services/sandbox-server` start command reading env (RPC URL, registry, keys from
    secrets, port), listening on a configurable host (`0.0.0.0` in containers), plus a health endpoint.
-2. **Persistent state:** a storage interface for cooldowns, claims, directory, trial quotas and idempotency/receipts,
+2. **Persistent state** (#75): a storage interface for cooldowns, claims, directory, trial quotas and idempotency/receipts,
    with SQLite (A) or Durable Objects (B). Idempotency must survive restarts.
-3. **Relayer gas budget (ADR-0006, #61):** track ETH spent per UTC day; above the budget, stop sponsoring gas and
+3. **Relayer gas budget** (#76; ADR-0006, #61): track ETH spent per UTC day; above the budget, stop sponsoring gas and
    tell callers to self-relay. No per-agent count limits.
-4. **Docker image:** Node 24 + a pinned Foundry release, non-root user, run in CI, published for self-hosting (#18).
-5. **Abuse controls for the anonymous web faucet:** Turnstile, and a signed-challenge path for agents (ADR-0006 as amended).
-6. **Read consistency on public RPCs (#67 part 2):** the server reads right after it writes, as the smoke test did.
-7. **Operations:** secrets set-up, alerts on relayer balance and budget, logs without secrets (ADR-0010), and the
+4. **Docker image** (#74): Node 24 + a pinned Foundry release, non-root user, run in CI, published for self-hosting (#18).
+5. **Abuse controls for the anonymous web faucet** (#79): Turnstile, and a signed-challenge path for agents (ADR-0006 as amended).
+6. **Read consistency on public RPCs** (#67 part 2): the server reads right after it writes, as the smoke test did.
+7. **Operations** (#78): secrets set-up, alerts on relayer balance and budget, logs without secrets (ADR-0010), and the
    runbook in `OPERATIONS.md`.
-8. **Go-live:** DNS, a smoke test against the hosted API, `G1-13` → PASS, and site and README updates.
+8. **Go-live** (#78): DNS, a smoke test against the hosted API, `G1-13` → PASS, and site and README updates.
+
+9. **Gasless use** (#77): sponsored signed actions (EIP-3009 transfers, vault signatures), so `tANE` holders never need ETH.
 
 ## Security and legal impacts
 - **Hot keys on a hosted machine:** keep relayer and provider balances small, set the gas budget, rotate the keys

@@ -61,4 +61,6 @@ export interface AneClientOptions {
   contracts?: Partial<AneContractAddresses>;
   facilitatorUrl?: string;
   sendHooks?: SendHooks;
+  /** How long after a confirmed write reads are held to that write's block (#67). Default 60 s; 0 turns it off. */
+  readFloorWindowMs?: number;
 }

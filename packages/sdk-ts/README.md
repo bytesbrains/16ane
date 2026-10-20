@@ -75,5 +75,11 @@ Budgets are enforced by the vault contract, not by the SDK: a session cannot spe
 `perTxLimit`, and in `FIXED` mode incoming revenue never increases what it may spend. `maxPayment` is an extra,
 client-side guard.
 
+**Reads right after a write.** Public load-balanced RPCs (`sepolia.base.org`) can answer from a node that hasn't
+seen a block you just wrote. For 60 seconds after its last confirmed transaction, an `AneClient` reads at a block
+no older than that one, waiting while the node is behind, so `delegateSession` followed by `signSpendIntent`
+sees the new policy. If the write came from a different client or process, call
+`client.observeBlock(blockNumber)` first. `readFloorWindowMs` changes the window; `0` turns it off.
+
 See the [repository README](https://github.com/bytesbrains/16ane#readme) for the protocol, threat model and
 ADRs, and [`e2e/`](https://github.com/bytesbrains/16ane/tree/main/e2e) for complete flows against a local chain.

@@ -82,6 +82,7 @@ adapter instead of SQLite.
 4. **Docker image** (#74): Node 24 + a pinned Foundry release, non-root user, run in CI, published for self-hosting (#18).
 5. **Abuse controls for the anonymous web faucet** (#79): Turnstile, and a signed-challenge path for agents (ADR-0006 as amended).
 6. **Read consistency on public RPCs** (#67 part 2): the server reads right after it writes, as the smoke test did.
+   Done in the TypeScript SDK: `AneClient` holds reads to its last write's block for 60 s (`observeBlock`).
 7. **Operations** (#78): secrets set-up, alerts on relayer balance and budget, logs without secrets (ADR-0010), and the
    runbook in `OPERATIONS.md`.
 8. **Go-live** (#78): DNS, a smoke test against the hosted API, `G1-13` → PASS, and site and README updates.

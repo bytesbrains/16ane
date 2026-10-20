@@ -10,6 +10,7 @@ import {
 } from "./crypto.ts";
 import { keccak256Utf8 } from "./keccak.ts";
 import { castSend, type CastSendResult } from "./cast.ts";
+import { ReadFloor, RECEIPT_RETRY_DELAYS_MS, sleep } from "./read-floor.ts";
 import { redactSecrets, SecretKey } from "./secret.ts";
 import { privateKeyToAddress, recoverAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
 import {
@@ -60,6 +61,7 @@ export class AneClient {
   private registryAddress?: string;
   private cachedContracts?: AneContractAddresses;
   readonly #sendHooks?: SendHooks;
+  readonly #reads: ReadFloor;
 
   constructor(options: AneClientOptions) {
     this.rpcUrl = options.rpcUrl;
@@ -67,6 +69,7 @@ export class AneClient {
     this.registryAddress = options.registryAddress;
     this.facilitatorUrl = options.facilitatorUrl;
     this.#sendHooks = options.sendHooks;
+    this.#reads = new ReadFloor(options.readFloorWindowMs ?? 60_000, (method, params) => this.rpcCall(method, params));
     if (
       options.contracts?.aneTestToken &&
       options.contracts?.aneVaultFactory &&
@@ -105,8 +108,20 @@ export class AneClient {
     return payload.result as T;
   }
 
+  /**
+   * Holds this client's reads to `blockNumber` or newer for a while (`readFloorWindowMs`). Called after every
+   * confirmed send; call it yourself when another client or process made the write you're about to read.
+   */
+  observeBlock(blockNumber: number | bigint): void {
+    this.#reads.observe(blockNumber);
+  }
+
   async ethCall(to: string, data: string): Promise<string> {
-    return this.rpcCall<string>("eth_call", [{ to, data }, "latest"]);
+    return this.#reads.read<string>("eth_call", [{ to, data }]);
+  }
+
+  async getEthBalance(account: string): Promise<bigint> {
+    return BigInt(await this.#reads.read<string>("eth_getBalance", [account]));
   }
 
   async resolveContracts(): Promise<AneContractAddresses> {
@@ -148,7 +163,7 @@ export class AneClient {
   }
 
   async isContractDeployed(address: string): Promise<boolean> {
-    const code = await this.rpcCall<string>("eth_getCode", [address, "latest"]);
+    const code = await this.#reads.read<string>("eth_getCode", [address]);
     return Boolean(code && code !== "0x" && code !== "0x0");
   }
 
@@ -235,6 +250,7 @@ export class AneClient {
         throw new Error(redactSecrets(msg, [rawKey]));
       }
       this.#sendHooks?.after?.(from, sent.feeWei, sent.txHash, ticket);
+      this.observeBlock(sent.blockNumber);
       if (sent.status !== 1) throw new Error(`Transaction reverted: ${sent.txHash}`);
       return { txHash: sent.txHash, blockNumber: sent.blockNumber, status: sent.status };
     }
@@ -364,11 +380,19 @@ export class AneClient {
     txHash: string;
     reason?: string;
   }> {
-    const receipt = await this.rpcCall<{
+    type Receipt = {
       status: string;
       blockNumber: string;
       logs: Array<{ address: string; topics: string[]; data: string }>;
-    } | null>("eth_getTransactionReceipt", [params.txHash]);
+    };
+    // A node behind the one that mined the transaction answers null (#67): ask again briefly before
+    // reporting it missing.
+    let receipt = await this.rpcCall<Receipt | null>("eth_getTransactionReceipt", [params.txHash]);
+    for (const delay of RECEIPT_RETRY_DELAYS_MS) {
+      if (receipt) break;
+      await sleep(delay);
+      receipt = await this.rpcCall<Receipt | null>("eth_getTransactionReceipt", [params.txHash]);
+    }
 
     if (!receipt) {
       return {

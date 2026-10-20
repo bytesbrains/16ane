@@ -10,6 +10,7 @@ export * from "./types.ts";
 export * from "./client.ts";
 export * from "./x402.ts";
 export * from "./wallet.ts";
+export * from "./signed-actions.ts";
 export * from "./session.ts";
 export * from "./trial-quota.ts";
 export * from "./merchant.ts";

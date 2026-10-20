@@ -1,17 +1,24 @@
 import util from "node:util";
 import { normalizeSaltBytes32, type AneClient } from "./client.ts";
+import { hashTransferWithAuthorization, randomBytes32Hex } from "./crypto.ts";
 import { REDACTED_PRIVATE_KEY, SecretKey } from "./secret.ts";
-import { privateKeyToAddress, toChecksumAddress } from "./secp256k1.ts";
-import { BUDGET_MODE, type BudgetModeName } from "./types.ts";
+import { privateKeyToAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
+import {
+  type DelegatePolicyInput,
+  hashRevoke,
+  hashSetPolicy,
+  hashVaultCreation,
+  policyTupleArg,
+  type SignedPolicy,
+  type SignedRevoke,
+  type SignedTransfer,
+  type SignedVaultCreation,
+  toPolicyFields,
+} from "./signed-actions.ts";
 
-export interface DelegatePolicyInput {
-  mode?: BudgetModeName;
-  allowanceCap: bigint | string;
-  perTxLimit: bigint | string;
-  dailyLimit?: bigint | string;
-  expiry: number;
-  revolvingTreasuryCeiling?: bigint | string;
-}
+// Signatures for a relayer to submit (#77) are short-lived: 10 minutes unless the caller says otherwise.
+const DEFAULT_SIGNATURE_TTL_SECONDS = 600;
+const deadlineFromNow = (seconds = DEFAULT_SIGNATURE_TTL_SECONDS) => Math.floor(Date.now() / 1000) + seconds;
 
 export class OwnerWallet {
   readonly client: AneClient;
@@ -79,19 +86,11 @@ export class OwnerWallet {
     sessionAddress: string,
     policy: DelegatePolicyInput,
   ): Promise<{ txHash: string }> {
-    const modeEnum = policy.mode === "REVOLVING" ? BUDGET_MODE.REVOLVING : BUDGET_MODE.FIXED;
-    const maxTotal = BigInt(policy.allowanceCap).toString();
-    const maxPerTx = BigInt(policy.perTxLimit).toString();
-    const dailyLimit = BigInt(policy.dailyLimit ?? policy.allowanceCap).toString();
-    const revolvingCeiling = BigInt(
-      policy.revolvingTreasuryCeiling ?? policy.allowanceCap,
-    ).toString();
-    const tupleArg = `(${toChecksumAddress(sessionAddress)},${maxTotal},${maxPerTx},${dailyLimit},${policy.expiry},${modeEnum},${revolvingCeiling})`;
     const res = await this.client.sendContractTx(
       this.#secretKey,
       vaultAddress,
       "setPolicy((address,uint256,uint256,uint256,uint64,uint8,uint256))",
-      [tupleArg],
+      [policyTupleArg(toPolicyFields(sessionAddress, policy))],
     );
     return { txHash: res.txHash };
   }
@@ -132,5 +131,62 @@ export class OwnerWallet {
       [BigInt(amount).toString(), toChecksumAddress(to)],
     );
     return { txHash: res.txHash };
+  }
+
+  // ---- signed for a relayer to submit, so this wallet needs no ETH (#77) ---------------------------------
+
+  /** An EIP-3009 transfer of tANE from this wallet. Funding a vault is a transfer to the vault's address. */
+  async signTransfer(
+    to: string,
+    value: bigint | string,
+    options: { validBefore?: number; nonce?: string } = {},
+  ): Promise<SignedTransfer> {
+    const { aneTestToken } = await this.client.resolveContracts();
+    const auth = {
+      from: this.address,
+      to: toChecksumAddress(to),
+      value: BigInt(value),
+      validAfter: 0,
+      validBefore: options.validBefore ?? deadlineFromNow(),
+      nonce: options.nonce ?? randomBytes32Hex(),
+    };
+    const { digest } = hashTransferWithAuthorization(this.client.chainId, aneTestToken, auth);
+    return { ...auth, signature: signDigest(digest, this.#secretKey).serialized };
+  }
+
+  /** setPolicyWithSig for the vault's current policy version, so the signature can be used once. */
+  async signPolicy(
+    vaultAddress: string,
+    sessionAddress: string,
+    policy: DelegatePolicyInput,
+    options: { deadline?: number } = {},
+  ): Promise<SignedPolicy> {
+    const vault = toChecksumAddress(vaultAddress);
+    const fields = toPolicyFields(sessionAddress, policy);
+    const expectedPolicyVersion = await this.client.getPolicyVersion(vault);
+    const deadline = options.deadline ?? deadlineFromNow();
+    const digest = hashSetPolicy(this.client.chainId, vault, fields, expectedPolicyVersion, deadline);
+    return { vault, policy: fields, expectedPolicyVersion, deadline, signature: signDigest(digest, this.#secretKey).serialized };
+  }
+
+  /** revokeWithSig for the vault's current policy version. */
+  async signRevoke(vaultAddress: string, options: { deadline?: number } = {}): Promise<SignedRevoke> {
+    const vault = toChecksumAddress(vaultAddress);
+    const expectedPolicyVersion = await this.client.getPolicyVersion(vault);
+    const deadline = options.deadline ?? deadlineFromNow();
+    const digest = hashRevoke(this.client.chainId, vault, expectedPolicyVersion, deadline);
+    return { vault, expectedPolicyVersion, deadline, signature: signDigest(digest, this.#secretKey).serialized };
+  }
+
+  /** Asks a relay server to create this wallet's vault (checked by the server; the factory needs no signature). */
+  async signVaultCreation(
+    salt: bigint | number | string = 0n,
+    options: { deadline?: number } = {},
+  ): Promise<SignedVaultCreation> {
+    const { aneVaultFactory } = await this.client.resolveContracts();
+    const saltB32 = normalizeSaltBytes32(salt);
+    const deadline = options.deadline ?? deadlineFromNow();
+    const digest = hashVaultCreation(this.client.chainId, aneVaultFactory, this.address, saltB32, deadline);
+    return { owner: this.address, salt: saltB32, deadline, signature: signDigest(digest, this.#secretKey).serialized };
   }
 }

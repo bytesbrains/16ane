@@ -65,6 +65,7 @@ await owner.revokeSession(vaultAddress);
 |---|---|
 | `AneClient` | JSON-RPC reads (balances, vault accounting, payment records), contract resolution through `AneRegistry`, transaction sending, on-chain settlement verification, service-manifest signing and verification |
 | `OwnerWallet` | Owner actions: `ensureVaultDeployed`, `fundVault`, `delegateSession`, `revokeSession`, `revokeAndSweep`, `withdrawPrincipal` |
+| Signed actions (#77) | `OwnerWallet.signTransfer`, `signPolicy`, `signRevoke`, `signVaultCreation`; `relayTransfer`, `relaySetPolicy`, `relayRevoke`, `relayCreateVault` for a relayer to submit them and pay the gas, so an owner never needs ETH |
 | `AgentSession` | Agent actions with a delegated session key: `purchase` (x402 flow), `signSpendIntent`, `settleDirectSpend` |
 | `AnePaymentVerifier` | Merchant side: verify and settle x402 payment proofs, idempotency, receipts |
 | `TrialQuotaTracker` | Per-caller and global quotas for provider-sponsored trial calls |

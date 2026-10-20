@@ -32,12 +32,12 @@ const now = () => Math.floor(Date.now() / 1000);
 
 // An RPC that knows the registry and the faucet's views, records every method it is asked for, and refuses
 // everything else. A refused claim must never get past eth_call: no nonce lookup, no gas estimate, no send.
-async function fakeRpc(usedNonces: Set<string>) {
+async function fakeRpc(usedNonces: Set<string>, nonceReply?: { result?: string; delayMs?: number }) {
   const methods: string[] = [];
   const server = http.createServer((req, res) => {
     let body = "";
     req.on("data", (c) => (body += c));
-    req.on("end", () => {
+    req.on("end", async () => {
       const { id, method, params } = JSON.parse(body) as { id: number; method: string; params: [{ data: string }] };
       methods.push(method);
       let result: string | undefined;
@@ -46,7 +46,9 @@ async function fakeRpc(usedNonces: Set<string>) {
         if (data.startsWith(functionSelector("claimAmount()"))) result = "0x" + word(16_000n * 10n ** 18n);
         else if (data.startsWith(functionSelector("cooldownSeconds()"))) result = "0x" + word(3600);
         else if (data.startsWith(functionSelector("relayedNonceUsed(bytes32)"))) {
-          result = "0x" + word(usedNonces.has("0x" + data.slice(10)) ? 1 : 0);
+          methods.push("relayedNonceUsed");
+          await new Promise((resolve) => setTimeout(resolve, nonceReply?.delayMs ?? 0));
+          result = nonceReply?.result ?? "0x" + word(usedNonces.has("0x" + data.slice(10)) ? 1 : 0);
         } else result = "0x" + word(0x11) + word(0x22) + word(0x33) + word(0x44);
       }
       res.writeHead(200, { "content-type": "application/json" });
@@ -97,10 +99,10 @@ async function fakeSiteverify() {
 
 async function withServer(
   t: test.TestContext,
-  options: Partial<SandboxServerConfig> & { usedNonces?: Set<string> },
+  options: Partial<SandboxServerConfig> & { usedNonces?: Set<string>; nonceReply?: { result?: string; delayMs?: number } },
   run: (claim: (body: object) => Promise<{ status: number; code?: string; message?: string }>, rpcMethods: string[]) => Promise<void>,
 ) {
-  const rpc = await fakeRpc(options.usedNonces ?? new Set());
+  const rpc = await fakeRpc(options.usedNonces ?? new Set(), options.nonceReply);
   const sandbox = await createSandboxServer({
     rpcUrl: rpc.url,
     registryAddress: "0x" + "ab".repeat(20),
@@ -125,7 +127,7 @@ async function withServer(
   }
 }
 
-const onlyReads = (methods: string[]) => methods.every((m) => m === "eth_call");
+const onlyReads = (methods: string[]) => methods.every((m) => m === "eth_call" || m === "relayedNonceUsed");
 const asBody = (c: SignedFaucetClaim) => ({
   recipient: c.recipient,
   authorization: { deadline: c.deadline, nonce: c.nonce, signature: c.signature },
@@ -232,4 +234,52 @@ test("faucetOpenClaims accepts a claim with no proof (local and private servers 
     assert.equal(r.status, 502);
     assert.ok(!onlyReads(methods), "the relayer tried to send");
   });
+});
+
+test("a concurrent duplicate claim for the same recipient is refused with 409 before its nonce lookup", async (t) => {
+  // The nonce lookup is held, so both requests are in flight together.
+  await withServer(t, { nonceReply: { delayMs: 200 } }, async (claim, methods) => {
+    const [a, b] = await Promise.all([
+      claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY))),
+      claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY))),
+    ]);
+    assert.deepEqual([a.status, b.status].sort(), [409, 502]);
+    assert.ok([a, b].some((r) => r.code === "ANE-E-1009"));
+    assert.equal(methods.filter((m) => m === "relayedNonceUsed").length, 1, "only one claim got past the guard");
+  });
+});
+
+test("a malformed nonce lookup fails closed with 502, never as an unused nonce", async (t) => {
+  for (const result of ["0x", "0x" + "00".repeat(31)]) {
+    await withServer(t, { nonceReply: { result } }, async (claim, methods) => {
+      const r = await claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY)));
+      assert.equal(r.status, 502, result);
+      assert.equal(r.code, "ANE-E-1004");
+      assert.ok(onlyReads(methods), "nothing was sent");
+    });
+  }
+});
+
+test("a non-integer amount is a 400 ANE-E-1002, not a 500", async (t) => {
+  await withServer(t, { faucetOpenClaims: true }, async (claim, methods) => {
+    for (const amount of [1.5, "1.5", "abc", 7, ""]) {
+      const r = await claim({ recipient: RECIPIENT, amount });
+      assert.equal(r.status, 400, JSON.stringify(amount));
+      assert.equal(r.code, "ANE-E-1002");
+    }
+    assert.deepEqual(methods, []);
+  });
+});
+
+test("Turnstile: siteverify being unreachable is a 503 ANE-E-1010 and spends no gas", async (t) => {
+  await withServer(
+    t,
+    { turnstileSecretKey: "turnstile-secret", turnstileSiteverifyUrl: "http://127.0.0.1:1/siteverify" },
+    async (claim, methods) => {
+      const r = await claim({ recipient: RECIPIENT, turnstileToken: "pass" });
+      assert.equal(r.status, 503);
+      assert.equal(r.code, "ANE-E-1010");
+      assert.deepEqual(methods, []);
+    },
+  );
 });

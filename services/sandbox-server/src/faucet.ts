@@ -176,8 +176,9 @@ export async function handleFaucetClaim(
   }
   const recipient = toChecksumAddress(body.recipient);
   // The contract always mints its fixed claimAmount; a smaller requested amount is accepted but ignored.
-  const amount = body.amount ? BigInt(body.amount) : ctx.faucetConfig.claimAmount;
-  if (amount <= 0n || amount > ctx.faucetConfig.claimAmount) {
+  const amountOk = body.amount == null || (typeof body.amount === "string" && /^\d+$/.test(body.amount));
+  const amount = amountOk && body.amount != null ? BigInt(body.amount) : ctx.faucetConfig.claimAmount;
+  if (!amountOk || amount <= 0n || amount > ctx.faucetConfig.claimAmount) {
     sendError(
       res,
       400,
@@ -237,11 +238,21 @@ export async function handleFaucetClaim(
   ctx.inFlight.add(key);
   try {
     if (signed) {
-      const used = await ctx.client.ethCall(
-        ctx.faucetAddress,
-        functionSelector("relayedNonceUsed(bytes32)") + abiWordBytes32(signed.nonce),
-      );
-      if (BigInt(used.slice(0, 66)) !== 0n) {
+      // Anything but one well-formed word (a revert, an empty or garbled reply) is a failure, never "unused".
+      let used: string;
+      try {
+        used = await ctx.client.ethCall(
+          ctx.faucetAddress,
+          functionSelector("relayedNonceUsed(bytes32)") + abiWordBytes32(signed.nonce),
+        );
+        if (typeof used !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(used)) {
+          throw new Error(`relayedNonceUsed returned ${JSON.stringify(used)}`);
+        }
+      } catch (err) {
+        sendLoggedError(res, 502, "ANE-E-1004", "Faucet could not check the claim on-chain; try again later", true, err);
+        return;
+      }
+      if (BigInt(used) !== 0n) {
         sendError(res, 403, "ANE-E-1008", "Faucet claim refused: authorization nonce was already used", false);
         return;
       }

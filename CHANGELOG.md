@@ -9,7 +9,7 @@ Nothing has been released yet: no version is tagged, and no package is published
 ### Added
 - Planning specification: requirements, protocol docs, threat model, ADR-0001 to ADR-0015, traceability, proposed issues and launch-readiness gates.
 - Solidity contracts in `src/`: `AneTestToken` (`tANE`), `AneAgentVault`, `AneVaultFactory`, `AneFaucet`, `AneRegistry` and `AneServiceDirectory`, with Foundry unit, fuzz and invariant tests and a Base Sepolia deployment script that CI runs as a dry run.
-- TypeScript SDK `@16ane/sdk` (`packages/sdk-ts`) and Python SDK `16ane-sdk` (`packages/sdk-py`, import `ane_sdk`).
+- TypeScript SDK `@16ane/sdk` (`packages/sdk-ts`, with its own README) and Python SDK `16ane-sdk` (`packages/sdk-py`, import `ane_sdk`).
 - `ane` CLI (`packages/cli`).
 - Reference sandbox server with an x402 payment flow, faucet and demo endpoints (`services/sandbox-server`). It runs locally and in the E2E suite only.
 - E2E scenarios S1 to S6 and threat-model checks T1 to T10 (`e2e/`).

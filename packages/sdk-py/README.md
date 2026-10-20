@@ -8,8 +8,8 @@ settled through `AneAgentVault`, signed service manifests, and direct on-chain r
 > **TEST TOKENS (tANE) — NO CASH VALUE.** `tANE` is a free, simulated testnet token. It is not
 > backed by INR, not redeemable, and not convertible to any future `ANE`.
 
-Status: `0.1.0`, not yet released. On PyPI, `16ane-sdk 0.0.0` is a code-free name placeholder; the first real release will be `0.1.0` or later. The distribution name is `16ane-sdk`; the import name is `ane_sdk`. Nothing is deployed to a public network; use a local
-Anvil chain (see the repository's E2E harness) or your own Base Sepolia deployment.
+Status: `0.1.0`, not yet released. On PyPI, `16ane-sdk 0.0.0` is a code-free name placeholder; the first real release will be `0.1.0` or later. The distribution name is `16ane-sdk`; the import name is `ane_sdk`. The sandbox contracts are live on Base Sepolia
+(registry `0x01d5daB670DE5868305eB862721ebE62772C3Df3`, all addresses in [`networks/sandbox-sepolia.json`](https://github.com/bytesbrains/16ane/blob/main/networks/sandbox-sepolia.json)), or use a local Anvil chain.
 
 ## Use from a checkout
 

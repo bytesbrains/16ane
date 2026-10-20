@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>16ane — Open Agent Economy (sandbox)</title>
-  <meta name="description" content="An open-source sandbox where AI agents pay each other with free test tokens, inside budgets enforced by smart contracts. In development; nothing is deployed yet. tANE has no cash value.">
+  <meta name="description" content="An open-source sandbox where AI agents pay each other with free test tokens, inside budgets enforced by smart contracts. In development; the contracts are live on the Base Sepolia testnet. tANE has no cash value.">
   <meta name="color-scheme" content="dark light">
   <meta name="theme-color" content="#0B1A3A">
   <link rel="canonical" href="https://16ane.com/">
@@ -13,7 +13,7 @@
   <meta property="og:site_name" content="16ane">
   <meta property="og:url" content="https://16ane.com/">
   <meta property="og:title" content="16ane — Open Agent Economy (sandbox)">
-  <meta property="og:description" content="An open-source sandbox where AI agents pay each other with free test tokens, inside budgets enforced by smart contracts. In development; nothing is deployed yet. tANE has no cash value.">
+  <meta property="og:description" content="An open-source sandbox where AI agents pay each other with free test tokens, inside budgets enforced by smart contracts. In development; the contracts are live on the Base Sepolia testnet. tANE has no cash value.">
   <meta property="og:image" content="https://16ane.com/og-image.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="1280">
@@ -51,7 +51,7 @@
       <ul>
         <li>tANE is a free, simulated test token. It is not money, cannot be redeemed, and does not convert into anything.</li>
         <li>There is <strong>no token sale, no presale and no tradable 16ane token</strong>. Anyone offering to sell you one is not us.</li>
-        <li>When contracts are deployed, their addresses will be published only in the <a href="https://github.com/bytesbrains/16ane">GitHub repository</a> and on this page.</li>
+        <li>The contract addresses are published only in the <a href="https://github.com/bytesbrains/16ane/blob/main/networks/sandbox-sepolia.json">GitHub repository</a> and on this page. Registry: <code>0x01d5daB670DE5868305eB862721ebE62772C3Df3</code>. Check the address, never the token symbol.</li>
       </ul>
     </section>
 
@@ -88,18 +88,18 @@
       <h2 id="status-title">Where it stands</h2>
       <div class="status">
         <div class="col">
-          <h3><span class="tag ok">Works today</span> locally and in CI</h3>
+          <h3><span class="tag ok">Works today</span></h3>
           <ul class="list">
+            <li>Contracts on the Base Sepolia testnet. Registry: <code>0x01d5daB670DE5868305eB862721ebE62772C3Df3</code>; check addresses here, never by the token symbol</li>
             <li>Contracts: test token, agent vault, faucet and registry, with fuzz and invariant tests</li>
             <li>x402 payments with idempotency and verifiable receipts</li>
             <li>TypeScript and Python SDKs and the <code>ane</code> CLI, in the repository</li>
-            <li>End-to-end scenarios against a throwaway local chain</li>
+            <li>End-to-end scenarios, locally and in CI</li>
           </ul>
         </div>
         <div class="col">
           <h3><span class="tag no">Not live yet</span></h3>
           <ul class="list">
-            <li>Contracts on the Base Sepolia testnet</li>
             <li>A public faucet and demo API</li>
             <li>Providers accepting tANE for their sandbox, demo or trial tiers</li>
             <li>Developer docs and an owner dashboard</li>

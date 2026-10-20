@@ -45,6 +45,7 @@ async function withServer(
     rpcUrl: rpc.url,
     registryAddress: "0x" + "ab".repeat(20),
     relayerPrivateKey: "0x" + "1".repeat(64),
+    faucetOpenClaims: true, // these tests are about error handling, not claim proofs (faucet-claims.test.ts)
   });
   const logs: string[] = [];
   t.mock.method(console, "error", (line: string) => logs.push(line));

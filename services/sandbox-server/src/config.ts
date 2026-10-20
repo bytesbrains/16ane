@@ -72,6 +72,13 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     problems.push("ANE_CLIENT_IP_HEADER must be a header name");
   }
   if (!["true", "false"].includes(trustProxyRaw)) problems.push("ANE_TRUST_PROXY must be true or false");
+  const openClaimsRaw = get("ANE_FAUCET_OPEN_CLAIMS") ?? "false";
+  if (!["true", "false"].includes(openClaimsRaw)) problems.push("ANE_FAUCET_OPEN_CLAIMS must be true or false");
+  const turnstileSecretKey = get("ANE_TURNSTILE_SECRET_KEY");
+  const turnstileExpectedHostname = get("ANE_TURNSTILE_HOSTNAME");
+  if (turnstileExpectedHostname !== undefined && !turnstileSecretKey) {
+    problems.push("ANE_TURNSTILE_HOSTNAME needs ANE_TURNSTILE_SECRET_KEY");
+  }
 
   if (problems.length > 0) throw new ConfigError(problems);
   return {
@@ -86,6 +93,9 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     chainId,
     trustProxy: trustProxyRaw === "true",
     clientIpHeader,
+    faucetOpenClaims: openClaimsRaw === "true",
+    turnstileSecretKey,
+    turnstileExpectedHostname,
     trialFreeCallsPerCaller,
     trialGlobalDailyCap,
   };

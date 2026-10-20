@@ -36,6 +36,10 @@ paths:
   /v1/faucet/claims:
     post:
       summary: Claim simulated tANE from the gasless sandbox faucet (max 16,000 tANE per recipient per hour)
+      description: >-
+        Each claim carries a proof (#79): an `authorization` signed by the recipient (EIP-712 `FaucetClaim`, as
+        checked by AneFaucet.relayedClaim; see AneClient.signFaucetClaim) or, where the server has Turnstile set
+        up, a `turnstileToken` from the web faucet. A refused claim costs the relayer no gas.
       operationId: createFaucetClaim
       requestBody:
         required: true
@@ -49,11 +53,34 @@ paths:
                   type: string
                 amount:
                   type: string
+                authorization:
+                  type: object
+                  required: [deadline, nonce, signature]
+                  properties:
+                    deadline:
+                      type: integer
+                      description: Unix seconds, 30 s to 1 h from now
+                    nonce:
+                      type: string
+                      description: Random bytes32; single use, enforced on-chain
+                    signature:
+                      type: string
+                      description: 65-byte signature by the recipient over the EIP-712 FaucetClaim
+                turnstileToken:
+                  type: string
       responses:
         "201":
           description: Claim settled on-chain
+        "401":
+          description: No proof (ANE-E-1007)
+        "403":
+          description: Proof refused - wrong signer, bad deadline, used nonce or failed Turnstile check (ANE-E-1008)
+        "409":
+          description: A claim for this recipient is already in progress (ANE-E-1009)
         "429":
           description: Cooldown or quota active
+        "503":
+          description: Relayer gas budget used up (ANE-E-1006) or Turnstile unavailable (ANE-E-1010)
   /v1/faucet/claims/{id}:
     get:
       summary: Get faucet claim status by claimId

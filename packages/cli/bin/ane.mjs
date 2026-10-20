@@ -50,7 +50,7 @@ async function main() {
           commands: [
             "ane network list",
             "ane wallet create",
-            "ane wallet fund --test --recipient <address> --api-url <url>",
+            "ane wallet fund --test --api-url <url>   (signs with ANE_OWNER_PRIVATE_KEY; funds its address)",
             "ane wallet delegate --vault <address> --session <address> --cap <wei> --per-tx <wei>",
             "ane wallet revoke --vault <address> --session <address> [--sweep-to <address>]",
             "ane wallet withdraw --vault <address> --to <address> --amount <wei>",
@@ -102,13 +102,26 @@ async function main() {
     }
     const apiUrl = flags["api-url"] ?? process.env.ANE_API_URL ?? "http://127.0.0.1:8787";
     const recipient = flags["recipient"];
-    if (!recipient) {
-      throw new Error("--recipient <address> is required");
+    const ownerKey = process.env.ANE_OWNER_PRIVATE_KEY;
+    let claim = { recipient, amount: flags["amount"] };
+    if (ownerKey) {
+      // The faucet wants a proof (#79): the recipient signs a claim the server relays, so it pays no gas.
+      // The faucet's address and chain come from the server itself.
+      const { networks } = await (await fetch(`${apiUrl}/v1/networks`)).json();
+      const client = new AneClient({ rpcUrl: apiUrl, chainId: networks[0].chainId, contracts: networks[0].contracts });
+      const signed = await client.signFaucetClaim(new SecretKey(ownerKey));
+      if (recipient && recipient.toLowerCase() !== signed.recipient.toLowerCase()) {
+        throw new Error("--recipient must be ANE_OWNER_PRIVATE_KEY's address: a signed claim funds its signer");
+      }
+      const { deadline, nonce, signature } = signed;
+      claim = { recipient: signed.recipient, amount: flags["amount"], authorization: { deadline, nonce, signature } };
+    } else if (!recipient) {
+      throw new Error("Set ANE_OWNER_PRIVATE_KEY to sign the claim (or pass --recipient to a server with open claims)");
     }
     const res = await fetch(`${apiUrl}/v1/faucet/claims`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient, amount: flags["amount"] }),
+      body: JSON.stringify(claim),
     });
     const body = await res.json();
     if (!res.ok) {

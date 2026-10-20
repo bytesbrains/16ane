@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createSandboxServer } from "../services/sandbox-server/src/server.ts";
 import { SqliteKeyValueStore } from "../services/sandbox-server/src/sqlite-store.ts";
-import { DEPLOYER_KEY, PROVIDER_KEY, startSandboxStack } from "./harness.ts";
+import { DEPLOYER_KEY, OWNER_KEY, PROVIDER_KEY, signedClaimBody, startSandboxStack } from "./harness.ts";
 
 const ONE_TANE = 10n ** 18n;
 
@@ -33,7 +33,7 @@ test("server state survives a restart on the same SQLite file", async (t) => {
   const claim = await fetch(`${a.url}/v1/faucet/claims`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ recipient: owner.address }),
+    body: await signedClaimBody(client, OWNER_KEY),
   });
   assert.equal(claim.status, 201);
   await owner.fundVault(vaultAddress, 100n * ONE_TANE);
@@ -69,7 +69,7 @@ test("server state survives a restart on the same SQLite file", async (t) => {
   const again = await fetch(`${b.url}/v1/faucet/claims`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ recipient: owner.address }),
+    body: await signedClaimBody(client, OWNER_KEY),
   });
   assert.equal(again.status, 429, "the faucet cooldown survived the restart");
 

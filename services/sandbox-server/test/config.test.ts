@@ -59,3 +59,25 @@ test("missing required settings are named", () => {
     return true;
   });
 });
+
+test("faucet proofs (#79): required by default; open claims and Turnstile are opt-in", () => {
+  const d = parseServerConfig(BASE);
+  assert.equal(d.faucetOpenClaims, false);
+  assert.equal(d.turnstileSecretKey, undefined);
+  const c = parseServerConfig({
+    ...BASE,
+    ANE_FAUCET_OPEN_CLAIMS: "true",
+    ANE_TURNSTILE_SECRET_KEY: "0x4AAA-secret",
+    ANE_TURNSTILE_HOSTNAME: "app.16ane.com",
+  });
+  assert.equal(c.faucetOpenClaims, true);
+  assert.equal(c.turnstileSecretKey, "0x4AAA-secret");
+  assert.equal(c.turnstileExpectedHostname, "app.16ane.com");
+  assert.throws(
+    () => parseServerConfig({ ...BASE, ANE_FAUCET_OPEN_CLAIMS: "yes", ANE_TURNSTILE_HOSTNAME: "app.16ane.com" }),
+    (err: unknown) =>
+      err instanceof ConfigError &&
+      err.problems.includes("ANE_FAUCET_OPEN_CLAIMS must be true or false") &&
+      err.problems.includes("ANE_TURNSTILE_HOSTNAME needs ANE_TURNSTILE_SECRET_KEY"),
+  );
+});

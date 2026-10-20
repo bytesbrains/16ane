@@ -17,6 +17,7 @@ import {
   PEER_OWNER_KEY,
   PEER_SESSION_KEY,
   SESSION_KEY,
+  signedClaimBody,
   startSandboxStack,
 } from "./harness.ts";
 
@@ -38,11 +39,11 @@ test("16ane E2E Scenarios S1-S6, Threat Model T1-T10, Python SDK & CLI Verificat
   } = await startSandboxStack(t);
 
   await t.test("S1: Bounded Agent Sandbox Purchase, Faucet Cooldown & Idempotency (REQ-001..006, T5, T7)", async () => {
-    // 1. Claim 16,000 tANE via Faucet API
+    // 1. Claim 16,000 tANE via Faucet API, signed by the recipient (#79)
     const claimRes = await fetch(`${sandbox.url}/v1/faucet/claims`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient: owner.address }),
+      body: await signedClaimBody(client, OWNER_KEY),
     });
     assert.equal(claimRes.status, 201);
     const claimBody = (await claimRes.json()) as {
@@ -57,7 +58,7 @@ test("16ane E2E Scenarios S1-S6, Threat Model T1-T10, Python SDK & CLI Verificat
     const repeatClaim = await fetch(`${sandbox.url}/v1/faucet/claims`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient: owner.address }),
+      body: await signedClaimBody(client, OWNER_KEY),
     });
     assert.equal(repeatClaim.status, 429);
 
@@ -327,7 +328,7 @@ print(json.dumps(res))
     await fetch(`${sandbox.url}/v1/faucet/claims`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient: peerOwner.address }),
+      body: await signedClaimBody(client, PEER_OWNER_KEY),
     });
     const { vaultAddress: peerVault } = await peerOwner.ensureVaultDeployed(0n);
     await peerOwner.fundVault(peerVault, 200n * ONE_TANE);

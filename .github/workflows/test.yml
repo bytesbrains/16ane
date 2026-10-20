@@ -155,6 +155,29 @@ jobs:
             gitleaks git --no-banner --redact --config .gitleaks.toml .
           fi
 
+  docker:
+    name: Sandbox server Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+
+      # The image Fly.io and self-hosters run (ADR-0016, #74); amd64 on the runner, like Fly.io.
+      - name: Build image
+        run: docker build -t 16ane-sandbox:test .
+
+      - name: Run the image against a local chain (healthz, gasless claim, cooldown, x402 quote, clean stop)
+        run: scripts/docker-smoke.sh 16ane-sandbox:test
+
   committed-files:
     name: Committed files hygiene
     if: github.event_name == 'pull_request'

@@ -17,13 +17,14 @@ The name **16ane** comes from the historical **anna** (*ānna*), a monetary subu
 - Faucet-minted, unbacked testnet ERC-20-style asset. Supply can be increased for experiments, subject to transparent mint authority.
 - No redemption, no reserve, no guaranteed purchasing power, no claim on issuer, no airdrop/convertibility into real ANE.
 - Free test tokens may buy **only voluntarily sponsored/simulated** services that explicitly accept them.
+- **One sandbox currency across providers.** tANE is intended as the common unit for every platform's sandbox, demo and introductory/offer-credit tiers: a provider prices such access in tANE, and agents pay from one balance across all participating providers. tANE obtained from the faucet or received for serving other agents can be held and spent at any other participating provider. Holding it confers no right other than paying services that accept it, and no provider is obliged to accept it.
 - No resale, fiat exchange, exchange listings, liquidity promises or marketing as an investment.
 - Publish token contract, admin roles, faucet supply, burns, issuance logs and any upgrades.
 
 ## Separate accounting systems
 1. **tANE balance**: transferable test asset held in wallet.
 2. **Delegated allowance**: authorization constraint, not necessarily a token balance.
-3. **Provider service quota**: entitlement to provider-funded compute; not transferable tANE and not cash.
+3. **Provider service quota**: entitlement to provider-funded compute; not transferable tANE and not cash. A provider may accept tANE as payment for its sandbox tier *and* grant its own introductory credits; the two are accounted separately, and its credits are never presented as tANE.
 4. **Revenue**: tANE received for delivered service; may be non-spendable under fixed mode.
 5. **Future ANE reserve liability**: only if separately authorized and issued in production.
 

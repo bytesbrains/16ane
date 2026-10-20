@@ -1,7 +1,7 @@
 # Product vision and positioning
 
 ## Problem
-Agent developers currently stitch together API keys, subscriptions, card billing, provider credits, wallet signing, discovery and manual approval. Autonomous micro-commerce is difficult to demonstrate end-to-end. Providers separately implement trials, quotas and payment integration.
+Agent developers currently stitch together API keys, subscriptions, card billing, provider credits, wallet signing, discovery and manual approval. Autonomous micro-commerce is difficult to demonstrate end-to-end. Providers separately implement trials, quotas and payment integration, so every platform's sandbox or introductory credits need their own sign-up, keys and rules.
 
 ## Mission
 Make it trivial to grant an AI agent a bounded crypto budget and let it autonomously buy, deliver, earn and return value across interoperable services.
@@ -19,10 +19,11 @@ Make it trivial to grant an AI agent a bounded crypto budget and let it autonomo
 - 'Let my agent select intelligence based on cost, latency, and task quality.'
 - 'Make my paid API purchasable by any compatible agent.'
 - 'Offer free trial usage without creating unlimited real compute liability.'
+- 'Let my agent try any participating provider's sandbox from one test balance, without a separate account for each.'
 - 'Let me prove which agent paid, what was delivered, and what remains.'
 
 ## Value proposition
-- Users: no repeated human approvals within budget; no mandatory separate provider payment account for compatible demo services.
+- Users: no repeated human approvals within budget; one tANE balance works across every participating provider's sandbox, demo and introductory tier, with no separate account per provider.
 - Providers: open machine-readable pricing, wallet-native checkout, discoverability and controlled trials.
 - Ecosystem: portable SDKs, reference contracts, transparent sandbox metrics, self-hostable infrastructure.
 

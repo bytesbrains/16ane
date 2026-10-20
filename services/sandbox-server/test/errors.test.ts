@@ -124,3 +124,13 @@ test("a malformed JSON body is a 400, not a 500", async (t) => {
     assert.equal(error.code, "ANE-E-4000");
   });
 });
+
+test("/healthz reports 503 without details when the RPC is down", async (t) => {
+  await withServer(t, async (url) => {
+    const res = await fetch(`${url}/healthz`);
+    assert.equal(res.status, 503);
+    const body = (await res.json()) as { status: string };
+    assert.equal(body.status, "unavailable");
+    assert.doesNotMatch(JSON.stringify(body), /DO_NOT_LEAK|rpc\.example|127\.0\.0\.1/);
+  });
+});

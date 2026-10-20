@@ -23,6 +23,8 @@ import {
 
 export interface SandboxServerConfig {
   port?: number;
+  /** Address to listen on; "0.0.0.0" in a container. Defaults to 127.0.0.1. */
+  host?: string;
   rpcUrl: string;
   chainId?: number;
   registryAddress: string;
@@ -127,6 +129,24 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       }
 
       // 2. Networks Metadata (/v1/networks)
+      // Liveness and readiness for the container platform (ADR-0016): reports whether the RPC answers,
+      // without exposing configuration beyond the public chain and registry.
+      if (method === "GET" && pathname === "/healthz") {
+        try {
+          const blockHex = await client.rpcCall<string>("eth_blockNumber", []);
+          sendJson(res, 200, {
+            status: "ok",
+            chainId,
+            registry: contracts.registry,
+            blockNumber: Number(BigInt(blockHex)),
+            disclaimer: SANDBOX_DISCLAIMER,
+          });
+        } catch {
+          sendJson(res, 503, { status: "unavailable", reason: "RPC not reachable", disclaimer: SANDBOX_DISCLAIMER });
+        }
+        return;
+      }
+
       if (method === "GET" && pathname === "/v1/networks") {
         sendJson(res, 200, {
           networks: [
@@ -399,7 +419,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   });
 
   await new Promise<void>((resolve) => {
-    server.listen(config.port ?? 0, "127.0.0.1", () => resolve());
+    server.listen(config.port ?? 0, config.host ?? "127.0.0.1", () => resolve());
   });
 
   const addr = server.address();

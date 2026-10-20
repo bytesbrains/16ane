@@ -1,0 +1,5 @@
+# Only packages/sdk-ts/src and services/sandbox-server/src are copied; keep everything else, and every
+# secret, out of the build context.
+*
+!packages/sdk-ts/src/
+!services/sandbox-server/src/

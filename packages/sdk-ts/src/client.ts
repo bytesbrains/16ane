@@ -10,6 +10,7 @@ import {
 } from "./crypto.ts";
 import { keccak256Utf8 } from "./keccak.ts";
 import { castSend, type CastSendResult } from "./cast.ts";
+import { ReadFloor, RECEIPT_RETRY_DELAYS_MS, sleep } from "./read-floor.ts";
 import { redactSecrets, SecretKey } from "./secret.ts";
 import { privateKeyToAddress, recoverAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
 import {
@@ -28,16 +29,6 @@ import {
 // so a rejected transaction was never broadcast, and retrying after a short wait cannot send it twice.
 const STALE_NONCE = /nonce too low|replacement transaction underpriced/i;
 const NONCE_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
-
-// The same lag hits reads (#67): straight after a write, a node that hasn't seen its block answers with the old
-// state (a stale policyVersion, a missing payment record, no receipt). For a while after this client's last
-// confirmed write, state reads therefore go to an explicit block no older than that write, and wait while the
-// node answering is behind. Later reads use "latest" again, so a long-running client doesn't pay an extra
-// eth_blockNumber per read forever; public RPC lag is seconds, not minutes.
-const READ_LAG_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000];
-const LAGGING_NODE = /header not found|unknown block|block not found|cannot query unfinalized data/i;
-const RECEIPT_RETRY_DELAYS_MS = [500, 1000, 2000];
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function splitWords(hexData: string): string[] {
   const clean = hexData.startsWith("0x") ? hexData.slice(2) : hexData;
@@ -70,8 +61,7 @@ export class AneClient {
   private registryAddress?: string;
   private cachedContracts?: AneContractAddresses;
   readonly #sendHooks?: SendHooks;
-  readonly #readFloorWindowMs: number;
-  #readFloor?: { block: bigint; until: number };
+  readonly #reads: ReadFloor;
 
   constructor(options: AneClientOptions) {
     this.rpcUrl = options.rpcUrl;
@@ -79,7 +69,7 @@ export class AneClient {
     this.registryAddress = options.registryAddress;
     this.facilitatorUrl = options.facilitatorUrl;
     this.#sendHooks = options.sendHooks;
-    this.#readFloorWindowMs = options.readFloorWindowMs ?? 60_000;
+    this.#reads = new ReadFloor(options.readFloorWindowMs ?? 60_000, (method, params) => this.rpcCall(method, params));
     if (
       options.contracts?.aneTestToken &&
       options.contracts?.aneVaultFactory &&
@@ -123,49 +113,15 @@ export class AneClient {
    * confirmed send; call it yourself when another client or process made the write you're about to read.
    */
   observeBlock(blockNumber: number | bigint): void {
-    if (this.#readFloorWindowMs <= 0) return;
-    const block = BigInt(blockNumber);
-    const until = Date.now() + this.#readFloorWindowMs;
-    const floor = this.#readFloor;
-    this.#readFloor = { block: floor && floor.block > block ? floor.block : block, until };
-  }
-
-  // "latest", or while a read floor is active, the head block of a node that has reached it.
-  async #readBlockTag(): Promise<string> {
-    const floor = this.#readFloor;
-    if (!floor || Date.now() > floor.until) return "latest";
-    let head = 0n;
-    for (let attempt = 0; ; attempt++) {
-      head = BigInt(await this.rpcCall<string>("eth_blockNumber", []));
-      if (head >= floor.block) return "0x" + head.toString(16);
-      const delay = READ_LAG_RETRY_DELAYS_MS[attempt];
-      if (delay === undefined) break;
-      await sleep(delay);
-    }
-    throw new Error(`RPC node is behind this client's last write (block ${floor.block}, node at ${head})`);
-  }
-
-  // A state read (eth_call, eth_getCode, eth_getBalance) at the tag above. A load balancer can send the read to
-  // a different node than the one that reported the head; that node rejects an unknown block, so retry.
-  async #readState<T>(method: string, params: unknown[]): Promise<T> {
-    const tag = await this.#readBlockTag();
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await this.rpcCall<T>(method, [...params, tag]);
-      } catch (err) {
-        const delay = READ_LAG_RETRY_DELAYS_MS[attempt];
-        if (tag === "latest" || delay === undefined || !LAGGING_NODE.test(String(err))) throw err;
-        await sleep(delay);
-      }
-    }
+    this.#reads.observe(blockNumber);
   }
 
   async ethCall(to: string, data: string): Promise<string> {
-    return this.#readState<string>("eth_call", [{ to, data }]);
+    return this.#reads.read<string>("eth_call", [{ to, data }]);
   }
 
   async getEthBalance(account: string): Promise<bigint> {
-    return BigInt(await this.#readState<string>("eth_getBalance", [account]));
+    return BigInt(await this.#reads.read<string>("eth_getBalance", [account]));
   }
 
   async resolveContracts(): Promise<AneContractAddresses> {
@@ -207,7 +163,7 @@ export class AneClient {
   }
 
   async isContractDeployed(address: string): Promise<boolean> {
-    const code = await this.#readState<string>("eth_getCode", [address]);
+    const code = await this.#reads.read<string>("eth_getCode", [address]);
     return Boolean(code && code !== "0x" && code !== "0x0");
   }
 

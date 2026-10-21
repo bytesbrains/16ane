@@ -39,6 +39,7 @@ environment), never in a command you'd keep in shell history.
 | `ANE_TURNSTILE_HOSTNAME` | no | The site your Turnstile widget runs on (e.g. `app.16ane.com`); tokens issued for other sites are refused |
 | `ANE_FAUCET_OPEN_CLAIMS` | no | `true` accepts claims with no proof at all. For a local or private server only; never on a public one |
 | `ANE_TRIAL_FREE_CALLS_PER_CALLER`, `ANE_TRIAL_GLOBAL_DAILY_CAP` | no | Sponsored-trial quotas (ADR-0008) |
+| `ANE_RELAYER_MAX_FEE_WEI` | no | The relayer's gas-price ceiling in wei (`ADR-0006`). Before each sponsored send the server reads `eth_gasPrice`; above this it sends nothing and answers `503 ANE-E-1205` with `Retry-After: 60`. Unset: no ceiling |
 | `ANE_RELAYER_GAS_BUDGET_WEI` | no | Most the relayer may spend on gas per UTC day, in wei (default `50000000000000000` = 0.05 ETH, `ADR-0006`). Counts the full fee, including Base's L1 data fee. Once reached, sponsored claims and settlements get `503 ANE-E-1006` with `Retry-After` until 00:00 UTC and a hint to pay their own gas |
 | `ANE_STATE_PATH` | no | SQLite file for state that must survive restarts: faucet cooldowns and claims, the service directory, trial quotas, x402 idempotency records, consumed payment proofs and receipts. The image sets `/data/sandbox.sqlite`; mount a volume at `/data` to keep it across container re-creation. Unset outside the image: memory only, with a startup warning |
 

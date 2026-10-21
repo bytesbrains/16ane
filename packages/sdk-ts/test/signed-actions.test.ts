@@ -1,14 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
   type AneClient,
   BUDGET_MODE,
+  createVaultCalldata,
+  CREATE_VAULT_SIG,
+  encodeCallWithTrailingBytes,
   keccak256Utf8,
   OwnerWallet,
   policyTupleArg,
   relayCreateVault,
+  REVOKE_WITH_SIG_SIG,
+  revokeCalldata,
   SecretKey,
+  SET_POLICY_WITH_SIG_SIG,
+  setPolicyCalldata,
   toPolicyFields,
+  TRANSFER_WITH_AUTHORIZATION_SIG,
+  transferCalldata,
 } from "../src/index.ts";
 
 const FACTORY = "0x" + "22".repeat(20);
@@ -78,3 +88,39 @@ test("toPolicyFields keeps delegateSession's defaults and policyTupleArg its tup
   assert.equal(revolving.dailyLimit, 50n);
   assert.equal(revolving.revolvingTreasuryCeiling, 5_000n);
 });
+
+// Each calldata builder must match Foundry's encoder exactly: the relay server simulates with it before paying.
+test("calldata builders match cast calldata", () => {
+  const cast = (sig: string, ...args: string[]) => execFileSync("cast", ["calldata", sig, ...args], { encoding: "utf8" }).trim();
+  const sig65 = "0x" + "ab".repeat(32) + "cd".repeat(32) + "1b";
+  const a = "0x" + "11".repeat(20);
+  const b = "0x" + "22".repeat(20);
+  const nonce = "0x" + "33".repeat(32);
+
+  assert.equal(
+    transferCalldata({ from: a, to: b, value: 16n * 10n ** 18n, validAfter: 0, validBefore: 1_900_000_000, nonce, signature: sig65 }),
+    cast(TRANSFER_WITH_AUTHORIZATION_SIG, a, b, "16000000000000000000", "0", "1900000000", nonce, sig65),
+  );
+  const policy = toPolicyFields(b, { mode: "REVOLVING", allowanceCap: 320n, perTxLimit: 64n, dailyLimit: 100n, expiry: 1_900_000_000, revolvingTreasuryCeiling: 999n });
+  assert.equal(
+    setPolicyCalldata({ vault: a, policy, expectedPolicyVersion: 3, deadline: 1_900_000_100, signature: sig65 }),
+    cast(SET_POLICY_WITH_SIG_SIG, policyTupleArg(policy), "3", "1900000100", sig65),
+  );
+  assert.equal(
+    revokeCalldata({ vault: a, expectedPolicyVersion: 4, deadline: 1_900_000_200, signature: sig65 }),
+    cast(REVOKE_WITH_SIG_SIG, "4", "1900000200", sig65),
+  );
+  assert.equal(createVaultCalldata(a, nonce), cast(CREATE_VAULT_SIG, a, nonce));
+});
+
+test("encodeCallWithTrailingBytes rejects a malformed static word", () => {
+  assert.throws(
+    () => encodeCallWithTrailingBytes(REVOKE_WITH_SIG_SIG, ["not-a-word"], "0xab"),
+    /Invalid static ABI word/,
+  );
+  assert.throws(
+    () => encodeCallWithTrailingBytes(REVOKE_WITH_SIG_SIG, ["0x" + "11".repeat(32)], "0xab"),
+    /Invalid static ABI word/,
+  );
+});
+

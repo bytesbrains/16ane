@@ -12,6 +12,7 @@ import {
   type ServiceManifestPayload,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } from "./demo.ts";
+import { handleRelay, type RelayContext } from "./relay.ts";
 import {
   type ClaimStatusRecord,
   type FaucetContext,
@@ -44,6 +45,8 @@ export interface SandboxServerConfig {
   store?: KeyValueStore;
   /** Most the relayer may spend on gas per UTC day (#76). Defaults to 0.05 ETH (ADR-0006). */
   relayerGasBudgetWei?: bigint;
+  /** The relayer's maxFeePerGas ceiling (ADR-0006): no sponsored send while the gas price is above it. */
+  relayerMaxFeeWei?: bigint;
   rpcUrl: string;
   chainId?: number;
   registryAddress: string;
@@ -113,6 +116,16 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   const contracts = await client.resolveContracts();
   const faucetConfig = await readFaucetConfig(client, contracts.aneFaucet);
   const verifier = new AnePaymentVerifier({ client, relayerKey, store });
+  const relay: RelayContext = {
+    client,
+    relayerKey,
+    relayerAddress,
+    chainId,
+    contracts,
+    maxFeeWei: config.relayerMaxFeeWei,
+    maxBodyBytes,
+    inFlight: new Set(),
+  };
   const faucet: FaucetContext = {
     client,
     relayerKey,
@@ -132,6 +145,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     clientIpHeader: config.clientIpHeader,
     maxBodyBytes,
     inFlight: new Set(),
+    maxFeeWei: config.relayerMaxFeeWei,
   };
 
   const freeCallsPerCaller = config.trialFreeCallsPerCaller ?? 1;
@@ -251,6 +265,11 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       }
 
       // 4. Faucet Claims (POST /v1/faucet/claims & GET /v1/faucet/claims/:id)
+      if (method === "POST" && pathname === "/v1/relay") {
+        await handleRelay(relay, req, res);
+        return;
+      }
+
       if (method === "POST" && pathname === "/v1/faucet/claims") {
         await handleFaucetClaim(faucet, req, res);
         return;

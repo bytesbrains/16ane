@@ -41,6 +41,7 @@ async function fakeRpc(usedNonces: Set<string>, nonceReply?: { result?: string; 
       const { id, method, params } = JSON.parse(body) as { id: number; method: string; params: [{ data: string }] };
       methods.push(method);
       let result: string | undefined;
+      if (method === "eth_gasPrice") result = "0x" + (5_000).toString(16);
       if (method === "eth_call") {
         const data = params[0].data;
         if (data.startsWith(functionSelector("claimAmount()"))) result = "0x" + word(16_000n * 10n ** 18n);
@@ -283,3 +284,17 @@ test("Turnstile: siteverify being unreachable is a 503 ANE-E-1010 and spends no 
     },
   );
 });
+
+test("faucet claims respect the relayer's fee ceiling: 503 with Retry-After, nothing sent", async (t) => {
+  // The fake RPC's gas price is 5,000 wei.
+  await withServer(t, { relayerMaxFeeWei: 1_000n }, async (claim, methods) => {
+    const r = await claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY)));
+    assert.equal(r.status, 503);
+    assert.equal(r.code, "ANE-E-1205");
+    assert.ok(methods.every((m) => m === "eth_call" || m === "relayedNonceUsed" || m === "eth_gasPrice"), methods.join(","));
+  });
+  await withServer(t, { relayerMaxFeeWei: 10_000n }, async (claim) => {
+    assert.equal((await claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY)))).status, 502, "under the ceiling it sends");
+  });
+});
+

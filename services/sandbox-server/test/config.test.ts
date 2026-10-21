@@ -81,3 +81,13 @@ test("faucet proofs (#79): required by default; open claims and Turnstile are op
       err.problems.includes("ANE_TURNSTILE_HOSTNAME needs ANE_TURNSTILE_SECRET_KEY"),
   );
 });
+
+test("ANE_RELAYER_MAX_FEE_WEI is a whole number of wei, unset by default", () => {
+  assert.equal(parseServerConfig(BASE).relayerMaxFeeWei, undefined);
+  assert.equal(parseServerConfig({ ...BASE, ANE_RELAYER_MAX_FEE_WEI: "1000000000" }).relayerMaxFeeWei, 1_000_000_000n);
+  assert.throws(
+    () => parseServerConfig({ ...BASE, ANE_RELAYER_MAX_FEE_WEI: "1 gwei" }),
+    (err: unknown) => err instanceof ConfigError && err.problems.includes("ANE_RELAYER_MAX_FEE_WEI must be a whole number of wei"),
+  );
+});
+

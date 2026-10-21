@@ -30,3 +30,25 @@ export function abiWordBool(flag: boolean): string {
 export function functionSelector(signature: string): string {
   return keccak256Utf8(signature).slice(0, 10);
 }
+
+// A dynamic `bytes` value's tail: its length word, then the data right-padded to whole words.
+export function abiBytesTail(hex: string): string {
+  const clean = hex.trim().replace(/^0x/i, "").toLowerCase();
+  if (!/^([0-9a-f]{2})*$/.test(clean)) throw new Error("Invalid bytes for ABI encoding");
+  const padded = clean.padEnd(Math.ceil(clean.length / 64) * 64, "0");
+  return abiWordUint(clean.length / 2) + padded;
+}
+
+// Calldata for a function whose arguments are static words followed by one trailing `bytes` argument (the
+// shape of every signature-carrying call the relayer makes). Each staticWord must already be a 32-byte hex
+// word with no 0x prefix (as returned by abiWordUint / abiWordAddress / abiWordBytes32).
+export function encodeCallWithTrailingBytes(signature: string, staticWords: string[], bytesHex: string): string {
+  for (const word of staticWords) {
+    if (!/^[0-9a-fA-F]{64}$/.test(word)) {
+      throw new Error(`Invalid static ABI word (need 64 hex chars, no 0x): ${word}`);
+    }
+  }
+  const offset = abiWordUint((staticWords.length + 1) * 32);
+  return functionSelector(signature) + staticWords.join("") + offset + abiBytesTail(bytesHex);
+}
+

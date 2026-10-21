@@ -14,6 +14,7 @@ primary_region = "sin" # closest Fly region to India-first users (no Mumbai regi
   ANE_CHAIN_ID = "84532"
   ANE_STATE_PATH = "/data/sandbox.sqlite"
   ANE_RELAYER_GAS_BUDGET_WEI = "50000000000000000" # 0.05 Base Sepolia ETH per UTC day (ADR-0006)
+  ANE_RELAYER_MAX_FEE_WEI = "1000000000" # 1 gwei: well above Base Sepolia's usual gas price; above it, sends wait
   # Set by Fly's proxy to the client's address. api.16ane.com is DNS-only (no Cloudflare proxy) so it stays the
   # real client; behind another proxy it would be that proxy's address. DEPLOY_API.md step 3 checks a client
   # can't forge it.

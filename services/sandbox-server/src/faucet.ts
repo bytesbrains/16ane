@@ -13,7 +13,7 @@ import {
   type SignedFaucetClaim,
   toChecksumAddress,
 } from "../../../packages/sdk-ts/src/index.ts";
-import { RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
+import { refuseAboveFeeCeiling, RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
 import { clientIp, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
 
 export interface FaucetConfig {
@@ -140,6 +140,8 @@ export interface FaucetContext {
   maxBodyBytes: number;
   /** Recipients with a claim being sent, so a concurrent duplicate is refused instead of reverting on-chain. */
   inFlight: Set<string>;
+  /** The relayer's gas-price ceiling (ADR-0006); unset: none. */
+  maxFeeWei?: bigint;
 }
 
 export interface ClaimStatusRecord {
@@ -271,6 +273,8 @@ export async function handleFaucetClaim(
       }
     }
 
+    const selfServe = "claim directly from the AneFaucet contract (claim(address)) with your own gas";
+    if (await refuseAboveFeeCeiling((m, p) => ctx.client.rpcCall(m, p), ctx.maxFeeWei, res, selfServe)) return;
     try {
       const settled = signed
         ? await ctx.client.executeRelayedFaucetClaimOnChain(ctx.relayerKey, signed)
@@ -291,7 +295,7 @@ export async function handleFaucetClaim(
       sendJson(res, 201, record);
     } catch (err) {
       if (err instanceof RelayerGasBudgetExceededError) {
-        sendBudgetExhausted(res, err, "claim directly from the AneFaucet contract (claim(address)) with your own gas");
+        sendBudgetExhausted(res, err, selfServe);
         return;
       }
       sendLoggedError(res, 502, "ANE-E-1004", "Faucet claim could not be completed on-chain; try again later", true, err);

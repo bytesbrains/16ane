@@ -5,6 +5,7 @@ import {
   hashVaultCreation,
   keccak256Utf8,
   OwnerWallet,
+  privateKeyToAddress,
   recoverAddress,
   relayCreateVault,
   relayRevoke,
@@ -83,4 +84,65 @@ test("an owner and agent with no ETH: claim, create, fund, delegate, pay, revoke
 
   assert.equal(await ethOf(owner.address), 0n, "the owner never held ETH");
   assert.equal(await ethOf(session.sessionAddress), 0n, "the agent never held ETH");
+});
+
+// #77's acceptance, through the reference server: every relayed step is a POST /v1/relay, so the owner and the
+// agent only ever sign. A replayed policy signature is caught by the server's simulation and costs no gas.
+test("the same journey through POST /v1/relay, and a replay refused without gas", async (t) => {
+  const { client, sandbox } = await startSandboxStack(t);
+  const relayerAddress = privateKeyToAddress(new SecretKey(DEPLOYER_KEY));
+  const relayerNonce = async () => BigInt(await client.rpcCall<string>("eth_getTransactionCount", [relayerAddress, "latest"]));
+  const ownerKey = keccak256Utf8("16ane.e2e.relay.owner.v1");
+  const owner = new OwnerWallet(client, ownerKey);
+  const agent = new SecretKey(keccak256Utf8("16ane.e2e.relay.agent.v1"));
+  const relay = async (action: string, signed: object) => {
+    const res = await fetch(`${sandbox.url}/v1/relay`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action, ...signed }, (_k, v) => (typeof v === "bigint" ? v.toString() : v)),
+    });
+    return { status: res.status, body: (await res.json()) as { vaultAddress?: string; error?: { code: string } } };
+  };
+
+  const claim = await fetch(`${sandbox.url}/v1/faucet/claims`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: await signedClaimBody(client, ownerKey),
+  });
+  assert.equal(claim.status, 201);
+
+  const created = await relay("createVault", await owner.signVaultCreation(3n));
+  assert.equal(created.status, 201);
+  const vaultAddress = created.body.vaultAddress!;
+  assert.equal((await relay("transfer", await owner.signTransfer(vaultAddress, 1_600n * ONE_TANE))).status, 201);
+  assert.equal(await client.getTokenBalance(vaultAddress), 1_600n * ONE_TANE);
+
+  const session = new AgentSession({ client, vaultAddress, sessionKey: agent });
+  const policy = await owner.signPolicy(vaultAddress, session.sessionAddress, {
+    allowanceCap: 320n * ONE_TANE,
+    perTxLimit: 64n * ONE_TANE,
+    expiry: Math.floor(Date.now() / 1000) + 3600,
+  });
+  assert.equal((await relay("setPolicy", policy)).status, 201);
+
+  // Replaying the same policy signature: the vault's policy version moved, the simulation reverts, nothing is sent.
+  const before = await relayerNonce();
+  const replay = await relay("setPolicy", policy);
+  assert.equal(replay.status, 422);
+  assert.equal(replay.body.error?.code, "ANE-E-1204");
+  assert.equal(await relayerNonce(), before, "the refused replay sent no transaction");
+
+  const idemKey = "idem-relay-001";
+  const paid = await session.purchase(`${sandbox.url}/v1/demo/summarize`, {
+    method: "POST",
+    body: JSON.stringify({ text: "Sixteen annas made a rupee." }),
+    idempotencyKey: idemKey,
+    maxPayment: 32n * ONE_TANE,
+  });
+  assert.equal(paid.status, 200);
+
+  assert.equal((await relay("revoke", await owner.signRevoke(vaultAddress))).status, 201);
+  assert.equal((await client.getAccountingSummary(vaultAddress)).active, false);
+  assert.equal(await client.getEthBalance(owner.address), 0n, "the owner never held ETH");
+  assert.equal(await client.getEthBalance(session.sessionAddress), 0n, "the agent never held ETH");
 });

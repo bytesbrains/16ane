@@ -9,11 +9,12 @@ import { readFileSync, appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 
-// Provisional floors: the first CI run on real data sets the baseline, and these move to just
-// under it (see #55). They must pass on current code — raising coverage is explicitly non-scope.
-export const DEFAULT_MIN_LINES_TOTAL = 50;
-export const DEFAULT_MIN_BRANCHES_TOTAL = 15;
-export const DEFAULT_MIN_LINES_CHANGED = 50;
+// Floors from the CI baseline (2026-10-21, PR #112: total 88.2% lines / 72.5% branches): each
+// sits a few points under what the suites measure today, so a real drop fails while toolchain
+// wobble does not. Raise them when coverage genuinely improves; never lower them to land a PR.
+export const DEFAULT_MIN_LINES_TOTAL = 85;
+export const DEFAULT_MIN_BRANCHES_TOTAL = 70;
+export const DEFAULT_MIN_LINES_CHANGED = 80;
 
 export interface FileCoverage {
   lines: Map<number, number>;
@@ -28,10 +29,12 @@ export function normalizePath(sf: string): string {
 
 const CODE_EXTENSIONS = [".sol", ".ts", ".mts", ".cts", ".js", ".mjs", ".cjs", ".py"];
 
-// First-party code under coverage. Test files are excluded (they always execute); node_modules,
-// build output and anything outside the known source trees never counts.
+// First-party code under coverage. Test files are excluded (they always execute): anything under
+// a test/ or tests/ directory, e2e/ (test entries and harness, never shipped), and the usual
+// test filename shapes. node_modules, build output and anything outside the known source trees
+// never counts.
 export function isCoverable(file: string): boolean {
-  if (!/^(src|packages|services|e2e|scripts)\//.test(file)) return false;
+  if (!/^(src|packages|services|scripts)\//.test(file)) return false;
   if (!CODE_EXTENSIONS.some((ext) => file.endsWith(ext))) return false;
   if (file.split("/").some((seg) => seg === "test" || seg === "tests" || seg === "__tests__")) return false;
   const base = file.split("/").at(-1) ?? "";

@@ -81,12 +81,13 @@ test("isCoverable keeps first-party sources and drops tests, vendors and docs", 
     "packages/cli/bin/ane.mjs",
     "services/sandbox-server/src/server.ts",
     "packages/sdk-py/ane_sdk/client.py",
-    "e2e/harness.ts",
     "scripts/api-health.ts",
   ]) {
     assert.equal(isCoverable(file), true, file);
   }
   for (const file of [
+    "e2e/harness.ts",
+    "e2e/signed-actions.ts",
     "packages/sdk-ts/test/sdk.test.ts",
     "packages/sdk-py/tests/test_sdk.py",
     "services/sandbox-server/test/x.test.ts",

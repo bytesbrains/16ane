@@ -36,6 +36,35 @@ Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT
    make lint
    ```
 
+## End-to-end flows
+
+`e2e/flows/*.test.ts` holds one file per user flow (#56), each tagged with the `REQ-*`/`T*`
+IDs it checks. Every flow boots its own Anvil chain (chain id 84532), deploys the sandbox
+contracts with `script/DeploySandbox.s.sol`, and starts the reference server through the
+shared `e2e/harness.ts` — so any flow runs alone and the suite passes in any order. No
+external RPC, faucet, or secret is needed.
+
+```bash
+npm run test:e2e                                    # all flows, ~2 minutes
+node --experimental-strip-types --test e2e/flows/purchase.test.ts   # one flow
+# Flows matching a name (the flag must come before the file list):
+node --experimental-strip-types --test --test-concurrency=1 --test-name-pattern "trial" e2e/flows/*.test.ts
+```
+
+Two environment knobs (see `e2e/harness.ts`): `E2E_ARTIFACT_DIR` collects per-stack Anvil
+logs, deploy output, and deployed addresses for failure debugging, and `ANVIL_FORK_URL`
+runs the same flows against an Anvil fork of Base Sepolia:
+
+```bash
+ANVIL_FORK_URL="$(jq -r .rpcUrl networks/sandbox-sepolia.json)" npm run test:e2e
+```
+
+CI runs the flows in `.github/workflows/e2e.yml` on every PR and push to `main` (a
+required check), with per-flow results in the job summary and failure artifacts uploaded.
+The same workflow re-runs everything weekly against a fork to catch drift from Base
+Sepolia. Test keys must stay Anvil's well-known dev keys or `keccak`-derived strings —
+never reuse them on a public network, and keep `test/gitleaks/allowlist.test.sh` green.
+
 ## Coverage
 
 CI's *Coverage report and thresholds* job (`#55`) collects LCOV for every suite — `forge coverage` for

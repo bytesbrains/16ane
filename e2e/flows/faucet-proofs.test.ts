@@ -2,16 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { keccak256Utf8, privateKeyToAddress, SecretKey } from "../packages/sdk-ts/src/index.ts";
-import { createSandboxServer } from "../services/sandbox-server/src/server.ts";
-import { DEPLOYER_KEY, PROVIDER_KEY, startSandboxStack } from "./harness.ts";
+import { keccak256Utf8, privateKeyToAddress, SecretKey } from "../../packages/sdk-ts/src/index.ts";
+import { createSandboxServer } from "../../services/sandbox-server/src/server.ts";
+import { DEPLOYER_KEY, PROVIDER_KEY, startSandboxStack } from "../harness.ts";
 
 const execFileAsync = promisify(execFile);
 const ONE_TANE = 10n ** 18n;
 
 // #79 on a real chain: a claim needs a proof, the recipient's signed claim is relayed gaslessly (also from the
 // CLI), and a refused claim (no proof, wrong signer, replayed nonce) costs the relayer nothing.
-test("faucet claims need a recipient's proof, and refused claims spend no gas", async (t) => {
+test("faucet claims need a recipient's proof, and refused claims spend no gas (REQ-002, T3, #79)", async (t) => {
   const { rpcUrl, registryAddress, repoRoot, sandbox, client } = await startSandboxStack(t);
   const relayer = privateKeyToAddress(new SecretKey(DEPLOYER_KEY));
   const relayerTxCount = async () => BigInt(await client.rpcCall<string>("eth_getTransactionCount", [relayer, "latest"]));

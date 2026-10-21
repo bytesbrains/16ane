@@ -3,16 +3,16 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createSandboxServer } from "../services/sandbox-server/src/server.ts";
-import { SqliteKeyValueStore } from "../services/sandbox-server/src/sqlite-store.ts";
-import { DEPLOYER_KEY, OWNER_KEY, PROVIDER_KEY, signedClaimBody, startSandboxStack } from "./harness.ts";
+import { createSandboxServer } from "../../services/sandbox-server/src/server.ts";
+import { SqliteKeyValueStore } from "../../services/sandbox-server/src/sqlite-store.ts";
+import { DEPLOYER_KEY, OWNER_KEY, PROVIDER_KEY, signedClaimBody, startSandboxStack } from "../harness.ts";
 
 const ONE_TANE = 10n ** 18n;
 
 // #75: a hosted server restarts (deploys, crashes, Fly.io machine moves). With ANE_STATE_PATH set, nothing a
 // client relies on may be forgotten: faucet cooldowns, x402 idempotency (no double charge, 409 on a changed
 // body) and receipts.
-test("server state survives a restart on the same SQLite file", async (t) => {
+test("server state survives a restart on the same SQLite file (REL, T3, #75)", async (t) => {
   const { rpcUrl, registryAddress, client, owner, vaultAddress, session } = await startSandboxStack(t);
   const dir = mkdtempSync(path.join(tmpdir(), "state-restart-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkApiHealth } from "../scripts/api-health.ts";
-import { runApiSmoke } from "../scripts/smoke-api.ts";
-import { createSandboxServer } from "../services/sandbox-server/src/server.ts";
-import { DEPLOYER_KEY, PROVIDER_KEY, startSandboxStack } from "./harness.ts";
+import { checkApiHealth } from "../../scripts/api-health.ts";
+import { runApiSmoke } from "../../scripts/smoke-api.ts";
+import { createSandboxServer } from "../../services/sandbox-server/src/server.ts";
+import { DEPLOYER_KEY, PROVIDER_KEY, startSandboxStack } from "../harness.ts";
 
 // Keeps the hosted-API smoke test and the monitor's health check working (#78, docs/operations/DEPLOY_API.md):
 // both run here against a local server exactly as they would against api.16ane.com.
-test("the hosted-API smoke test passes against a local server", async (t) => {
+test("the hosted-API smoke test passes against a local server (ops guard, #78)", async (t) => {
   const { rpcUrl, registryAddress, sandbox } = await startSandboxStack(t);
   const lines: string[] = [];
   const { recipient } = await runApiSmoke({ apiUrl: sandbox.url, rpcUrl, expectedRegistry: registryAddress, log: (l) => lines.push(l) });
@@ -15,7 +15,7 @@ test("the hosted-API smoke test passes against a local server", async (t) => {
   assert.match(recipient, /^0x[0-9a-fA-F]{40}$/);
 });
 
-test("the monitor sees a used-up gas budget on a real server", async (t) => {
+test("the monitor sees a used-up gas budget on a real server (ops guard, #78)", async (t) => {
   const { rpcUrl, registryAddress } = await startSandboxStack(t);
   const server = await createSandboxServer({
     rpcUrl,

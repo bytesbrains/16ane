@@ -12,8 +12,8 @@ import {
   relaySetPolicy,
   relayTransfer,
   SecretKey,
-} from "../packages/sdk-ts/src/index.ts";
-import { DEPLOYER_KEY, signedClaimBody, startSandboxStack } from "./harness.ts";
+} from "../../packages/sdk-ts/src/index.ts";
+import { DEPLOYER_KEY, signedClaimBody, startSandboxStack } from "../harness.ts";
 
 const ONE_TANE = 10n ** 18n;
 
@@ -21,7 +21,7 @@ const ONE_TANE = 10n ** 18n;
 // (the deployer key here) submits and pays the gas for every step: vault creation, funding by an EIP-3009
 // transfer, delegation (setPolicyWithSig), and revocation (revokeWithSig). The agent's payment is relayed by the
 // merchant through x402, as it always has been.
-test("an owner and agent with no ETH: claim, create, fund, delegate, pay, revoke", async (t) => {
+test("an owner and agent with no ETH: claim, create, fund, delegate, pay, revoke (REQ-003, REQ-005, #77)", async (t) => {
   const { client, sandbox, contracts } = await startSandboxStack(t);
   const relayer = new SecretKey(DEPLOYER_KEY);
   const ownerKey = keccak256Utf8("16ane.e2e.gasless.owner.v1");
@@ -88,7 +88,7 @@ test("an owner and agent with no ETH: claim, create, fund, delegate, pay, revoke
 
 // #77's acceptance, through the reference server: every relayed step is a POST /v1/relay, so the owner and the
 // agent only ever sign. A replayed policy signature is caught by the server's simulation and costs no gas.
-test("the same journey through POST /v1/relay, and a replay refused without gas", async (t) => {
+test("the same journey through POST /v1/relay, and a replay refused without gas (REQ-003, REQ-005, T3, #77)", async (t) => {
   const { client, sandbox } = await startSandboxStack(t);
   const relayerAddress = privateKeyToAddress(new SecretKey(DEPLOYER_KEY));
   const relayerNonce = async () => BigInt(await client.rpcCall<string>("eth_getTransactionCount", [relayerAddress, "latest"]));

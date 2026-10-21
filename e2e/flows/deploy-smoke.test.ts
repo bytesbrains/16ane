@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { keccak256Utf8, privateKeyToAddress, SecretKey } from "../packages/sdk-ts/src/index.ts";
-import { runSmoke, waitFor } from "../scripts/smoke-sandbox.ts";
-import { startSandboxStack } from "./harness.ts";
+import { keccak256Utf8, privateKeyToAddress, SecretKey } from "../../packages/sdk-ts/src/index.ts";
+import { runSmoke, waitFor } from "../../scripts/smoke-sandbox.ts";
+import { startSandboxStack } from "../harness.ts";
 
 // Keeps scripts/smoke-sandbox.ts working: the deploy runbook (docs/operations/DEPLOY_SANDBOX.md)
 // runs it against Base Sepolia, where it can't be tested in CI.
-test("the deployment smoke test passes against a fresh local deployment", async (t) => {
+test("the deployment smoke test passes against a fresh local deployment (deploy guard)", async (t) => {
   const { rpcUrl, registryAddress, client } = await startSandboxStack(t);
   const ownerKey = new SecretKey(keccak256Utf8("16ane.e2e.smoke.owner.key.v1"));
   await client.rpcCall("anvil_setBalance", [privateKeyToAddress(ownerKey), "0x" + (10n ** 19n).toString(16)]);

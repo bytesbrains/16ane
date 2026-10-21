@@ -120,25 +120,8 @@ test("sendLoggedError posts to Sentry when sentryDsn is set, and never when unse
   };
 
   // Fake RPC: healthy for deploy resolution, then fails so the faucet hits sendLoggedError.
-  let healthy = true;
-  const rpc = http.createServer((req, res) => {
-    let body = "";
-    req.on("data", (c) => (body += c));
-    req.on("end", () => {
-      if (!healthy) {
-        res.writeHead(500, { "content-type": "text/plain" });
-        res.end(`upstream error at ${LEAKY_URL} key=${PRIVATE_KEY}`);
-        return;
-      }
-      const { id } = JSON.parse(body) as { id: number };
-      const result = "0x" + word(0x11) + word(0x22) + word(0x33) + word(0x44);
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ jsonrpc: "2.0", id, result }));
-    });
-  });
-  await new Promise<void>((resolve) => rpc.listen(0, "127.0.0.1", () => resolve()));
-  const { port } = rpc.address() as AddressInfo;
-  const rpcUrl = `http://127.0.0.1:${port}`;
+  const rpc = await startFlakyRpc();
+  const rpcUrl = rpc.rpcUrl;
 
   const withSentry = await createSandboxServer({
     rpcUrl,
@@ -148,15 +131,10 @@ test("sendLoggedError posts to Sentry when sentryDsn is set, and never when unse
     sentryDsn: SAMPLE_DSN,
     sentryFetch: fetchImpl,
   });
-  healthy = false;
+  rpc.setHealthy(false);
   try {
-    const res = await fetch(`${withSentry.url}/v1/faucet/claims`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient: "0x" + "cd".repeat(20) }),
-    });
-    assert.equal(res.status, 502);
-    const { error } = (await res.json()) as { error: { errorId: string; code: string } };
+    const { status, error } = await postFaucetClaim(withSentry.url);
+    assert.equal(status, 502);
     assert.equal(error.code, "ANE-E-1004");
     await new Promise((r) => setImmediate(r));
     assert.equal(posts.length, 1);
@@ -168,7 +146,7 @@ test("sendLoggedError posts to Sentry when sentryDsn is set, and never when unse
 
   // Unset DSN: same failure path, no Sentry POST.
   posts.length = 0;
-  healthy = true;
+  rpc.setHealthy(true);
   const noSentry = await createSandboxServer({
     rpcUrl,
     registryAddress: "0x" + "ab".repeat(20),
@@ -176,19 +154,15 @@ test("sendLoggedError posts to Sentry when sentryDsn is set, and never when unse
     faucetOpenClaims: true,
     sentryFetch: fetchImpl,
   });
-  healthy = false;
+  rpc.setHealthy(false);
   try {
-    const res = await fetch(`${noSentry.url}/v1/faucet/claims`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient: "0x" + "cd".repeat(20) }),
-    });
-    assert.equal(res.status, 502);
+    const { status } = await postFaucetClaim(noSentry.url);
+    assert.equal(status, 502);
     await new Promise((r) => setImmediate(r));
     assert.equal(posts.length, 0);
   } finally {
     await noSentry.close();
-    await new Promise<void>((resolve) => rpc.close(() => resolve()));
+    await rpc.close();
   }
 });
 
@@ -244,6 +218,16 @@ async function startFlakyRpc(): Promise<{
   };
 }
 
+async function postFaucetClaim(url: string): Promise<{ status: number; error: { errorId: string; code: string } }> {
+  const res = await fetch(`${url}/v1/faucet/claims`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ recipient: "0x" + "cd".repeat(20) }),
+  });
+  const { error } = (await res.json()) as { error: { errorId: string; code: string } };
+  return { status: res.status, error };
+}
+
 test("two servers in one process report to their own Sentry sinks, never each other's", async () => {
   const postsA: { url: string; body: string }[] = [];
   const postsB: { url: string; body: string }[] = [];
@@ -275,18 +259,12 @@ test("two servers in one process report to their own Sentry sinks, never each ot
   });
   rpc.setHealthy(false);
   try {
-    const claim = (url: string) =>
-      fetch(`${url}/v1/faucet/claims`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ recipient: "0x" + "cd".repeat(20) }),
-      });
-    const resA = await claim(a.url);
-    assert.equal(resA.status, 502);
-    const { error: errA } = (await resA.json()) as { error: { errorId: string } };
-    const resB = await claim(b.url);
-    assert.equal(resB.status, 502);
-    const { error: errB } = (await resB.json()) as { error: { errorId: string } };
+    const sentA = await postFaucetClaim(a.url);
+    assert.equal(sentA.status, 502);
+    const sentB = await postFaucetClaim(b.url);
+    assert.equal(sentB.status, 502);
+    const errA = sentA.error;
+    const errB = sentB.error;
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     assert.equal(postsA.length, 1);
@@ -329,12 +307,8 @@ test("a failed startup leaves no sink behind: other servers' errors stay local",
   );
   rpc.setHealthy(false);
   try {
-    const res = await fetch(`${healthyServer.url}/v1/faucet/claims`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ recipient: "0x" + "cd".repeat(20) }),
-    });
-    assert.equal(res.status, 502);
+    const { status } = await postFaucetClaim(healthyServer.url);
+    assert.equal(status, 502);
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     assert.equal(posts.length, 0);

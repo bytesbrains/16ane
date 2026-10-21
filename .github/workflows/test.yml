@@ -82,6 +82,12 @@ jobs:
       - name: Run sandbox server unit tests
         run: npm run test:server
 
+      - name: Run facilitator unit tests
+        run: npm run test:facilitator
+
+      - name: Run indexer unit tests
+        run: npm run test:indexer
+
       - name: Run repo script unit tests
         run: npm run test:scripts
 
@@ -132,6 +138,12 @@ jobs:
 
       - name: Collect sandbox server coverage
         run: npm run coverage:server
+
+      - name: Collect facilitator coverage
+        run: npm run coverage:facilitator
+
+      - name: Collect indexer coverage
+        run: npm run coverage:indexer
 
       - name: Collect repo script coverage
         run: npm run coverage:scripts
@@ -252,6 +264,11 @@ jobs:
           persist-credentials: false
           submodules: recursive
 
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
 
@@ -261,6 +278,15 @@ jobs:
 
       - name: Run the image against a local chain (healthz, gasless claim, cooldown, x402 quote, clean stop)
         run: scripts/docker-smoke.sh 16ane-sandbox:test
+
+      # The standalone facilitator and indexer images self-hosters run (REQ-106, #18).
+      - name: Build standalone images
+        run: |
+          docker build -f services/facilitator/Dockerfile -t 16ane-facilitator:test .
+          docker build -f services/indexer/Dockerfile -t 16ane-indexer:test .
+
+      - name: Run the standalone images against a local chain (verify/settle both schemes, anchor indexing, clean stop)
+        run: scripts/docker-smoke-standalone.sh 16ane-facilitator:test 16ane-indexer:test
 
   committed-files:
     name: Committed files hygiene

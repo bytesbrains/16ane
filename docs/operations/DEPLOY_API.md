@@ -40,6 +40,11 @@ both unset: claims then need the recipient's signature.
 ```bash
 pbpaste | sed 's/^/ANE_TURNSTILE_SECRET_KEY=/' | fly secrets import --app 16ane-sandbox-api --stage
 ```
+Error tracking (#90): create a Sentry project and import its DSN the same way, so it isn't typed on a
+command line. Unset stays off.
+```bash
+pbpaste | sed 's/^/ANE_SENTRY_DSN=/' | fly secrets import --app 16ane-sandbox-api --stage
+```
 
 Fly can't show secrets back. If a key is lost or exposed, generate a new one the same way and redeploy;
 both keys hold only test assets.

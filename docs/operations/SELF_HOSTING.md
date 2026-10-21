@@ -42,6 +42,7 @@ environment), never in a command you'd keep in shell history.
 | `ANE_RELAYER_MAX_FEE_WEI` | no | The relayer's gas-price ceiling in wei (`ADR-0006`). Before each sponsored send the server reads `eth_gasPrice`; above this it sends nothing and answers `503 ANE-E-1205` with `Retry-After: 60`. Unset: no ceiling |
 | `ANE_RELAYER_GAS_BUDGET_WEI` | no | Most the relayer may spend on gas per UTC day, in wei (default `50000000000000000` = 0.05 ETH, `ADR-0006`). Counts the full fee, including Base's L1 data fee. Once reached, sponsored claims and settlements get `503 ANE-E-1006` with `Retry-After` until 00:00 UTC and a hint to pay their own gas |
 | `ANE_STATE_PATH` | no | SQLite file for state that must survive restarts: faucet cooldowns and claims, the service directory, trial quotas, x402 idempotency records, consumed payment proofs and receipts. The image sets `/data/sandbox.sqlite`; mount a volume at `/data` to keep it across container re-creation. Unset outside the image: memory only, with a startup warning |
+| `ANE_SENTRY_DSN` | no | Sentry project DSN for scrubbed `sendLoggedError` events (#90). **Unset means off** (self-host default). Posts only `code`, `errorId` and a URL/key-redacted message — never request bodies, headers, query strings, client IPs, signatures or Turnstile tokens. No npm Sentry SDK; the server posts Sentry's envelope HTTP API directly |
 
 A bad configuration exits with code 2 and lists every problem, without printing key values.
 

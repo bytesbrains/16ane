@@ -35,7 +35,9 @@ import {
   sendError,
   sendJson,
   sendLoggedError,
+  setLoggedErrorSink,
 } from "./http.ts";
+import { createSentryReporter, type SentryFetch } from "./sentry.ts";
 
 export interface SandboxServerConfig {
   port?: number;
@@ -67,6 +69,13 @@ export interface SandboxServerConfig {
   /** Overrides Cloudflare's siteverify endpoint; for tests. */
   turnstileSiteverifyUrl?: string;
   maxBodyBytes?: number;
+  /**
+   * Sentry DSN for scrubbed error events from sendLoggedError (#90). Unset means off (self-host
+   * default). Posts directly to Sentry's envelope HTTP API — no npm dependency.
+   */
+  sentryDsn?: string;
+  /** Overrides `fetch` for Sentry POSTs; for tests. */
+  sentryFetch?: SentryFetch;
 }
 
 export type { ClaimStatusRecord } from "./faucet.ts";
@@ -83,6 +92,8 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   const chainId = config.chainId ?? 84532;
   const trustProxy = config.trustProxy ?? false;
   const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  // Optional Sentry sink: unset DSN keeps reporting off. Cleared on close so tests don't leak state.
+  setLoggedErrorSink(createSentryReporter(config.sentryDsn, config.sentryFetch));
   const relayerKey =
     config.relayerPrivateKey instanceof SecretKey
       ? config.relayerPrivateKey
@@ -464,6 +475,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     providerAddress,
     close: () =>
       new Promise<void>((resolve, reject) => {
+        setLoggedErrorSink(undefined);
         server.close((err) => (err ? reject(err) : resolve()));
       }),
   };

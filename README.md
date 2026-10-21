@@ -4,7 +4,7 @@
 
 # 16ane — Open Agent Economy
 
-**Status:** Product vision, planning specification, and a sandbox implementation (contracts, SDKs, CLI, reference server) that is tested locally and in CI only, v0.1.0 (2026-10-19). **The sandbox contracts are live on the Base Sepolia testnet** (registry `0x01d5daB670DE5868305eB862721ebE62772C3Df3`, all addresses in [`networks/sandbox-sepolia.json`](networks/sandbox-sepolia.json)); **no hosted faucet or API exists yet, and this is not a regulatory authorization.** Check contract addresses here or on 16ane.com, never by the `tANE` symbol. See [launch readiness](docs/planning/LAUNCH_READINESS.md).
+**Status:** Product vision, planning specification, and a sandbox implementation (contracts, SDKs, CLI, reference server) that is tested locally, in CI and hosted, v0.1.0 (2026-10-21). **The sandbox contracts are live on the Base Sepolia testnet** (registry `0x01d5daB670DE5868305eB862721ebE62772C3Df3`, all addresses in [`networks/sandbox-sepolia.json`](networks/sandbox-sepolia.json)); **the public faucet and demo API are hosted at `https://api.16ane.com`, and this is not a regulatory authorization.** Check contract addresses here or on 16ane.com, never by the `tANE` symbol. See [launch readiness](docs/planning/LAUNCH_READINESS.md).
 
 > **16 Aane = 1 Rupee.** Give an agent a budget. Let it discover, spend, earn, and return value.
 
@@ -30,7 +30,7 @@ COPRA is commodity-referenced and therefore has variable INR purchasing power. 1
 - Support India-first content and examples while allowing global sandbox participation.
 
 ## First five-minute success story
-_Target experience once the public sandbox is deployed; none of the hosted pieces below exist yet._
+_Target experience against the public sandbox (`https://api.16ane.com`, live since 2026-10-21 for faucet claims, demo APIs and the service directory; `docs.16ane.com` and the owner dashboard below don't exist yet)._
 
 1. Developer opens `docs.16ane.com` and creates an agent wallet on the public sandbox.
 2. Faucet grants 16,000 **tANE** (not rupees); owner delegates a fixed budget.

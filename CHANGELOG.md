@@ -32,6 +32,7 @@ Nothing has been released yet: no version is tagged, and no package is published
 - Tagged API releases (#78): pushing a `sandbox-api-v*` tag on `main` runs `.github/workflows/release-api.yml`, which checks the tag is on `main`, builds the Dockerfile on Fly, deploys `16ane-sandbox-api`, smoke-tests the live app (`scripts/smoke-api.ts`) and records a GitHub release. First-time setup (app, volume, keys, `FLY_API_TOKEN` secret) stays in `docs/operations/DEPLOY_API.md`.
 
 ### Changed
+- Go-live docs (#78): `G1-13` is PASS (API hosted at `https://api.16ane.com`), and the site, README, runbook and `ADR-0015` now say so; the site test pins the new status wording.
 - Hosted API's day-one relayer gas budget is 0.001 Base Sepolia ETH per UTC day (`fly.toml`), sized to the relayer's starting funds so the deploy smoke gate's funding check passes; raise it as funding grows. The code default stays 0.05 ETH.
 - E2E scenarios S1–S6 live in `e2e/scenarios/` (#65); `e2e/run-scenarios.ts` only boots the shared stack and runs them in order. No behaviour change.
 - Faucet and relayer limits sized for agent-speed use (#61): faucet defaults 16,000 tANE per claim, 1 hour cooldown per recipient, 160 M tANE per day (were 1,600 / 24 h / 1.6 M); ADR-0006, ADR-0008 and ADR-0010 amended so the payment path carries no protocol rate limits or count caps, and operator-paid resources are limited by cost only.

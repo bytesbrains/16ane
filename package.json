@@ -10,7 +10,8 @@
     "test:sdk-py": "python3 -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' -v",
     "test:cli": "node --experimental-strip-types --test packages/cli/test/*.test.ts",
     "test:server": "node --experimental-strip-types --test services/sandbox-server/test/*.test.ts",
-    "test:e2e": "node --experimental-strip-types --test --test-concurrency=1 e2e/run-scenarios.ts e2e/smoke-script.ts e2e/restart-state.ts e2e/gas-budget.ts e2e/faucet-proof.ts e2e/api-smoke.ts e2e/signed-actions.ts",
+    "test:e2e": "node --experimental-strip-types --test --test-concurrency=1 e2e/flows/*.test.ts",
+    "test:e2e:ci": "node --experimental-strip-types --test --test-concurrency=1 --test-reporter=spec --test-reporter=tap --test-reporter-destination=stdout --test-reporter-destination=e2e-results.tap e2e/flows/*.test.ts",
     "test:web": "node --experimental-strip-types --test test/web/site.test.ts",
     "test:scripts": "node --experimental-strip-types --test test/scripts/*.test.ts",
     "coverage:contracts": "forge coverage --report lcov --report-file coverage/forge.lcov --exclude-tests",
@@ -19,7 +20,7 @@
     "coverage:cli": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/cli.lcov packages/cli/test/*.test.ts",
     "coverage:server": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/server.lcov services/sandbox-server/test/*.test.ts",
     "coverage:scripts": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/scripts.lcov test/scripts/*.test.ts",
-    "coverage:e2e": "node --experimental-strip-types --test --test-concurrency=1 --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/e2e.lcov e2e/run-scenarios.ts e2e/smoke-script.ts e2e/restart-state.ts e2e/gas-budget.ts e2e/faucet-proof.ts e2e/api-smoke.ts e2e/signed-actions.ts",
+    "coverage:e2e": "node --experimental-strip-types --test --test-concurrency=1 --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/e2e.lcov e2e/flows/*.test.ts",
     "coverage:report": "node --experimental-strip-types scripts/coverage-report.ts --lcov coverage/forge.lcov --lcov coverage/sdk-ts.lcov --lcov coverage/cli.lcov --lcov coverage/server.lcov --lcov coverage/scripts.lcov --lcov coverage/e2e.lcov --lcov coverage/py.lcov",
     "coverage": "mkdir -p coverage && npm run coverage:contracts && npm run coverage:sdk-ts && npm run coverage:cli && npm run coverage:server && npm run coverage:scripts && npm run coverage:sdk-py && npm run coverage:e2e && npm run coverage:report"
   },

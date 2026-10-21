@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSandboxServer } from "../services/sandbox-server/src/server.ts";
-import { DEPLOYER_KEY, PROVIDER_KEY, startSandboxStack } from "./harness.ts";
+import { createSandboxServer } from "../../services/sandbox-server/src/server.ts";
+import { DEPLOYER_KEY, PROVIDER_KEY, startSandboxStack } from "../harness.ts";
 
 // #76 on a real chain: with a 1-wei daily budget the first sponsored claim goes through (nothing spent yet),
 // it records its real fee, and the next one is refused with 503 + Retry-After and a self-serve hint.
-test("the relayer stops sponsoring gas once today's budget is spent", async (t) => {
+test("the relayer stops sponsoring gas once today's budget is spent (REQ-105, ADR-0006, #76)", async (t) => {
   const { rpcUrl, registryAddress } = await startSandboxStack(t);
   const server = await createSandboxServer({
     rpcUrl,
@@ -41,7 +41,7 @@ test("the relayer stops sponsoring gas once today's budget is spent", async (t) 
 });
 
 // The race both #83 reviews found: concurrent claims must not all pass the check before any fee is recorded.
-test("concurrent sponsored claims can't overspend the budget", async (t) => {
+test("concurrent sponsored claims can't overspend the budget (REQ-105, ADR-0006, #83)", async (t) => {
   const { rpcUrl, registryAddress } = await startSandboxStack(t);
   const server = await createSandboxServer({
     rpcUrl,

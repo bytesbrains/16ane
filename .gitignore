@@ -77,3 +77,7 @@ temp/
 coverage/
 .coverage*
 lcov.info
+
+# E2E run output (TAP report and per-stack logs; CI uploads them on failure)
+e2e-results.tap
+e2e-artifacts/

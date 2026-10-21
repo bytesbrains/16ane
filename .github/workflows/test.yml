@@ -88,9 +88,6 @@ jobs:
       - name: Run Python SDK unit tests
         run: npm run test:sdk-py
 
-      - name: Run E2E Scenarios S1-S6 & Threat Model T1-T10
-        run: npm run test:e2e
-
   coverage:
     name: Coverage report and thresholds
     runs-on: ubuntu-latest

@@ -1,0 +1,154 @@
+name: E2E flows
+
+on:
+  # PR commits are covered by pull_request; push only runs for main so each commit runs once.
+  # The schedule runs the fork job only (drift against Base Sepolia, not PR signal).
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  flows:
+    name: E2E flows on a local chain
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install Node dev dependencies (TypeScript type-checker)
+        run: npm ci --ignore-scripts
+
+      # Pinned, not floating: chain behaviour must not change between runs (#56).
+      # Bump deliberately, after running the flows locally on the new version.
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+
+      - name: Show tool versions
+        run: |
+          forge --version
+          anvil --version
+          node --version
+          python3 --version
+
+      - name: Run one flow per file, each on its own Anvil chain
+        env:
+          E2E_ARTIFACT_DIR: e2e-artifacts
+        run: npm run test:e2e:ci
+
+      - name: Write per-flow results to the summary
+        if: always()
+        run: |
+          if [[ ! -f e2e-results.tap ]]; then
+            echo "## E2E flows: no TAP output (the run failed before reporting)" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          pass=$(grep -c '^ok ' e2e-results.tap || true)
+          fail=$(grep -c '^not ok' e2e-results.tap || true)
+          {
+            echo "## E2E flows: ${pass} passed, ${fail} failed"
+            echo ""
+            grep -E '^ok [0-9]+ - ' e2e-results.tap | sed -E 's/^ok [0-9]+ - /- PASS /'
+            grep -E '^not ok' e2e-results.tap | sed -E 's/^not ok [0-9]* - /- FAIL /'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload Anvil logs, deploy output and deployed addresses
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-failure
+          path: |
+            e2e-artifacts/
+            e2e-results.tap
+          if-no-files-found: warn
+          retention-days: 14
+
+  fork:
+    name: E2E flows on a Base Sepolia fork
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install Node dev dependencies (TypeScript type-checker)
+        run: npm ci --ignore-scripts
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+
+      - name: Show tool versions
+        run: |
+          forge --version
+          anvil --version
+          node --version
+          python3 --version
+
+      # Same flows, forked state: catches drift from the real network. The RPC is the
+      # public endpoint committed in networks/sandbox-sepolia.json — no secrets.
+      - name: Run all flows against an Anvil fork of Base Sepolia
+        env:
+          E2E_ARTIFACT_DIR: e2e-artifacts
+        run: |
+          export ANVIL_FORK_URL="$(jq -r .rpcUrl networks/sandbox-sepolia.json)"
+          npm run test:e2e:ci
+
+      - name: Write per-flow results to the summary
+        if: always()
+        run: |
+          if [[ ! -f e2e-results.tap ]]; then
+            echo "## E2E fork flows: no TAP output (the run failed before reporting)" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          pass=$(grep -c '^ok ' e2e-results.tap || true)
+          fail=$(grep -c '^not ok' e2e-results.tap || true)
+          {
+            echo "## E2E fork flows: ${pass} passed, ${fail} failed"
+            echo ""
+            grep -E '^ok [0-9]+ - ' e2e-results.tap | sed -E 's/^ok [0-9]+ - /- PASS /'
+            grep -E '^not ok' e2e-results.tap | sed -E 's/^not ok [0-9]* - /- FAIL /'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload Anvil logs, deploy output and deployed addresses
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-fork-failure
+          path: |
+            e2e-artifacts/
+            e2e-results.tap
+          if-no-files-found: warn
+          retention-days: 14

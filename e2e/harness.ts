@@ -135,7 +135,9 @@ export async function startSandboxStack(t: TestContext) {
     if (silentAt >= 0) anvilArgs.splice(silentAt, 1);
     anvilLogFd = openSync(path.join(artifactDir, `anvil-${anvilPort}.log`), "a");
   }
-  const anvilProc: ChildProcess = spawn("anvil", anvilArgs, {
+  // The harness runs the foundryup/toolchain `anvil` from PATH by design; anyone able to
+  // plant a hostile earlier entry already executes code as this user. Reviewed, not a finding.
+  const anvilProc: ChildProcess = spawn("anvil", anvilArgs, { // NOSONAR
     stdio: anvilLogFd === undefined ? "ignore" : ["ignore", anvilLogFd, anvilLogFd],
   });
 

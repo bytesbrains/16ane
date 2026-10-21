@@ -57,6 +57,21 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
   const chainId = integer("ANE_CHAIN_ID", 84532, 1, Number.MAX_SAFE_INTEGER);
   const trialFreeCallsPerCaller = integer("ANE_TRIAL_FREE_CALLS_PER_CALLER", 1, 0, 1_000_000);
   const trialGlobalDailyCap = integer("ANE_TRIAL_GLOBAL_DAILY_CAP", 50, 0, 1_000_000_000);
+  const trialMaxTokensPerRequest = integer("ANE_TRIAL_MAX_TOKENS_PER_REQUEST", 0, 0, 1_000_000_000);
+  const micros = (name: string, fallback: bigint) => {
+    const raw = get(name);
+    if (raw === undefined) return fallback;
+    if (/^\d+$/.test(raw)) return BigInt(raw);
+    problems.push(`${name} must be a whole number of USD micros`);
+    return fallback;
+  };
+  const trialCostBudgetMicros = micros("ANE_TRIAL_COST_BUDGET_MICROS", 20_000_000n);
+  const trialEstimatedCostMicrosPerCall = micros("ANE_TRIAL_ESTIMATED_COST_MICROS_PER_CALL", 0n);
+  const trialOnlyRaw = get("ANE_TRIAL_ONLY_PATHS");
+  const trialOnlyPaths = trialOnlyRaw === undefined ? [] : trialOnlyRaw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (trialOnlyPaths.some((p) => !p.startsWith("/v1/demo/"))) {
+    problems.push("ANE_TRIAL_ONLY_PATHS must be comma-separated /v1/demo/ paths");
+  }
 
   const host = get("ANE_HOST") ?? "127.0.0.1";
   const statePath = get("ANE_STATE_PATH");
@@ -110,6 +125,10 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     turnstileExpectedHostname,
     trialFreeCallsPerCaller,
     trialGlobalDailyCap,
+    trialMaxTokensPerRequest,
+    trialCostBudgetMicros,
+    trialEstimatedCostMicrosPerCall,
+    trialOnlyPaths,
     sentryDsn,
   };
 }

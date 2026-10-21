@@ -5,12 +5,19 @@ import {
   privateKeyToAddress,
   SANDBOX_DISCLAIMER,
   SecretKey,
+  SponsoredQuotaEngine,
   toChecksumAddress,
-  TrialQuotaTracker,
   type KeyValueStore,
   MemoryKeyValueStore,
   type ServiceManifestPayload,
 } from "../../../packages/sdk-ts/src/index.ts";
+import {
+  buildDefaultCampaignInput,
+  campaignHealthView,
+  campaignPublicView,
+  DEFAULT_TRIAL_COST_BUDGET_MICROS,
+  handleCampaignControl,
+} from "./campaigns.ts";
 import { buildDemoManifest, handleDemoRequest, isDemoRoute, type DemoContext } from "./demo.ts";
 import { handleRelay, type RelayContext } from "./relay.ts";
 import {
@@ -55,6 +62,14 @@ export interface SandboxServerConfig {
   providerPrivateKey?: string | SecretKey;
   trialFreeCallsPerCaller?: number;
   trialGlobalDailyCap?: number;
+  /** Lifetime sponsor compute ceiling for the demo campaign in USD micros (#16). Defaults to $20. */
+  trialCostBudgetMicros?: bigint;
+  /** Upstream cost pre-reserved per sponsored stub call; 0: the stubs sponsor no real compute. */
+  trialEstimatedCostMicrosPerCall?: bigint;
+  /** Per-request token ceiling for sponsored calls; 0 disables it. */
+  trialMaxTokensPerRequest?: number;
+  /** Demo paths where an exhausted trial rejects (429/503) instead of falling back to paid. */
+  trialOnlyPaths?: string[];
   /** Honour X-Forwarded-For only when a trusted reverse proxy sets it. */
   trustProxy?: boolean;
   /** Header the platform's proxy sets to the client IP (e.g. "fly-client-ip"); overrides X-Forwarded-For. */
@@ -162,23 +177,24 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     loggedErrorSink: sentrySink,
   };
 
-  const freeCallsPerCaller = config.trialFreeCallsPerCaller ?? 1;
-  const globalDailyCap = config.trialGlobalDailyCap ?? 50;
-  const trialTracker = new TrialQuotaTracker(
-    {
-      enabled: true,
-      freeCallsPerCaller,
-      globalDailyCap,
-      // The disclosure states the configured quotas, not fixed numbers (AGENTS.md: disclose sponsorship and quotas).
-      sponsorDisclosure: `Provider-sponsored sandbox trial (0 tANE charged; capped at ${freeCallsPerCaller} call(s)/caller and ${globalDailyCap} calls/day)`,
-    },
-    store,
+  // Seeding keeps a stored pause latch: a restart never silently resumes a paused campaign (#16).
+  const quotaEngine = new SponsoredQuotaEngine(store);
+  quotaEngine.seedCampaign(
+    buildDefaultCampaignInput({
+      providerAddress,
+      freeCallsPerCaller: config.trialFreeCallsPerCaller ?? 1,
+      globalDailyCap: config.trialGlobalDailyCap ?? 50,
+      costBudgetMicros: config.trialCostBudgetMicros ?? DEFAULT_TRIAL_COST_BUDGET_MICROS,
+      estimatedCostMicrosPerCall: config.trialEstimatedCostMicrosPerCall ?? 0n,
+      maxTokensPerRequest: config.trialMaxTokensPerRequest ?? 0,
+      trialOnlyEndpoints: config.trialOnlyPaths ?? [],
+    }),
   );
 
   const demo: DemoContext = {
     client,
     verifier,
-    trialTracker,
+    quotaEngine,
     providerKey,
     providerAddress,
     contracts,
@@ -233,6 +249,9 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
               reservedTodayWei: gasBudget.reservedTodayWei().toString(),
               remainingTodayWei: gasBudget.remainingTodayWei().toString(),
               lowBalance: gasBudget.isLowBalance(balanceWei),
+            },
+            sponsored: {
+              campaigns: quotaEngine.listCampaigns().map((c) => campaignHealthView(quotaEngine, c)),
             },
             disclaimer: SANDBOX_DISCLAIMER,
           });
@@ -419,23 +438,25 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       // 9. Sponsored Trial Campaigns (/v1/campaigns)
       if (method === "GET" && pathname === "/v1/campaigns") {
         sendJson(res, 200, {
-          campaigns: [
-            {
-              campaignId: "sandbox-trial-summarize-v1",
-              serviceId: "16ane-sandbox-reference-demo",
-              endpoint: "/v1/demo/summarize",
-              freeCallsPerCaller: trialTracker.config.freeCallsPerCaller,
-              globalDailyCap: trialTracker.config.globalDailyCap,
-              sponsorDisclosure: trialTracker.config.sponsorDisclosure,
-              disclaimer: SANDBOX_DISCLAIMER,
-            },
-          ],
+          campaigns: quotaEngine.listCampaigns().map((c) => campaignPublicView(quotaEngine, c)),
           disclaimer: SANDBOX_DISCLAIMER,
         });
         return;
       }
 
-      // 10. Reference Paid Demo Endpoints (/v1/demo/*)
+      // 10. Provider circuit breaker: pause/resume a campaign with the provider's key (#16)
+      if (
+        method === "POST" &&
+        pathname.startsWith("/v1/campaigns/") &&
+        (pathname.endsWith("/pause") || pathname.endsWith("/resume"))
+      ) {
+        const action = pathname.endsWith("/pause") ? "pause" : "resume";
+        const campaignId = pathname.slice("/v1/campaigns/".length, pathname.length - `/${action}`.length);
+        await handleCampaignControl(quotaEngine, maxBodyBytes, req, res, campaignId, action);
+        return;
+      }
+
+      // 11. Reference Paid Demo Endpoints (/v1/demo/*)
       if (isDemoRoute(method, pathname)) {
         await handleDemoRequest(demo, req, res, method, pathname, fullUrl);
         return;

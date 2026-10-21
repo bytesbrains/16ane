@@ -5,7 +5,7 @@ import { DEPLOYER_KEY, ONE_TANE, PROVIDER_KEY, setupFundedSession, startSandboxS
 
 // Provider-funded sponsored compute is capped per caller and in aggregate: with a global
 // daily cap of 1, the second trial call — caller quota still open — falls back to paid.
-// (REQ-014, REQ-103. No per-service cap exists yet; see TRACEABILITY.)
+// (REQ-014, REQ-103; cost budgets and trial-only rejection live in sponsored-budget.test.ts.)
 test("the global trial cap binds even when caller quota is open (REQ-014, REQ-103)", async (t) => {
   const stack = await startSandboxStack(t);
   await setupFundedSession(stack);

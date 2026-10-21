@@ -378,12 +378,7 @@ export class SponsoredQuotaEngine {
 
   /** Swaps the cost hold for the upstream cost actually incurred. */
   settle(reservation: SponsorReservation, actualCostMicros: bigint): void {
-    if (this.#closed.has(reservation)) return;
-    this.#closed.add(reservation);
-    const held = this.#inFlight.get(reservation.campaignId) ?? 0n;
-    const freed = held >= reservation.costMicros ? reservation.costMicros : held;
-    if (held - freed > 0n) this.#inFlight.set(reservation.campaignId, held - freed);
-    else this.#inFlight.delete(reservation.campaignId);
+    if (!this.#closeReservation(reservation)) return;
     const spentKey = this.#spentKey(reservation.campaignId);
     this.#store.set(QUOTA_NS, spentKey, (this.#getMicros(spentKey) + actualCostMicros).toString());
     const hourKey = this.#serviceHourKey(reservation.campaignId, reservation.hour);
@@ -404,12 +399,7 @@ export class SponsoredQuotaEngine {
    * no sponsorship was delivered. Paid calls never reach the engine, so they are never counted.
    */
   release(reservation: SponsorReservation): void {
-    if (this.#closed.has(reservation)) return;
-    this.#closed.add(reservation);
-    const held = this.#inFlight.get(reservation.campaignId) ?? 0n;
-    const freed = held >= reservation.costMicros ? reservation.costMicros : held;
-    if (held - freed > 0n) this.#inFlight.set(reservation.campaignId, held - freed);
-    else this.#inFlight.delete(reservation.campaignId);
+    if (!this.#closeReservation(reservation)) return;
     const hourKey = this.#serviceHourKey(reservation.campaignId, reservation.hour);
     this.#store.set(QUOTA_NS, hourKey, (this.#getMicros(hourKey) - reservation.costMicros).toString());
     const callerKey = this.#callerKey(reservation.campaignId, reservation.day, reservation.callerKey);
@@ -460,6 +450,21 @@ export class SponsoredQuotaEngine {
 
   #budgetSpent(campaign: SponsoredCampaign): boolean {
     return campaign.providerCostBudgetMicros > 0n && this.#spent(campaign.campaignId) >= campaign.providerCostBudgetMicros;
+  }
+
+  /**
+   * Marks a reservation closed and frees its cost hold. Returns false when the reservation was
+   * already closed, so settle/release each apply exactly once. Shared: settle and release must
+   * free the hold identically, or the survivors drift.
+   */
+  #closeReservation(reservation: SponsorReservation): boolean {
+    if (this.#closed.has(reservation)) return false;
+    this.#closed.add(reservation);
+    const held = this.#inFlight.get(reservation.campaignId) ?? 0n;
+    const freed = held >= reservation.costMicros ? reservation.costMicros : held;
+    if (held - freed > 0n) this.#inFlight.set(reservation.campaignId, held - freed);
+    else this.#inFlight.delete(reservation.campaignId);
+    return true;
   }
 
   #deny(

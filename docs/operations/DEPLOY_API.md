@@ -45,6 +45,14 @@ command line. Unset stays off.
 ```bash
 pbpaste | sed 's/^/ANE_SENTRY_DSN=/' | fly secrets import --app 16ane-sandbox-api --stage
 ```
+Tag deploys (`release-api.yml`) need an app-scoped deploy token as the `FLY_API_TOKEN` repository secret,
+once. The first command prints the token; the second prompts for the paste, so it never appears on a
+command line:
+```bash
+fly tokens create deploy -a 16ane-sandbox-api -n github-release -x 8760h
+gh secret set FLY_API_TOKEN
+```
+One year; renew with the same two commands before it lapses.
 
 Fly can't show secrets back. If a key is lost or exposed, generate a new one the same way and redeploy;
 both keys hold only test assets.
@@ -52,14 +60,22 @@ both keys hold only test assets.
 **Fund the relayer** with a little Base Sepolia ETH (0.01 ETH covers thousands of sponsored transactions at
 2026-10-20 prices). The provider receives demo payments in `tANE` and needs no ETH.
 
-## 2. Deploy
+## 2. Deploy: push a tag
+Deploys run from GitHub, not laptops. Push a `sandbox-api-v*` tag on `main` — tags are deployment
+markers, not versions (CONTRIBUTING.md), so any suffix works:
 ```bash
-fly deploy --app 16ane-sandbox-api          # builds the Dockerfile remotely for amd64
+git tag sandbox-api-v0.1.0 && git push origin sandbox-api-v0.1.0
+```
+`release-api.yml` checks the tag is on `main`, builds the Dockerfile on Fly, deploys, smoke-tests the
+live app with `scripts/smoke-api.ts` and records a GitHub release. Watch the run, then check `/healthz`
+yourself:
+```bash
 fly status --app 16ane-sandbox-api
 curl -s https://16ane-sandbox-api.fly.dev/healthz
 ```
 `/healthz` must show `"status":"ok"`, the registry `0x01d5daB670DE5868305eB862721ebE62772C3Df3`, the relayer's
 address and balance, and its daily gas budget. Fly's health check uses the same endpoint.
+Manual fallback (same build, no smoke gate): `fly deploy --app 16ane-sandbox-api`.
 
 ## 3. Check it end to end
 From a checkout of this repo (no key needed):
@@ -114,4 +130,5 @@ What to do for each alert is in `docs/operations/OPERATIONS.md` ("Hosted sandbox
 - **One machine only:** state and the payment-replay guard assume a single process (#82). Don't
   `fly scale count` above 1 without a shared store.
 - **Rollback:** `fly releases --app 16ane-sandbox-api`, then `fly deploy --image <previous image>`. State on
-  the volume is kept.
+  the volume is kept. (Pushing a tag always deploys forward; to re-release older code, tag that commit
+  with a new `sandbox-api-v*` name.)

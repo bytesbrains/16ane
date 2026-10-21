@@ -1,0 +1,102 @@
+name: Release sandbox API
+
+# Deploys the sandbox API to Fly.io when a `sandbox-api-v*` tag is pushed (docs/operations/DEPLOY_API.md
+# step 2, ADR-0016). Tags are deployment markers, not version releases (CONTRIBUTING.md): the API is
+# unversioned and every deploy builds the Dockerfile from the tagged commit. First-time setup (app,
+# volume, keys, FLY_API_TOKEN secret) stays manual; this covers repeat deploys. A failed smoke test
+# fails the run but leaves the deploy live; roll back per DEPLOY_API.md.
+on:
+  push:
+    tags: ['sandbox-api-v*']
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  FLY_APP: 16ane-sandbox-api
+  LIVE_URL: https://16ane-sandbox-api.fly.dev
+
+jobs:
+  guard:
+    name: Check the tag is on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # A tag can point at any commit; only deploy what has been merged to main (and so passed CI there).
+      - name: Refuse a tag that is not on main
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main \
+            || { echo "::error::${TAG} is not on main"; exit 1; }
+
+  deploy:
+    name: Deploy to Fly.io
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: fly
+      url: https://fly.io/apps/16ane-sandbox-api
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@dfdfedc86b296f5e5384f755a18bf400409a15d0 # v1.4
+
+      - name: Deploy the image
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --app "$FLY_APP"
+
+  smoke:
+    name: Smoke-test the live deployment
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      # Keyless: the script makes a throwaway key in memory and claims for it gaslessly.
+      - name: Run the hosted-API smoke test
+        run: API_URL="$LIVE_URL" node --experimental-strip-types scripts/smoke-api.ts
+
+  release:
+    name: Record the GitHub release
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Create the release from the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --title "$TAG" --generate-notes

@@ -142,7 +142,7 @@ test("the published registry address matches networks/sandbox-sepolia.json", () 
 test("the status section matches the launch report: the API is live, listed once (G1-13)", () => {
   const html = read("index.html");
   const status = html.match(/<section[^>]*aria-labelledby="status-title"[\s\S]*?<\/section>/)?.[0] ?? "";
-  assert.ok(status.includes("api.16ane.com"), "the live API host is named");
+  assert.equal(status.split("api.16ane.com").length - 1, 1, "the live API host is named once");
   assert.doesNotMatch(status, /not live yet[\s\S]*faucet and demo API/i, "the faucet/API left the not-live list");
 });
 

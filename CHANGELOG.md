@@ -29,6 +29,7 @@ Nothing has been released yet: no version is tagged, and no package is published
 - Git hooks: gitleaks and `forge fmt` before commit; gitleaks, committed-file hygiene and `forge test` before push.
 - Brand images in use: the README banner (`assets/16ane_social_preview.png`), link previews for 16ane.com (Open Graph and X/Twitter tags with `web/og-image.png`), the logo on the Python SDK's README, and homepage, source and issue links in the Python and TypeScript package metadata.
 - Community files: `LICENSE` (MIT), `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue and PR templates, `CODEOWNERS`.
+- Tagged API releases (#78): pushing a `sandbox-api-v*` tag on `main` runs `.github/workflows/release-api.yml`, which checks the tag is on `main`, builds the Dockerfile on Fly, deploys `16ane-sandbox-api`, smoke-tests the live app (`scripts/smoke-api.ts`) and records a GitHub release. First-time setup (app, volume, keys, `FLY_API_TOKEN` secret) stays in `docs/operations/DEPLOY_API.md`.
 
 ### Changed
 - E2E scenarios S1–S6 live in `e2e/scenarios/` (#65); `e2e/run-scenarios.ts` only boots the shared stack and runs them in order. No behaviour change.

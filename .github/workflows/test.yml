@@ -82,11 +82,98 @@ jobs:
       - name: Run sandbox server unit tests
         run: npm run test:server
 
+      - name: Run repo script unit tests
+        run: npm run test:scripts
+
       - name: Run Python SDK unit tests
         run: npm run test:sdk-py
 
       - name: Run E2E Scenarios S1-S6 & Threat Model T1-T10
         run: npm run test:e2e
+
+  coverage:
+    name: Coverage report and thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+          fetch-depth: 0 # the full history, so the report can diff against the PR base
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install Node dev dependencies (TypeScript type-checker)
+        run: npm ci --ignore-scripts
+
+      - name: Install Python lint, packaging and coverage tools
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/pytools"
+          "${RUNNER_TEMP}/pytools/bin/pip" install --disable-pip-version-check ruff==0.16.10 build==1.6.1 coverage==7.16.2
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+
+      - name: Collect Solidity coverage
+        run: |
+          mkdir -p coverage
+          npm run coverage:contracts
+
+      - name: Collect TypeScript SDK coverage
+        run: npm run coverage:sdk-ts
+
+      - name: Collect CLI coverage
+        run: npm run coverage:cli
+
+      - name: Collect sandbox server coverage
+        run: npm run coverage:server
+
+      - name: Collect repo script coverage
+        run: npm run coverage:scripts
+
+      # The venv's python shadows the system one so `python3 -m coverage` finds coverage.py.
+      - name: Collect Python SDK coverage
+        run: |
+          export PATH="${RUNNER_TEMP}/pytools/bin:${PATH}"
+          npm run coverage:sdk-py
+
+      - name: Collect E2E coverage
+        run: npm run coverage:e2e
+
+      - name: Diff against the PR base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff -U0 "${BASE_SHA}..HEAD" > coverage/base.diff
+
+      # The report is written to the run summary (readable on fork PRs too, with no extra
+      # permissions) before thresholds are checked, so a red run still shows its numbers.
+      - name: Write the coverage report and check thresholds
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            npm run coverage:report -- --diff coverage/base.diff
+          else
+            npm run coverage:report
+          fi
+
+      - name: Upload coverage files
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: |
+            coverage/*.lcov
+            coverage/base.diff
+          if-no-files-found: warn
+          retention-days: 14
 
   slither:
     name: Slither static analysis (medium+)

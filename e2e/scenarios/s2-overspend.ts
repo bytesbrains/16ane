@@ -4,8 +4,40 @@ import {
   computeRequestHash,
   computeResourceHash,
   keccak256Utf8,
+  type SpendIntent,
 } from "../../packages/sdk-ts/src/index.ts";
 import { ONE_TANE, OWNER_KEY, type SandboxStack } from "../harness.ts";
+
+/** Base64 Payment-Signature header for a raw fetch against the sandbox (S2 threat checks). */
+function encodePaymentSignature(params: {
+  asset: string;
+  amount: bigint;
+  payTo: string;
+  intent: SpendIntent;
+  signature: string;
+  resourceHash: string;
+  requestHash: string;
+}): string {
+  return Buffer.from(
+    JSON.stringify({
+      x402Version: 2,
+      scheme: "ane-vault-v1",
+      network: "eip155:84532",
+      accepted: {
+        asset: params.asset,
+        amount: params.amount.toString(),
+        payTo: params.payTo,
+      },
+      payload: {
+        ...params.intent,
+        resourceHash: params.resourceHash,
+        requestHash: params.requestHash,
+        signature: params.signature,
+      },
+    }),
+    "utf8",
+  ).toString("base64");
+}
 
 /** S2: overspend, spoofed manifest, prompt-injected SpendIntent, replay (T1, T2, T6, T8). */
 export async function runS2(stack: SandboxStack): Promise<void> {
@@ -74,25 +106,15 @@ export async function runS2(stack: SandboxStack): Promise<void> {
     validBefore: Math.floor(Date.now() / 1000) + 300,
     policyVersion,
   });
-  const overspendPayloadB64 = Buffer.from(
-    JSON.stringify({
-      x402Version: 2,
-      scheme: "ane-vault-v1",
-      network: "eip155:84532",
-      accepted: {
-        asset: contracts.aneTestToken,
-        amount: (500n * ONE_TANE).toString(),
-        payTo: sandbox.providerAddress,
-      },
-      payload: {
-        ...overspendSigned.intent,
-        resourceHash,
-        requestHash,
-        signature: overspendSigned.signature,
-      },
-    }),
-    "utf8",
-  ).toString("base64");
+  const overspendPayloadB64 = encodePaymentSignature({
+    asset: contracts.aneTestToken,
+    amount: 500n * ONE_TANE,
+    payTo: sandbox.providerAddress,
+    intent: overspendSigned.intent,
+    signature: overspendSigned.signature,
+    resourceHash,
+    requestHash,
+  });
 
   const overspendRes = await fetch(targetUrl, {
     method: "POST",
@@ -120,25 +142,15 @@ export async function runS2(stack: SandboxStack): Promise<void> {
     validBefore: Math.floor(Date.now() / 1000) + 300,
     policyVersion,
   });
-  const validPayloadB64 = Buffer.from(
-    JSON.stringify({
-      x402Version: 2,
-      scheme: "ane-vault-v1",
-      network: "eip155:84532",
-      accepted: {
-        asset: contracts.aneTestToken,
-        amount: (16n * ONE_TANE).toString(),
-        payTo: sandbox.providerAddress,
-      },
-      payload: {
-        ...validSigned.intent,
-        resourceHash,
-        requestHash,
-        signature: validSigned.signature,
-      },
-    }),
-    "utf8",
-  ).toString("base64");
+  const validPayloadB64 = encodePaymentSignature({
+    asset: contracts.aneTestToken,
+    amount: 16n * ONE_TANE,
+    payTo: sandbox.providerAddress,
+    intent: validSigned.intent,
+    signature: validSigned.signature,
+    resourceHash,
+    requestHash,
+  });
 
   const firstUse = await fetch(targetUrl, {
     method: "POST",

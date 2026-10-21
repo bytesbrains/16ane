@@ -139,6 +139,13 @@ test("the published registry address matches networks/sandbox-sepolia.json", () 
   assert.doesNotMatch(notice, /will be published/, "the notice no longer speaks of a future deployment");
 });
 
+test("the status section matches the launch report: the API is live, listed once (G1-13)", () => {
+  const html = read("index.html");
+  const status = html.match(/<section[^>]*aria-labelledby="status-title"[\s\S]*?<\/section>/)?.[0] ?? "";
+  assert.equal(status.split("api.16ane.com").length - 1, 1, "the live API host is named once");
+  assert.doesNotMatch(status, /not live yet[\s\S]*faucet and demo API/i, "the faucet/API left the not-live list");
+});
+
 test("security.txt names a contact and has not expired (RFC 9116)", () => {
   const body = read(".well-known/security.txt");
   assert.match(body, new RegExp(`^Contact: ${REPO}/security/advisories/new$`, "m"));

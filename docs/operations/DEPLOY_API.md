@@ -105,8 +105,12 @@ server: remove `ANE_CLIENT_IP_HEADER` from `fly.toml` and redeploy before going 
 ```bash
 fly certs add api.16ane.com --app 16ane-sandbox-api
 ```
-In Cloudflare (`bytesbrains` account, `16ane.com` zone), add the records `fly certs add` prints: a **CNAME
-`api` → `16ane-sandbox-api.fly.dev`, DNS only (grey cloud)**, plus the ACME validation record. It must be DNS-only
+In Cloudflare (`bytesbrains` account, `16ane.com` zone), add a **CNAME `api` → `16ane-sandbox-api.fly.dev`,
+DNS only (grey cloud)** — that is what `api.16ane.com` uses (a CNAME needs no updates if Fly ever changes IPs;
+confirm the exact target in `fly certs setup api.16ane.com`). Do **not** add the default A + AAAA pair alongside
+it: a CNAME cannot share its name with other records, so A/AAAA records at `api` would conflict with the live
+CNAME and can break the API's DNS. No ACME or ownership records are needed when traffic points straight at Fly.
+It must be DNS-only
 so Fly terminates TLS and its `Fly-Client-IP` header carries the real client address
 (`ANE_CLIENT_IP_HEADER` in `fly.toml`). Through Cloudflare's proxy, every request would appear to come from
 Cloudflare, and per-client trial quotas would stop working.

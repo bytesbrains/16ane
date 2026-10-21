@@ -2,6 +2,10 @@
 // filtering, diff intersection, and threshold verdicts.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   changedCoverage,
   coverableFileCount,
@@ -72,6 +76,14 @@ test("normalizePath strips ./ and relativizes absolute paths", () => {
   assert.equal(normalizePath("./src/A.sol"), "src/A.sol");
   assert.equal(normalizePath("src/A.sol"), "src/A.sol");
   assert.equal(normalizePath(`${process.cwd()}/src/A.sol`), "src/A.sol");
+});
+
+test("normalizePath folds every producer spelling to one key per file", () => {
+  assert.equal(normalizePath("./packages/sdk-ts/src/client.ts"), "packages/sdk-ts/src/client.ts");
+  assert.equal(normalizePath("packages\\sdk-ts\\src\\client.ts"), "packages/sdk-ts/src/client.ts");
+  assert.equal(normalizePath("packages/sdk-ts/../sdk-ts/src/client.ts"), "packages/sdk-ts/src/client.ts");
+  assert.equal(normalizePath("packages//sdk-ts/src/client.ts"), "packages/sdk-ts/src/client.ts");
+  assert.equal(normalizePath(""), "");
 });
 
 test("isCoverable keeps first-party sources and drops tests, vendors and docs", () => {
@@ -244,4 +256,22 @@ test("parseArgs rejects missing lcov files, unknown flags and bad values", () =>
   assert.throws(() => parseArgs(["--lcov", "a.lcov", "--bogus"]), /Unknown or incomplete flag/);
   assert.throws(() => parseArgs(["--lcov"]), /Unknown or incomplete flag/);
   assert.throws(() => parseArgs(["--lcov", "a.lcov", "--min-lines-total", "high"]), /Unknown or incomplete/);
+});
+
+test("a missing --diff file fails as bad usage (exit 2), not an uncaught stack trace", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coverage-report-"));
+  const lcov = join(dir, "a.lcov");
+  writeFileSync(lcov, "SF:src/A.sol\nDA:1,1\nend_of_record\n");
+  const script = new URL("../../scripts/coverage-report.ts", import.meta.url).pathname;
+  assert.throws(
+    () =>
+      execFileSync(process.execPath, ["--experimental-strip-types", script, "--lcov", lcov, "--diff", join(dir, "missing.diff")], {
+        stdio: ["ignore", "pipe", "pipe"],
+      }),
+    (err: unknown) => {
+      assert.equal((err as { status?: number }).status, 2);
+      assert.match(String((err as { stderr?: unknown }).stderr), /cannot read the --diff file/);
+      return true;
+    },
+  );
 });

@@ -22,9 +22,13 @@ export interface FileCoverage {
 }
 
 export function normalizePath(sf: string): string {
-  const stripped = sf.startsWith("./") ? sf.slice(2) : sf;
+  // SF spellings arrive from three producers (forge, node, coverage.py) and meet `--diff`
+  // keys from git: fold every spelling to one slash style and collapse dot segments so the
+  // same file never lands on two map keys and silently drops out of the report.
+  const forward = sf.replaceAll("\\", "/");
+  const stripped = forward.startsWith("./") ? forward.slice(2) : forward;
   if (path.isAbsolute(stripped)) return path.relative(process.cwd(), stripped).replaceAll(path.sep, "/");
-  return stripped;
+  return stripped === "" ? stripped : path.posix.normalize(stripped);
 }
 
 const CODE_EXTENSIONS = [".sol", ".ts", ".mts", ".cts", ".js", ".mjs", ".cjs", ".py"];
@@ -304,7 +308,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error("no coverable files in the LCOV input: check the SF paths and isCoverable");
     process.exit(2);
   }
-  const changed = args.diffFile ? changedCoverage(files, parseDiff(readFileSync(args.diffFile, "utf8"))) : undefined;
+  let changed: ChangedCoverage | undefined;
+  try {
+    changed = args.diffFile ? changedCoverage(files, parseDiff(readFileSync(args.diffFile, "utf8"))) : undefined;
+  } catch (err) {
+    console.error(`cannot read the --diff file: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(2);
+  }
   const { markdown, breaches } = renderReport({ files, changed, thresholds: args.thresholds });
   const summaryFile = args.summaryFile ?? process.env.GITHUB_STEP_SUMMARY;
   if (summaryFile) appendFileSync(summaryFile, markdown);

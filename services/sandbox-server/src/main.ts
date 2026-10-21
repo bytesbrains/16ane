@@ -4,7 +4,8 @@
 //     node --experimental-strip-types services/sandbox-server/src/main.ts
 // Optional: ANE_PROVIDER_PRIVATE_KEY, ANE_HOST (default 127.0.0.1; 0.0.0.0 in containers), ANE_PORT (8787),
 // ANE_CHAIN_ID (84532), ANE_TRUST_PROXY (false), ANE_TRIAL_FREE_CALLS_PER_CALLER, ANE_TRIAL_GLOBAL_DAILY_CAP,
-// ANE_STATE_PATH (SQLite file; without it state is in memory and lost on restart).
+// ANE_TRIAL_COST_BUDGET_MICROS, ANE_TRIAL_ESTIMATED_COST_MICROS_PER_CALL, ANE_TRIAL_MAX_TOKENS_PER_REQUEST,
+// ANE_TRIAL_ONLY_PATHS, ANE_STATE_PATH (SQLite file; without it state is in memory and lost on restart).
 import { ConfigError, parseServerConfig } from "./config.ts";
 import { createSandboxServer } from "./server.ts";
 import { SqliteKeyValueStore } from "./sqlite-store.ts";

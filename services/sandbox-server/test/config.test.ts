@@ -94,6 +94,39 @@ test("ANE_SENTRY_DSN (#90): unset stays off; a non-http value is rejected", () =
   );
 });
 
+test("sponsored-trial campaign settings (#16): cost budget, per-call estimate, token ceiling, trial-only paths", () => {
+  const d = parseServerConfig(BASE);
+  assert.equal(d.trialCostBudgetMicros, 20_000_000n);
+  assert.equal(d.trialEstimatedCostMicrosPerCall, 0n);
+  assert.equal(d.trialMaxTokensPerRequest, 0);
+  assert.deepEqual(d.trialOnlyPaths, []);
+  const c = parseServerConfig({
+    ...BASE,
+    ANE_TRIAL_COST_BUDGET_MICROS: "1000000",
+    ANE_TRIAL_ESTIMATED_COST_MICROS_PER_CALL: "250000",
+    ANE_TRIAL_MAX_TOKENS_PER_REQUEST: "4000",
+    ANE_TRIAL_ONLY_PATHS: "/v1/demo/summarize",
+  });
+  assert.equal(c.trialCostBudgetMicros, 1_000_000n);
+  assert.equal(c.trialEstimatedCostMicrosPerCall, 250_000n);
+  assert.equal(c.trialMaxTokensPerRequest, 4000);
+  assert.deepEqual(c.trialOnlyPaths, ["/v1/demo/summarize"]);
+  assert.throws(
+    () =>
+      parseServerConfig({
+        ...BASE,
+        ANE_TRIAL_COST_BUDGET_MICROS: "$1.00",
+        ANE_TRIAL_MAX_TOKENS_PER_REQUEST: "-5",
+        ANE_TRIAL_ONLY_PATHS: "/v1/faucet/claims",
+      }),
+    (err: unknown) =>
+      err instanceof ConfigError &&
+      err.problems.includes("ANE_TRIAL_COST_BUDGET_MICROS must be a whole number of USD micros") &&
+      err.problems.includes("ANE_TRIAL_MAX_TOKENS_PER_REQUEST must be an integer from 0 to 1000000000") &&
+      err.problems.includes("ANE_TRIAL_ONLY_PATHS must be comma-separated /v1/demo/ paths"),
+  );
+});
+
 test("ANE_RELAYER_MAX_FEE_WEI is a whole number of wei, unset by default", () => {
   assert.equal(parseServerConfig(BASE).relayerMaxFeeWei, undefined);
   assert.equal(parseServerConfig({ ...BASE, ANE_RELAYER_MAX_FEE_WEI: "1000000000" }).relayerMaxFeeWei, 1_000_000_000n);

@@ -7,13 +7,14 @@ import {
   keccak256Utf8,
   SANDBOX_DISCLAIMER,
   SecretKey,
+  SponsoredQuotaEngine,
   toChecksumAddress,
-  TrialQuotaTracker,
   type AneContractAddresses,
   type MerchantEndpointConfig,
   type ServiceManifestPayload,
   type X402Receipt,
 } from "../../../packages/sdk-ts/src/index.ts";
+import { DEFAULT_CAMPAIGN_ID, estimateDemoTokens } from "./campaigns.ts";
 import { clientIp, type LoggedErrorSink, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
 import { RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
 
@@ -33,7 +34,7 @@ const PRICE_BY_PATH: Record<string, bigint> = {
 export interface DemoContext {
   client: AneClient;
   verifier: AnePaymentVerifier;
-  trialTracker: TrialQuotaTracker;
+  quotaEngine: SponsoredQuotaEngine;
   providerKey: SecretKey;
   providerAddress: string;
   contracts: AneContractAddresses;
@@ -52,7 +53,16 @@ export function buildDemoManifest(
   ctx: DemoContext,
   chainId: number,
 ): Omit<ServiceManifestPayload, "signer" | "signature"> {
-  const { trialTracker } = ctx;
+  const campaign = ctx.quotaEngine.getCampaign(DEFAULT_CAMPAIGN_ID);
+  const trialQuota =
+    campaign === undefined
+      ? { enabled: false, freeCallsPerCaller: 0, globalDailyCap: 0, sponsorDisclosure: "" }
+      : {
+          enabled: ctx.quotaEngine.effectiveStatus(campaign) === "ACTIVE",
+          freeCallsPerCaller: campaign.maxCallsPerWallet,
+          globalDailyCap: campaign.maxCallsGlobalPerDay,
+          sponsorDisclosure: campaign.sponsorDisclosure,
+        };
   return {
     schemaVersion: "16ane-manifest-v0",
     serviceId: DEMO_SERVICE_ID,
@@ -93,14 +103,7 @@ export function buildDemoManifest(
           "Settles 16 tANE and simulates downstream failure with automatic on-chain refundPayment",
       },
     ],
-    trialQuota: {
-      enabled: true,
-      freeCallsPerCaller: trialTracker.config.freeCallsPerCaller,
-      globalDailyCap: trialTracker.config.globalDailyCap,
-      sponsorDisclosure:
-        trialTracker.config.sponsorDisclosure ??
-        "Provider-sponsored sandbox trial (0 tANE charged)",
-    },
+    trialQuota,
   };
 }
 
@@ -135,7 +138,7 @@ export async function handleDemoRequest(
   pathname: string,
   fullUrl: URL,
 ): Promise<void> {
-  const { client, verifier, trialTracker, providerKey, providerAddress, contracts } = ctx;
+  const { client, verifier, quotaEngine, providerKey, providerAddress, contracts } = ctx;
   const rawBody = await readRequestBody(req, ctx.maxBodyBytes);
   const requestHash = computeRequestHash(rawBody);
   const idempotencyKey = req.headers["idempotency-key"] as string | undefined;
@@ -170,11 +173,30 @@ export async function handleDemoRequest(
   const trialQuotaKey = clientIp(req, ctx.trustProxy, ctx.clientIpHeader);
   const claimedVault = (req.headers["x-agent-vault"] as string | undefined) ?? "";
 
-  // If no PAYMENT-SIGNATURE header, check if a provider-sponsored trial call was requested
+  // If no PAYMENT-SIGNATURE header, check if a provider-sponsored trial call was requested.
+  // Quotas bind only this sponsored path (#61): the paid path below never consults the engine.
   if (!paymentSignatureHeader) {
-    if (pathname === "/v1/demo/summarize" && trialRequested) {
-      const trial = trialTracker.checkAndConsume(trialQuotaKey);
-      if (trial.allowed) {
+    const campaign = quotaEngine.campaignForEndpoint(pathname);
+    const estimatedTokens = campaign === undefined ? 0 : estimateDemoTokens(rawBody);
+    if (campaign !== undefined && trialRequested) {
+      // Reserved before any upstream compute runs, so an exhausted quota spends nothing (#16).
+      const trial = quotaEngine.checkAndReserve({
+        campaignId: campaign.campaignId,
+        callerId: trialQuotaKey,
+        endpoint: pathname,
+        estimatedTokens,
+      });
+      if (trial.sponsored) {
+        let summary: ReturnType<typeof summarize>;
+        try {
+          summary = summarize(rawBody);
+        } catch (err) {
+          quotaEngine.release(trial.reservation);
+          throw err;
+        }
+        // The stubs meter no upstream cost, so each sponsored call settles at the campaign's
+        // configured per-call estimate (0 by default: the stubs sponsor no real compute, ADR-0016).
+        quotaEngine.settle(trial.reservation, campaign.estimatedCostMicrosPerCall);
         const trialReceipt: X402Receipt = {
           x402Version: 2,
           success: true,
@@ -195,6 +217,7 @@ export async function handleDemoRequest(
           idempotencyKey,
           settledAt: new Date().toISOString(),
           sponsored: true,
+          campaignId: trial.campaignId,
           disclaimer: `${SANDBOX_DISCLAIMER} — ${trial.disclosure}`,
         };
         const receiptHeaderB64 = Buffer.from(JSON.stringify(trialReceipt), "utf8").toString(
@@ -206,8 +229,9 @@ export async function handleDemoRequest(
           {
             serviceId: DEMO_SERVICE_ID,
             endpoint: pathname,
-            ...summarize(rawBody),
+            ...summary,
             sponsored: true,
+            campaignId: trial.campaignId,
             sponsorDisclosure: trial.disclosure,
             trialQuotaRemaining: trial.remainingCallerQuota,
             disclaimer: SANDBOX_DISCLAIMER,
@@ -219,13 +243,36 @@ export async function handleDemoRequest(
         );
         return;
       }
+      if (trial.fallback === "reject") {
+        // Trial-only endpoint: no paid fallback exists, so the exhausted quota rejects here,
+        // before any tANE is settled or upstream compute invoked.
+        if (trial.retryAfterSeconds !== undefined) {
+          res.setHeader("retry-after", trial.retryAfterSeconds.toString());
+        }
+        const budgetLike = trial.reason === "sponsor-budget-exhausted" || trial.reason === "service-velocity-exceeded";
+        sendError(
+          res,
+          trial.rejectStatus,
+          budgetLike ? "ANE-E-1305" : "ANE-E-1304",
+          budgetLike
+            ? `Sponsor compute budget exhausted for this trial-only endpoint; ${trial.disclosure}`
+            : `Sponsored trial quota used up for this trial-only endpoint (${trial.reason}); ${trial.disclosure}`,
+          true,
+        );
+        return;
+      }
     }
 
-    const challenge = verifier.build402Challenge(
-      endpointConfig,
-      fullUrl.toString(),
-      pathname === "/v1/demo/summarize",
-    );
+    const trialAvailable =
+      campaign === undefined
+        ? false
+        : quotaEngine.peek({
+            campaignId: campaign.campaignId,
+            callerId: trialQuotaKey,
+            endpoint: pathname,
+            estimatedTokens,
+          }).sponsored;
+    const challenge = verifier.build402Challenge(endpointConfig, fullUrl.toString(), trialAvailable);
     sendJson(res, challenge.status, challenge.body, challenge.headers);
     return;
   }

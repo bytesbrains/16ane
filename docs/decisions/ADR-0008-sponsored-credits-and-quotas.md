@@ -48,4 +48,4 @@ Adopt **Option A**:
 - Concurrent requests racing for the last unit of a sponsor's compute budget; mitigated by atomic reservation (pre-debiting estimated max request cost before upstream invocation and reconciling actual cost on completion).
 
 ## Validation plan
-- Automated test (`THREAT_MODEL.md` #8 & `SCENARIOS.md` S3): Fund an agent with `1,000,000 tANE`, configure a campaign with `max_calls_per_wallet = 3` and `provider_cost_budget = $0.05`, and verify the 4th call or budget-exceeding call is rejected without invoking upstream compute.
+- Automated tests (`THREAT_MODEL.md` #8 & `SCENARIOS.md` S3, #16): `e2e/flows/sponsored-budget.test.ts` funds an agent with `1,000,000 tANE` and verifies the 6th call past `max_calls_per_wallet = 5`, or the call past `provider_cost_budget = $1.00`, is not sponsored but falls back to the paid `402` quote (#61); trial-only endpoints answer `429`/`503` with no tANE settled. `packages/sdk-ts/test/campaigns.test.ts` covers the atomic budget race, velocity, tokens, window, eligibility and pause/resume.

@@ -18,7 +18,7 @@ Facts about the server that constrain where it can run (checked against `main`, 
 1. **It runs Foundry's `cast` as a child process** to send every transaction (`AneClient.sendContractTx`).
    The host must run a Node process **and** the Foundry binary. A Workers-style runtime can't spawn processes.
 2. **All state is in memory:** faucet cooldowns (`RecipientCooldowns`), claim records, the service directory,
-   trial quotas (`TrialQuotaTracker`), and x402 idempotency records and receipts (`AnePaymentVerifier`). A restart
+   sponsored-trial campaigns and quotas (`SponsoredQuotaEngine`), and x402 idempotency records and receipts (`AnePaymentVerifier`). A restart
    or second instance loses them: cooldowns reset, and idempotency stops protecting against double charges.
 3. **No start command:** only `e2e/harness.ts` constructs the server. `server.listen` is hard-coded to
    `127.0.0.1`, so a container couldn't accept traffic as is.

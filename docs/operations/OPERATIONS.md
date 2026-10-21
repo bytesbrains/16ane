@@ -10,7 +10,7 @@ RPC provider and alternate, contract explorer, faucet wallet and mint authority,
 - Faucet depleted: pause grants, replenish transparently, keep transfers functioning.
 - RPC degraded: fail over; warn of indexer lag; never claim payment failure solely from stale index.
 - Payment stuck: expose pending state; retry verification not payment; reconcile by idempotency key.
-- Sponsor budget exceeded: immediately stop real compute while retaining simulated settlement and refund policy.
+- Sponsor budget exceeded: sponsorship stops by itself (the campaign latches `PAUSED_BUDGET_EXHAUSTED`, visible on `GET /v1/campaigns` and `/healthz`) while paid settlement keeps working. To stop sooner, `POST /v1/campaigns/{id}/pause` with the provider's key; to restart after raising the budget, `POST /v1/campaigns/{id}/resume`.
 - Agent signer compromised: owner revokes and rotates; disclose already settled transactions.
 - Contract vulnerability: publish impact, admin capabilities, pause/migration plan, independent review and user notices.
 - Chain reset: publish migration/version strategy; testnet tokens carry no value or continuity guarantee.

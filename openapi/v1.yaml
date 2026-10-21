@@ -187,11 +187,85 @@ paths:
           description: Invalid manifest signature
   /v1/campaigns:
     get:
-      summary: List active provider-sponsored trial quota campaigns
+      summary: List provider-sponsored trial campaigns with quotas, spend and live status
+      description: >-
+        Each campaign carries its caps (maxCallsPerWallet, maxCallsGlobalPerDay,
+        maxTokensPerRequest, providerCostBudgetMicros), lifetime spend, today's calls, window
+        (startsAt/expiresAt), eligibility, stored and effective status, trial-only endpoints and
+        the sponsor disclosure. Quotas bind only sponsored cost: past them a call falls back to
+        the endpoint's normal paid 402 quote, unless the endpoint is trial-only.
       operationId: listCampaigns
       responses:
         "200":
           description: Sponsored trial campaigns
+  /v1/campaigns/{id}/pause:
+    post:
+      summary: Pause a campaign's sponsorship now; paid calls are unaffected
+      description: >-
+        The provider's circuit breaker. The body carries a deadline (unix seconds, within the
+        next hour) and the provider's EIP-191 signature over the campaign control message
+        (`16ane campaign control`, provider, campaign, action, deadline); only the campaign
+        provider's key is accepted. A restart never unpauses a campaign.
+      operationId: pauseCampaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deadline, signature]
+              properties:
+                deadline:
+                  type: integer
+                signature:
+                  type: string
+      responses:
+        "200":
+          description: Campaign paused (or already paused)
+        "403":
+          description: Not signed by the campaign provider, or the deadline is out of range (ANE-E-1302)
+        "404":
+          description: Unknown campaign (ANE-E-1301)
+  /v1/campaigns/{id}/resume:
+    post:
+      summary: Resume a paused campaign
+      description: >-
+        Same authorization as pause. Refused with 409 while the sponsor budget is still spent
+        or the campaign window has passed.
+      operationId: resumeCampaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [deadline, signature]
+              properties:
+                deadline:
+                  type: integer
+                signature:
+                  type: string
+      responses:
+        "200":
+          description: Campaign resumed
+        "403":
+          description: Not signed by the campaign provider (ANE-E-1302)
+        "404":
+          description: Unknown campaign (ANE-E-1301)
+        "409":
+          description: Budget still spent or window passed (ANE-E-1303)
   /v1/demo/summarize:
     post:
       summary: Deterministic text summarization (16 tANE via x402 v2, or 1 free sponsored trial call)
@@ -203,6 +277,10 @@ paths:
           description: Payment Required with PAYMENT-REQUIRED base64 quote header
         "409":
           description: Idempotency-Key conflict or replay rejected
+        "429":
+          description: Trial-only endpoint whose sponsored quota is spent (ANE-E-1304)
+        "503":
+          description: Trial-only endpoint whose sponsor budget is spent (ANE-E-1305)
   /v1/demo/clean-data:
     post:
       summary: Deterministic JSON array deduplication and normalization (32 tANE via x402 v2)

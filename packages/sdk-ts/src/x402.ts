@@ -43,6 +43,8 @@ export interface X402Receipt {
   idempotencyKey?: string;
   settledAt: string;
   sponsored?: boolean;
+  /** The sponsoring campaign (ADR-0008); set on sponsored-trial receipts only. */
+  campaignId?: string;
   disclaimer: string;
 }
 

@@ -89,7 +89,9 @@ export async function runStandaloneSmoke(opts: StandaloneSmokeOptions): Promise<
   const supported = (await (await fetch(`${opts.facilitatorUrl}/supported`)).json()) as {
     kinds: Array<{ scheme: string; network: string }>;
   };
-  const kinds = supported.kinds.map((k) => `${k.scheme}@${k.network}`).sort();
+  // Explicit code-unit order, not localeCompare: the same input must compare the same on every host.
+  const byCodeUnit = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  const kinds = supported.kinds.map((k) => `${k.scheme}@${k.network}`).sort(byCodeUnit);
   if (kinds.join(",") !== `ane-vault-v1@${network},exact@${network}`) {
     throw new Error(`unexpected /supported kinds: ${JSON.stringify(supported.kinds)}`);
   }
@@ -133,8 +135,12 @@ export async function runStandaloneSmoke(opts: StandaloneSmokeOptions): Promise<
   if (vaultSettle.status !== 200 || vaultSettle.json.success !== true) {
     throw new Error(`vault /settle failed: ${vaultSettle.status} ${JSON.stringify(vaultSettle.json)}`);
   }
+  const vaultTx = vaultSettle.json.transaction;
+  if (typeof vaultTx !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(vaultTx)) {
+    throw new Error(`vault /settle returned a malformed transaction hash: ${JSON.stringify(vaultTx)}`);
+  }
   const vaultCheck = await client.verifySettlementOnChain({
-    txHash: vaultSettle.json.transaction,
+    txHash: vaultTx,
     expectedAsset: contracts.aneTestToken,
     expectedPayee: merchant,
     expectedAmount: PAYMENT,
@@ -143,7 +149,7 @@ export async function runStandaloneSmoke(opts: StandaloneSmokeOptions): Promise<
   });
   if (!vaultCheck.verified) throw new Error(`vault settlement did not verify: ${vaultCheck.reason}`);
   if ((await client.getTokenBalance(merchant)) !== PAYMENT) throw new Error("merchant did not receive the vault payment");
-  log(`vault payment settled in ${vaultSettle.json.transaction} and verified on-chain`);
+  log(`vault payment settled in ${vaultTx} and verified on-chain`);
   const vaultRetry = await postJson(`${opts.facilitatorUrl}/settle`, vaultRequest);
   if (vaultRetry.json.success !== true || vaultRetry.json.extra?.replayed !== true) {
     throw new Error(`vault /settle retry did not replay the receipt: ${JSON.stringify(vaultRetry.json)}`);
@@ -177,10 +183,14 @@ export async function runStandaloneSmoke(opts: StandaloneSmokeOptions): Promise<
   if (exactSettle.status !== 200 || exactSettle.json.success !== true) {
     throw new Error(`exact /settle failed: ${exactSettle.status} ${JSON.stringify(exactSettle.json)}`);
   }
+  const exactTx = exactSettle.json.transaction;
+  if (typeof exactTx !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(exactTx)) {
+    throw new Error(`exact /settle returned a malformed transaction hash: ${JSON.stringify(exactTx)}`);
+  }
   if ((await client.getTokenBalance(exactMerchant)) !== PAYMENT) {
     throw new Error("merchant did not receive the exact payment");
   }
-  log(`exact payment settled in ${exactSettle.json.transaction}; payer held no ETH`);
+  log(`exact payment settled in ${exactTx}; payer held no ETH`);
 
   // --- the indexer follows the directory ---------------------------------------------------
   // Unique per run, so a rerun against the same chain (restart check) waits for its own anchor
@@ -225,6 +235,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error("Set RPC_URL, REGISTRY_ADDRESS, OWNER_KEY, FACILITATOR_URL and INDEXER_URL.");
     process.exit(2);
   }
+  // The smoke logs server responses; strip line breaks at the sink so a hostile response cannot
+  // forge log lines.
+  const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ");
   runStandaloneSmoke({
     rpcUrl: RPC_URL,
     registryAddress: REGISTRY_ADDRESS,
@@ -232,11 +245,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     facilitatorUrl: FACILITATOR_URL,
     indexerUrl: INDEXER_URL,
     chainId: CHAIN_ID ? Number(CHAIN_ID) : undefined,
-    log: (line) => console.log(`[smoke] ${line}`),
+    log: (line) => console.log(`[smoke] ${oneLine(line)}`),
   }).then(
     () => console.log("[smoke] PASS"),
     (err) => {
-      console.error(`[smoke] FAIL: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`[smoke] FAIL: ${oneLine(err instanceof Error ? err.message : String(err))}`);
       process.exit(1);
     },
   );

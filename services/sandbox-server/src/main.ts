@@ -8,6 +8,7 @@
 // ANE_TRIAL_ONLY_PATHS, ANE_STATE_PATH (SQLite file; without it state is in memory and lost on restart).
 import { ConfigError, parseServerConfig } from "./config.ts";
 import { createSandboxServer } from "./server.ts";
+import { handleShutdownSignals, reportMainFailure } from "./service-shared.ts";
 import { SqliteKeyValueStore } from "./sqlite-store.ts";
 
 async function main(): Promise<void> {
@@ -33,25 +34,10 @@ async function main(): Promise<void> {
       `registry ${config.registryAddress}, provider ${sandbox.providerAddress}`,
   );
 
-  let stopping = false;
-  const stop = (signal: string) => {
-    if (stopping) return;
-    stopping = true;
-    console.log(`[16ane-sandbox] ${signal} received, closing`);
-    sandbox.close().then(
-      () => {
-        store?.close();
-        process.exit(0);
-      },
-      () => process.exit(1),
-    );
-  };
-  process.on("SIGTERM", () => stop("SIGTERM"));
-  process.on("SIGINT", () => stop("SIGINT"));
+  handleShutdownSignals("16ane-sandbox", async () => {
+    await sandbox.close();
+    store?.close();
+  });
 }
 
-main().catch((err) => {
-  // Startup failures (e.g. an unreachable RPC) - the message never contains key values (ADR-0010).
-  console.error(`[16ane-sandbox] failed to start: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+main().catch((err) => reportMainFailure("16ane-sandbox", err));

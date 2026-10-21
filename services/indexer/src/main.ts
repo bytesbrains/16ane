@@ -8,6 +8,7 @@
 // are in memory and a restart rescans from ANE_INDEX_FROM_BLOCK).
 import { ConfigError, parseIndexerConfig } from "./config.ts";
 import { createIndexerServer } from "./server.ts";
+import { handleShutdownSignals, reportMainFailure } from "../../sandbox-server/src/service-shared.ts";
 import { SqliteKeyValueStore } from "../../sandbox-server/src/sqlite-store.ts";
 
 async function main(): Promise<void> {
@@ -30,24 +31,10 @@ async function main(): Promise<void> {
       `registry ${config.registryAddress}`,
   );
 
-  let stopping = false;
-  const stop = (signal: string) => {
-    if (stopping) return;
-    stopping = true;
-    console.log(`[16ane-indexer] ${signal} received, closing`);
-    indexer.close().then(
-      () => {
-        store?.close();
-        process.exit(0);
-      },
-      () => process.exit(1),
-    );
-  };
-  process.on("SIGTERM", () => stop("SIGTERM"));
-  process.on("SIGINT", () => stop("SIGINT"));
+  handleShutdownSignals("16ane-indexer", async () => {
+    await indexer.close();
+    store?.close();
+  });
 }
 
-main().catch((err) => {
-  console.error(`[16ane-indexer] failed to start: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+main().catch((err) => reportMainFailure("16ane-indexer", err));

@@ -1,27 +1,17 @@
 import http from "node:http";
 import {
-  AneClient,
+  type AneClient,
   AnePaymentVerifier,
-  privateKeyToAddress,
   SANDBOX_DISCLAIMER,
-  SecretKey,
   type KeyValueStore,
   MemoryKeyValueStore,
 } from "../../../packages/sdk-ts/src/index.ts";
+import { DEFAULT_MAX_BODY_BYTES, sendError, sendJson } from "../../sandbox-server/src/http.ts";
 import {
-  DEFAULT_RELAYER_GAS_BUDGET_WEI,
-  type GasReservation,
-  RelayerGasBudget,
-  RelayerGasBudgetExceededError,
-  sendBudgetExhausted,
-} from "../../sandbox-server/src/gas-budget.ts";
-import {
-  DEFAULT_MAX_BODY_BYTES,
-  PayloadTooLargeError,
-  sendError,
-  sendJson,
-  sendLoggedError,
-} from "../../sandbox-server/src/http.ts";
+  createRelayerClient,
+  fetchRelayerHealth,
+  sendServerError,
+} from "../../sandbox-server/src/service-shared.ts";
 import { handleSettle, handleVerify, supportedBody, type FacilitatorContext } from "./facilitator.ts";
 
 export interface FacilitatorServerConfig {
@@ -52,28 +42,14 @@ export async function createFacilitatorServer(config: FacilitatorServerConfig): 
 }> {
   const chainId = config.chainId ?? 84532;
   const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
-  const relayerKey =
-    config.relayerPrivateKey instanceof SecretKey
-      ? config.relayerPrivateKey
-      : new SecretKey(config.relayerPrivateKey);
-  const relayerAddress = privateKeyToAddress(relayerKey);
   const store = config.store ?? new MemoryKeyValueStore();
-  // Every settlement the relayer pays for reserves gas from its daily budget before it is sent,
-  // and is counted at its actual fee once mined. The only limit on this path is cost (#61).
-  const gasBudget = new RelayerGasBudget(store, config.relayerGasBudgetWei ?? DEFAULT_RELAYER_GAS_BUDGET_WEI);
-  const client = new AneClient({
+  const { client, gasBudget, relayerKey, relayerAddress } = createRelayerClient({
     rpcUrl: config.rpcUrl,
     chainId,
     registryAddress: config.registryAddress,
-    sendHooks: {
-      before: (from) => (from === relayerAddress ? gasBudget.reserve() : undefined),
-      after: (_from, feeWei, _txHash, ticket) => {
-        if (ticket) gasBudget.settle(ticket as GasReservation, feeWei);
-      },
-      failed: (_from, ticket) => {
-        if (ticket) gasBudget.release(ticket as GasReservation);
-      },
-    },
+    relayerPrivateKey: config.relayerPrivateKey,
+    store,
+    relayerGasBudgetWei: config.relayerGasBudgetWei,
   });
   const contracts = await client.resolveContracts();
   const verifier = new AnePaymentVerifier({ client, relayerKey, store });
@@ -96,22 +72,12 @@ export async function createFacilitatorServer(config: FacilitatorServerConfig): 
 
       if (method === "GET" && pathname === "/healthz") {
         try {
-          const blockHex = await client.rpcCall<string>("eth_blockNumber", []);
-          const balanceWei = BigInt(await client.rpcCall<string>("eth_getBalance", [relayerAddress, "latest"]));
+          const health = await fetchRelayerHealth(client, gasBudget, relayerAddress);
           sendJson(res, 200, {
             status: "ok",
             chainId,
             registry: contracts.registry,
-            blockNumber: Number(BigInt(blockHex)),
-            relayer: {
-              address: relayerAddress,
-              balanceWei: balanceWei.toString(),
-              dailyGasBudgetWei: gasBudget.dailyBudgetWei.toString(),
-              spentTodayWei: gasBudget.spentTodayWei().toString(),
-              reservedTodayWei: gasBudget.reservedTodayWei().toString(),
-              remainingTodayWei: gasBudget.remainingTodayWei().toString(),
-              lowBalance: gasBudget.isLowBalance(balanceWei),
-            },
+            ...health,
             disclaimer: SANDBOX_DISCLAIMER,
           });
         } catch {
@@ -148,21 +114,7 @@ export async function createFacilitatorServer(config: FacilitatorServerConfig): 
 
       sendError(res, 404, "ANE-E-4040", `Route not found: ${method} ${pathname}`, false);
     } catch (err) {
-      if (err instanceof PayloadTooLargeError) {
-        res.setHeader("connection", "close");
-        sendError(res, 413, "ANE-E-4130", err.message, false);
-        return;
-      }
-      if (err instanceof RelayerGasBudgetExceededError) {
-        sendBudgetExhausted(res, err, "settle the payment yourself with your own gas");
-        return;
-      }
-      // JSON.parse and BigInt throw SyntaxError on malformed client input; their messages only echo that input.
-      if (err instanceof SyntaxError) {
-        sendError(res, 400, "ANE-E-4000", `Malformed request body: ${err.message}`, false);
-        return;
-      }
-      sendLoggedError(res, 500, "ANE-E-5000", "Internal server error", true, err);
+      sendServerError(res, err, "settle the payment yourself with your own gas");
     }
   });
 

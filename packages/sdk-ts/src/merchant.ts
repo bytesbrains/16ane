@@ -235,6 +235,14 @@ export class AnePaymentVerifier {
     }
 
     const expectedResourceHash = computeResourceHash(params.method, params.canonicalUrl);
+    // The client signs the URL it called, but a TLS-terminating proxy hides the scheme from the
+    // server (our reference server only ever sees http): accept the hash for either scheme (#109).
+    // The scheme is not a security boundary — host, path, method and query stay bound either way.
+    const swapScheme = (url: string) =>
+      url.replace(/^https?:\/\//i, (m) => (m.toLowerCase() === "https://" ? "http://" : "https://"));
+    const expectedResourceHashes = [params.canonicalUrl, swapScheme(params.canonicalUrl)].map((u) =>
+      computeResourceHash(params.method, u).toLowerCase(),
+    );
     const expectedRequestHash = computeRequestHash(params.rawBody);
     const requiredAmount = BigInt(params.endpoint.priceAmount);
     const expectedPayTo = toChecksumAddress(params.endpoint.payTo);
@@ -248,8 +256,7 @@ export class AnePaymentVerifier {
         txHash?: string;
       };
       if (
-        (p.resourceHash &&
-          p.resourceHash.toLowerCase() !== expectedResourceHash.toLowerCase()) ||
+        (p.resourceHash && !expectedResourceHashes.includes(p.resourceHash.toLowerCase())) ||
         (p.requestHash && p.requestHash.toLowerCase() !== expectedRequestHash.toLowerCase())
       ) {
         return {

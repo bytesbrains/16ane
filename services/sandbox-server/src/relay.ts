@@ -26,7 +26,7 @@ import {
   transferCalldata,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { refuseAboveFeeCeiling, RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
-import { readRequestBody, redactUrls, sendError, sendJson, sendLoggedError } from "./http.ts";
+import { type LoggedErrorSink, readRequestBody, redactUrls, sendError, sendJson, sendLoggedError } from "./http.ts";
 
 // POST /v1/relay (#77, ADR-0006): the relayer submits an owner-signed action and pays its gas, so a tANE holder
 // never needs ETH. Only four actions on three kinds of target are relayed: a tANE transfer (EIP-3009; also how a
@@ -53,6 +53,8 @@ export interface RelayContext {
   maxBodyBytes: number;
   /** Signatures being sent, so a concurrent duplicate is refused instead of reverting on-chain. */
   inFlight: Set<string>;
+  /** Per-server sink for sendLoggedError (Sentry when ANE_SENTRY_DSN is set; #90). */
+  loggedErrorSink?: LoggedErrorSink;
 }
 
 class Refusal extends Error {
@@ -270,7 +272,7 @@ export async function handleRelay(ctx: RelayContext, req: http.IncomingMessage, 
       if (err instanceof RelayerGasBudgetExceededError) {
         return sendBudgetExhausted(res, err, "submit it yourself with your own gas");
       }
-      sendLoggedError(res, 502, "ANE-E-1206", "The relayed transaction could not be completed; try again later", true, err);
+      sendLoggedError(res, 502, "ANE-E-1206", "The relayed transaction could not be completed; try again later", true, err, ctx.loggedErrorSink);
     }
   } finally {
     ctx.inFlight.delete(key);

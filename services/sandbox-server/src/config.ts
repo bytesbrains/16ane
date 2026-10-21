@@ -85,6 +85,11 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
   if (turnstileExpectedHostname !== undefined && !turnstileSecretKey) {
     problems.push("ANE_TURNSTILE_HOSTNAME needs ANE_TURNSTILE_SECRET_KEY");
   }
+  // Optional; an unusable value is ignored at report time with a startup-style warning from the reporter.
+  const sentryDsn = get("ANE_SENTRY_DSN");
+  if (sentryDsn !== undefined && !/^https?:\/\//.test(sentryDsn)) {
+    problems.push("ANE_SENTRY_DSN must be an http(s) Sentry DSN when set");
+  }
 
   if (problems.length > 0) throw new ConfigError(problems);
   return {
@@ -105,5 +110,6 @@ export function parseServerConfig(env: Record<string, string | undefined>): Sand
     turnstileExpectedHostname,
     trialFreeCallsPerCaller,
     trialGlobalDailyCap,
+    sentryDsn,
   };
 }

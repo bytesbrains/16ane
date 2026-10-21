@@ -14,7 +14,7 @@ import {
   toChecksumAddress,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { refuseAboveFeeCeiling, RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
-import { clientIp, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
+import { clientIp, type LoggedErrorSink, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
 
 export interface FaucetConfig {
   claimAmount: bigint;
@@ -142,6 +142,8 @@ export interface FaucetContext {
   inFlight: Set<string>;
   /** The relayer's gas-price ceiling (ADR-0006); unset: none. */
   maxFeeWei?: bigint;
+  /** Per-server sink for sendLoggedError (Sentry when ANE_SENTRY_DSN is set; #90). */
+  loggedErrorSink?: LoggedErrorSink;
 }
 
 export interface ClaimStatusRecord {
@@ -251,7 +253,7 @@ export async function handleFaucetClaim(
           throw new Error(`relayedNonceUsed returned ${JSON.stringify(used)}`);
         }
       } catch (err) {
-        sendLoggedError(res, 502, "ANE-E-1004", "Faucet could not check the claim on-chain; try again later", true, err);
+        sendLoggedError(res, 502, "ANE-E-1004", "Faucet could not check the claim on-chain; try again later", true, err, ctx.loggedErrorSink);
         return;
       }
       if (BigInt(used) !== 0n) {
@@ -264,7 +266,7 @@ export async function handleFaucetClaim(
       try {
         refusal = await ctx.turnstile!.check(turnstileToken, clientIp(req, ctx.trustProxy, ctx.clientIpHeader));
       } catch (err) {
-        sendLoggedError(res, 503, "ANE-E-1010", "Turnstile verification is unavailable; try again later", true, err);
+        sendLoggedError(res, 503, "ANE-E-1010", "Turnstile verification is unavailable; try again later", true, err, ctx.loggedErrorSink);
         return;
       }
       if (refusal) {
@@ -298,7 +300,7 @@ export async function handleFaucetClaim(
         sendBudgetExhausted(res, err, selfServe);
         return;
       }
-      sendLoggedError(res, 502, "ANE-E-1004", "Faucet claim could not be completed on-chain; try again later", true, err);
+      sendLoggedError(res, 502, "ANE-E-1004", "Faucet claim could not be completed on-chain; try again later", true, err, ctx.loggedErrorSink);
     }
   } finally {
     ctx.inFlight.delete(key);

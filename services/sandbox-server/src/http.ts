@@ -35,9 +35,14 @@ export function redactUrls(text: string): string {
   return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, "<url>");
 }
 
+/** Optional per-server sink for sendLoggedError (Sentry when ANE_SENTRY_DSN is set; #90). */
+export type LoggedErrorSink = (info: { code: string; errorId: string; detail: string }) => void;
+
 // For failures whose underlying error may carry internal detail (RPC responses, chain-client
 // errors): the client gets a fixed message and an id; the detail is logged server-side with URLs
-// redacted, under the same id (ADR-0010).
+// redacted, under the same id (ADR-0010). When a sink is passed it gets the same fields only —
+// never the request, headers or client IP (#90). The sink travels in each handler context, never
+// in module state, so two servers in one process (or a failed startup) can't cross-report.
 export function sendLoggedError(
   res: http.ServerResponse,
   status: number,
@@ -45,10 +50,12 @@ export function sendLoggedError(
   publicMessage: string,
   retryable: boolean,
   cause: unknown,
+  sink?: LoggedErrorSink,
 ): void {
   const errorId = randomUUID();
   const detail = cause instanceof Error ? cause.message : String(cause);
   console.error(`[16ane-sandbox] ${code} ${errorId}: ${redactUrls(detail)}`);
+  sink?.({ code, errorId, detail });
   sendJson(res, status, {
     error: { code, message: publicMessage, retryable, errorId, disclaimer: SANDBOX_DISCLAIMER },
   });

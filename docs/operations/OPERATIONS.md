@@ -32,6 +32,15 @@ Deployment, secrets and rollback: `DEPLOY_API.md`.
 A relayer or provider key that may be exposed: generate a new one into Fly secrets (`DEPLOY_API.md` step 1),
 redeploy, and move any remaining test ETH from the old address. Both hold only test assets.
 
+### Error tracking (Sentry, #90)
+Every 5xx already carries an `errorId` (ADR-0010). When `ANE_SENTRY_DSN` is set as a Fly secret
+(`DEPLOY_API.md` step 1; self-host default: off), `sendLoggedError` also posts a scrubbed event tagged
+with that `errorId`. Each event holds only `code`, `errorId`, and a URL/key-redacted message — never
+request bodies, headers, query strings, client IPs, signatures, or Turnstile tokens.
+On a new error kind (new fingerprint): find the `errorId` in `fly logs`, reproduce, fix, and redeploy;
+a repeat with a new `errorId` but the same fingerprint is the same bug. Rotate nothing: the DSN is a
+write-only ingest key, not a credential — but keep it in Fly secrets anyway.
+
 ## Metrics and dashboards
 On-chain transfer counts, unique wallets (not unique humans), agent task completion, payments verified, merchant delivery success, provider sponsored actual costs, faucet claims/abuse rate, RPC latency, revocations, refunds and unresolved disputes. Clearly separate testnet activity from real economic transactions.
 

@@ -36,6 +36,7 @@ import {
   sendJson,
   sendLoggedError,
 } from "./http.ts";
+import { createSentryReporter, type SentryFetch } from "./sentry.ts";
 
 export interface SandboxServerConfig {
   port?: number;
@@ -67,6 +68,13 @@ export interface SandboxServerConfig {
   /** Overrides Cloudflare's siteverify endpoint; for tests. */
   turnstileSiteverifyUrl?: string;
   maxBodyBytes?: number;
+  /**
+   * Sentry DSN for scrubbed error events from sendLoggedError (#90). Unset means off (self-host
+   * default). Posts directly to Sentry's envelope HTTP API — no npm dependency.
+   */
+  sentryDsn?: string;
+  /** Overrides `fetch` for Sentry POSTs; for tests. */
+  sentryFetch?: SentryFetch;
 }
 
 export type { ClaimStatusRecord } from "./faucet.ts";
@@ -116,6 +124,10 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   const contracts = await client.resolveContracts();
   const faucetConfig = await readFaucetConfig(client, contracts.aneFaucet);
   const verifier = new AnePaymentVerifier({ client, relayerKey, store });
+  // Optional Sentry sink, created after the fallible chain reads above so a failed startup leaves
+  // no state behind. It travels in each handler context (never a module global), so two servers in
+  // one process can't cross-report; unset DSN keeps reporting off.
+  const sentrySink = createSentryReporter(config.sentryDsn, config.sentryFetch);
   const relay: RelayContext = {
     client,
     relayerKey,
@@ -125,6 +137,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     maxFeeWei: config.relayerMaxFeeWei,
     maxBodyBytes,
     inFlight: new Set(),
+    loggedErrorSink: sentrySink,
   };
   const faucet: FaucetContext = {
     client,
@@ -146,6 +159,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     maxBodyBytes,
     inFlight: new Set(),
     maxFeeWei: config.relayerMaxFeeWei,
+    loggedErrorSink: sentrySink,
   };
 
   const freeCallsPerCaller = config.trialFreeCallsPerCaller ?? 1;
@@ -171,6 +185,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
     trustProxy,
     clientIpHeader: config.clientIpHeader,
     maxBodyBytes,
+    loggedErrorSink: sentrySink,
   };
 
   const buildSignedManifest = (): ServiceManifestPayload => {
@@ -443,7 +458,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
         sendError(res, 400, "ANE-E-4000", `Malformed request body: ${err.message}`, false);
         return;
       }
-      sendLoggedError(res, 500, "ANE-E-5000", "Internal server error", true, err);
+      sendLoggedError(res, 500, "ANE-E-5000", "Internal server error", true, err, sentrySink);
     }
   });
 

@@ -1,6 +1,6 @@
 # ADR-0010: API Authentication, Rate Limits, Privacy, and Log Retention
 
-- **Status:** Accepted (2026-10-19); amended 2026-10-20 (#61)
+- **Status:** Accepted (2026-10-19); amended 2026-10-20 (#61), 2026-10-21 (#90)
 - **Date and owners:** 2026-10-19 | 16ane Security & Operations Maintainers
 - **Related requirements:** REQ-002, REQ-003, REQ-015, REQ-PRIV, REQ-OBS
 - **Related epics:** E02, E05, E10, E11, E15
@@ -41,6 +41,7 @@ Adopt **Option A**:
    - Structured JSON logs correlate `correlation_id`, `quote_id`, `payment_id`, `tx_hash`, `service_id`, `latency_ms`, and `status`.
    - Automatic log scrubber strips `Authorization`, `X-API-Key`, private keys (`0x[0-9a-fA-F]{64}`), seed phrases, and request/response prompt bodies by default.
    - Ephemeral operational logs expire after `7 days`; salted faucet rate-limit keys expire after `24 hours`.
+   - Error tracking (#90): when `ANE_SENTRY_DSN` is set, `sendLoggedError` posts only `code`, `errorId`, and a scrubbed message (URLs, 32-byte-or-longer hex, `Authorization`/`Bearer` material, and whole Turnstile pairs removed) to Sentry's envelope HTTP API — never request bodies, headers, query strings, client IPs, signatures, or Turnstile tokens. Unset means off, so self-hosters stay off by default.
 
 ## Consequences
 - Developers can use the sandbox immediately from CLI or SDK without creating a custodial account or handing over personal data.

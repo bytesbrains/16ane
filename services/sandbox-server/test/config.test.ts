@@ -82,6 +82,18 @@ test("faucet proofs (#79): required by default; open claims and Turnstile are op
   );
 });
 
+test("ANE_SENTRY_DSN (#90): unset stays off; a non-http value is rejected", () => {
+  assert.equal(parseServerConfig(BASE).sentryDsn, undefined);
+  assert.equal(
+    parseServerConfig({ ...BASE, ANE_SENTRY_DSN: "https://key@o0.ingest.sentry.io/12345" }).sentryDsn,
+    "https://key@o0.ingest.sentry.io/12345",
+  );
+  assert.throws(
+    () => parseServerConfig({ ...BASE, ANE_SENTRY_DSN: "not-a-dsn" }),
+    (err: unknown) => err instanceof ConfigError && err.problems.includes("ANE_SENTRY_DSN must be an http(s) Sentry DSN when set"),
+  );
+});
+
 test("ANE_RELAYER_MAX_FEE_WEI is a whole number of wei, unset by default", () => {
   assert.equal(parseServerConfig(BASE).relayerMaxFeeWei, undefined);
   assert.equal(parseServerConfig({ ...BASE, ANE_RELAYER_MAX_FEE_WEI: "1000000000" }).relayerMaxFeeWei, 1_000_000_000n);

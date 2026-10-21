@@ -31,6 +31,7 @@ Nothing has been released yet: no version is tagged, and no package is published
 - Community files: `LICENSE` (MIT), `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue and PR templates, `CODEOWNERS`.
 
 ### Changed
+- E2E scenarios S1–S6 live in `e2e/scenarios/` (#65); `e2e/run-scenarios.ts` only boots the shared stack and runs them in order. No behaviour change.
 - Faucet and relayer limits sized for agent-speed use (#61): faucet defaults 16,000 tANE per claim, 1 hour cooldown per recipient, 160 M tANE per day (were 1,600 / 24 h / 1.6 M); ADR-0006, ADR-0008 and ADR-0010 amended so the payment path carries no protocol rate limits or count caps, and operator-paid resources are limited by cost only.
 - tANE described as the shared sandbox currency across platforms: providers can price sandbox, demo and introductory/offer-credit tiers in tANE, and agents pay every participating provider from one balance (README, VISION, TOKENOMICS, SANDBOX_AND_CREDITS, 16ane.com). No change to tANE's no-value status.
 

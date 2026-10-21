@@ -40,11 +40,15 @@ COPY --chown=root:root services/sandbox-server/src services/sandbox-server/src
 # State (cooldowns, claims, x402 idempotency, consumed proofs, receipts) lives in SQLite under /data, the
 # mount point for a persistent volume (Fly.io). Without a volume it survives restarts but not re-creation.
 RUN mkdir -p /data && chown node:node /data
+# Cap V8 below small-box RAM: Node's multi-GB default heap lets garbage pile up until the kernel
+# OOM-kills the process (Fly killed ours at ~150MB RSS on a 256MB box). With a cap, V8 collects
+# instead, and any genuine leak fails loudly instead of dying silent. Big-box self-hosters can raise it.
 ENV NODE_ENV=production \
     ANE_HOST=0.0.0.0 \
     ANE_PORT=8787 \
     ANE_STATE_PATH=/data/sandbox.sqlite \
-    FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+    FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
+    NODE_OPTIONS=--max-old-space-size=192
 USER node
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

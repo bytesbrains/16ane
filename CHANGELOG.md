@@ -38,6 +38,7 @@ Nothing has been released yet: no version is tagged, and no package is published
 - tANE described as the shared sandbox currency across platforms: providers can price sandbox, demo and introductory/offer-credit tiers in tANE, and agents pay every participating provider from one balance (README, VISION, TOKENOMICS, SANDBOX_AND_CREDITS, 16ane.com). No change to tANE's no-value status.
 
 ### Fixed
+- Hosted API no longer OOMs under relay load: Fly's kernel killed the uncapped Node process (~150MB RSS on the 256MB box). The image now caps V8 at 192MB (`NODE_OPTIONS=--max-old-space-size=192`, so the collector runs before the kernel acts) and the machine is 512MB (`fly.toml`).
 - SDK transactions no longer fail on public load-balanced RPCs right after a previous transaction confirms: `sendContractTx` retries "nonce too low" and "replacement transaction underpriced", which mean the transaction was rejected and never broadcast. The deployment smoke test waits for its own writes to become visible before reading them.
 
 ### Security

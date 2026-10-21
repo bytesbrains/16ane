@@ -51,8 +51,10 @@ export function parseSentryDsn(raw: string | undefined): SentryDsn | undefined {
  */
 export function scrubErrorDetail(text: string): string {
   let out = redactUrls(text);
-  // Private keys are 0x + 64 hex; ECDSA signatures are longer (typically 65 bytes → 130 hex).
-  out = out.replace(/\b0x[0-9a-fA-F]{64,130}\b/g, "<hex>");
+  // Private keys are 0x + 64 hex; signatures, signed transactions and calldata run longer, so any
+  // 0x hex run of 32 bytes or more is redacted with no upper bound (#90, ADR-0010). The lookahead
+  // (not a word boundary) keeps a secret followed by a non-hex word char redacted too.
+  out = out.replace(/\b0x[0-9a-fA-F]{64,}(?![0-9a-fA-F])/g, "<hex>");
   // If a cause message echoed auth material, strip it (request fields themselves are never attached).
   // Bearer first so `Authorization: Bearer <token>` loses the token value too, not just the scheme word.
   out = out.replace(/\bBearer\s+\S+/gi, "Bearer <redacted>");
@@ -108,7 +110,7 @@ export async function postSentryEnvelope(
   fetchImpl: SentryFetch = fetch as SentryFetch,
 ): Promise<void> {
   const { envelope } = buildSentryEnvelope(report, dsn);
-  await fetchImpl(dsn.envelopeUrl, {
+  const res = await fetchImpl(dsn.envelopeUrl, {
     method: "POST",
     headers: {
       "content-type": "application/x-sentry-envelope",
@@ -117,6 +119,11 @@ export async function postSentryEnvelope(
     },
     body: envelope,
   });
+  if (!res.ok) {
+    // No retry: fire-and-forget telemetry must never delay the API response. The warning — status
+    // only, never the DSN — lets operators detect ingest failures instead of silently losing events.
+    console.warn(`[16ane-sandbox] Sentry ingest failed with HTTP ${res.status}; error event dropped`);
+  }
 }
 
 /**

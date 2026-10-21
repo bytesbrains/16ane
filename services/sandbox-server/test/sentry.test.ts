@@ -6,6 +6,7 @@ import {
   buildSentryEnvelope,
   createSentryReporter,
   parseSentryDsn,
+  postSentryEnvelope,
   scrubErrorDetail,
   type SentryFetch,
 } from "../src/sentry.ts";
@@ -38,6 +39,11 @@ test("scrubErrorDetail redacts URLs and 32-byte-or-longer hex, leaves addresses 
     "cast send --rpc-url <url> key=<hex>",
   );
   assert.equal(scrubErrorDetail(`sig ${SIGNATURE}`), "sig <hex>");
+  // Signed transactions and calldata run past 65 bytes: no upper bound may let them through.
+  const calldata = "0x" + "ef".repeat(100);
+  assert.equal(scrubErrorDetail(`calldata ${calldata}`), "calldata <hex>");
+  // A secret followed by a non-hex word char still redacts (no trailing word boundary required).
+  assert.equal(scrubErrorDetail(`key=${PRIVATE_KEY}g`), "key=<hex>g");
   const addr = "0x" + "11".repeat(20);
   assert.equal(scrubErrorDetail(`to ${addr}`), `to ${addr}`);
 });
@@ -183,5 +189,157 @@ test("sendLoggedError posts to Sentry when sentryDsn is set, and never when unse
   } finally {
     await noSentry.close();
     await new Promise<void>((resolve) => rpc.close(() => resolve()));
+  }
+});
+
+test("postSentryEnvelope warns without the DSN on a non-2xx ingest response, stays quiet on success", async () => {
+  const dsn = parseSentryDsn(SAMPLE_DSN)!;
+  const report = { code: "ANE-E-5000", errorId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", detail: "boom" };
+  const warnings: string[] = [];
+  const origWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args.map(String).join(" "));
+  };
+  try {
+    await postSentryEnvelope(dsn, report, async () => ({ ok: false, status: 500 }));
+    await postSentryEnvelope(dsn, report, async () => ({ ok: true, status: 200 }));
+  } finally {
+    console.warn = origWarn;
+  }
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /HTTP 500/);
+  assert.doesNotMatch(warnings[0], /pubKeyExample|ingest\.sentry\.io|12345/);
+});
+
+// Fake RPC: healthy for deploy resolution and startup, then fails so the faucet hits sendLoggedError.
+async function startFlakyRpc(): Promise<{
+  rpcUrl: string;
+  setHealthy: (h: boolean) => void;
+  close: () => Promise<void>;
+}> {
+  let healthy = true;
+  const rpc = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      if (!healthy) {
+        res.writeHead(500, { "content-type": "text/plain" });
+        res.end(`upstream error at ${LEAKY_URL} key=${PRIVATE_KEY}`);
+        return;
+      }
+      const { id } = JSON.parse(body) as { id: number };
+      const result = "0x" + word(0x11) + word(0x22) + word(0x33) + word(0x44);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ jsonrpc: "2.0", id, result }));
+    });
+  });
+  await new Promise<void>((resolve) => rpc.listen(0, "127.0.0.1", () => resolve()));
+  const { port } = rpc.address() as AddressInfo;
+  return {
+    rpcUrl: `http://127.0.0.1:${port}`,
+    setHealthy: (h: boolean) => {
+      healthy = h;
+    },
+    close: () => new Promise<void>((resolve) => rpc.close(() => resolve())),
+  };
+}
+
+test("two servers in one process report to their own Sentry sinks, never each other's", async () => {
+  const postsA: { url: string; body: string }[] = [];
+  const postsB: { url: string; body: string }[] = [];
+  const fetchA: SentryFetch = async (url, init) => {
+    postsA.push({ url, body: init.body });
+    return { ok: true, status: 200 };
+  };
+  const fetchB: SentryFetch = async (url, init) => {
+    postsB.push({ url, body: init.body });
+    return { ok: true, status: 200 };
+  };
+
+  const rpc = await startFlakyRpc();
+  const base = {
+    rpcUrl: rpc.rpcUrl,
+    registryAddress: "0x" + "ab".repeat(20),
+    relayerPrivateKey: "0x" + "1".repeat(64),
+    faucetOpenClaims: true,
+  };
+  const a = await createSandboxServer({
+    ...base,
+    sentryDsn: "https://keyA000000000000000000000001@o0.ingest.sentry.io/111",
+    sentryFetch: fetchA,
+  });
+  const b = await createSandboxServer({
+    ...base,
+    sentryDsn: "https://keyB000000000000000000000002@o0.ingest.sentry.io/222",
+    sentryFetch: fetchB,
+  });
+  rpc.setHealthy(false);
+  try {
+    const claim = (url: string) =>
+      fetch(`${url}/v1/faucet/claims`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ recipient: "0x" + "cd".repeat(20) }),
+      });
+    const resA = await claim(a.url);
+    assert.equal(resA.status, 502);
+    const { error: errA } = (await resA.json()) as { error: { errorId: string } };
+    const resB = await claim(b.url);
+    assert.equal(resB.status, 502);
+    const { error: errB } = (await resB.json()) as { error: { errorId: string } };
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    assert.equal(postsA.length, 1);
+    assert.equal(postsB.length, 1);
+    assert.match(postsA[0].url, /\/111\/envelope\/$/);
+    assert.match(postsB[0].url, /\/222\/envelope\/$/);
+    assert.match(postsA[0].body, new RegExp(errA.errorId));
+    assert.match(postsB[0].body, new RegExp(errB.errorId));
+    assert.doesNotMatch(postsA[0].body, new RegExp(errB.errorId));
+    assert.doesNotMatch(postsB[0].body, new RegExp(errA.errorId));
+  } finally {
+    await a.close();
+    await b.close();
+    await rpc.close();
+  }
+});
+
+test("a failed startup leaves no sink behind: other servers' errors stay local", async () => {
+  const posts: string[] = [];
+  const fetchImpl: SentryFetch = async (_url, init) => {
+    posts.push(init.body);
+    return { ok: true, status: 200 };
+  };
+  const rpc = await startFlakyRpc();
+  const healthyServer = await createSandboxServer({
+    rpcUrl: rpc.rpcUrl,
+    registryAddress: "0x" + "ab".repeat(20),
+    relayerPrivateKey: "0x" + "1".repeat(64),
+    faucetOpenClaims: true,
+  });
+  // Nothing listens here, so resolveContracts fails and startup rejects.
+  await assert.rejects(
+    createSandboxServer({
+      rpcUrl: "http://127.0.0.1:1/",
+      registryAddress: "0x" + "ab".repeat(20),
+      relayerPrivateKey: "0x" + "1".repeat(64),
+      sentryDsn: SAMPLE_DSN,
+      sentryFetch: fetchImpl,
+    }),
+  );
+  rpc.setHealthy(false);
+  try {
+    const res = await fetch(`${healthyServer.url}/v1/faucet/claims`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recipient: "0x" + "cd".repeat(20) }),
+    });
+    assert.equal(res.status, 502);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    assert.equal(posts.length, 0);
+  } finally {
+    await healthyServer.close();
+    await rpc.close();
   }
 });

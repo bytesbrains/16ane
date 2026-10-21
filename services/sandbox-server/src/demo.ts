@@ -14,7 +14,7 @@ import {
   type ServiceManifestPayload,
   type X402Receipt,
 } from "../../../packages/sdk-ts/src/index.ts";
-import { clientIp, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
+import { clientIp, type LoggedErrorSink, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
 import { RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
 
 const ONE_TANE = 10n ** 18n;
@@ -40,6 +40,8 @@ export interface DemoContext {
   trustProxy: boolean;
   clientIpHeader?: string;
   maxBodyBytes: number;
+  /** Per-server sink for sendLoggedError (Sentry when ANE_SENTRY_DSN is set; #90). */
+  loggedErrorSink?: LoggedErrorSink;
 }
 
 export function isDemoRoute(method: string, pathname: string): boolean {
@@ -245,7 +247,7 @@ export async function handleDemoRequest(
     }
     if (settled.cause !== undefined) {
       const retryable = settled.status >= 500;
-      sendLoggedError(res, settled.status, settled.code, settled.message, retryable, settled.cause);
+      sendLoggedError(res, settled.status, settled.code, settled.message, retryable, settled.cause, ctx.loggedErrorSink);
     } else {
       sendError(res, settled.status, settled.code, settled.message, settled.status >= 500);
     }

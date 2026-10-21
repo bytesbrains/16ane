@@ -42,4 +42,5 @@ primary_region = "sin" # closest Fly region to India-first users (no Mumbai regi
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  # 512MB: Node plus per-send cast children OOMed the 256MB box under relay load (2026-10-21).
+  memory = "512mb"

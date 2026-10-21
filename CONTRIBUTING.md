@@ -36,6 +36,28 @@ Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT
    make lint
    ```
 
+## Coverage
+
+CI's *Coverage report and thresholds* job (`#55`) collects LCOV for every suite — `forge coverage` for
+`src/`, Node's built-in test coverage for the TypeScript suites, `coverage.py` for `packages/sdk-py` —
+and writes per-group and total line/branch coverage plus changed-line coverage to the run summary. The
+job fails below the thresholds in `scripts/coverage-report.ts`, and uploads the `.lcov` files as the
+`coverage` artifact. The report needs no extra permissions, so fork PRs get the same summary.
+
+Run it locally the same way (needs `coverage.py` for your `python3`, same pin as CI):
+
+```bash
+pip install 'coverage==7.16.2'
+npm run coverage   # or: make coverage
+```
+
+For per-suite runs: `npm run coverage:<suite>` with `suite` one of `contracts`, `sdk-ts`,
+`sdk-py`, `cli`, `server`, `scripts`, `e2e` (each writes `coverage/<suite>.lcov`), then `npm run
+coverage:report`. For changed-line coverage against your
+branch point: `git diff -U0 main...HEAD > coverage/base.diff && npm run coverage:report -- --diff
+coverage/base.diff`. `coverage/` is gitignored. Each `coverage:*` script runs exactly its `test:*`
+twin's files — `test/scripts/package-coverage-sync.test.ts` fails if they drift apart.
+
 ## Pull Request Guidelines
 
 1. **Branching**: Create feature branches off `main` referencing the issue ID (e.g., `feat/iss-005-tane-token`).

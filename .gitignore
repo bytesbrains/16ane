@@ -72,3 +72,8 @@ Thumbs.db
 .logs/
 tmp/
 temp/
+
+# Coverage output (`npm run coverage` writes here; CI uploads it as an artifact)
+coverage/
+.coverage*
+lcov.info

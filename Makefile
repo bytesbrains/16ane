@@ -1,4 +1,4 @@
-.PHONY: all build test test-contracts test-sdk-ts test-sdk-py test-cli test-server test-e2e typecheck fmt fmt-check lint lint-py clean deploy-dry-run
+.PHONY: all build test test-contracts test-sdk-ts test-sdk-py test-cli test-server test-e2e typecheck fmt fmt-check lint lint-py clean deploy-dry-run coverage coverage-contracts coverage-sdk-ts coverage-sdk-py coverage-cli coverage-server coverage-scripts coverage-e2e coverage-report
 
 all: build test lint
 
@@ -24,6 +24,35 @@ test-server:
 
 test-e2e:
 	npm run test:e2e
+
+# Coverage mirrors test-* (see "Coverage" in CONTRIBUTING.md). Needs coverage.py
+# for python3 (CI pins coverage==7.16.2).
+coverage:
+	npm run coverage
+
+coverage-contracts:
+	mkdir -p coverage && npm run coverage:contracts
+
+coverage-sdk-ts:
+	mkdir -p coverage && npm run coverage:sdk-ts
+
+coverage-sdk-py:
+	mkdir -p coverage && npm run coverage:sdk-py
+
+coverage-cli:
+	mkdir -p coverage && npm run coverage:cli
+
+coverage-server:
+	mkdir -p coverage && npm run coverage:server
+
+coverage-scripts:
+	mkdir -p coverage && npm run coverage:scripts
+
+coverage-e2e:
+	mkdir -p coverage && npm run coverage:e2e
+
+coverage-report:
+	npm run coverage:report
 
 # Needs `npm ci` first (TypeScript is a dev dependency).
 typecheck:

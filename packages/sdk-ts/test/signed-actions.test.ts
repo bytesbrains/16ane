@@ -6,6 +6,7 @@ import {
   BUDGET_MODE,
   createVaultCalldata,
   CREATE_VAULT_SIG,
+  encodeCallWithTrailingBytes,
   keccak256Utf8,
   OwnerWallet,
   policyTupleArg,
@@ -110,5 +111,16 @@ test("calldata builders match cast calldata", () => {
     cast(REVOKE_WITH_SIG_SIG, "4", "1900000200", sig65),
   );
   assert.equal(createVaultCalldata(a, nonce), cast(CREATE_VAULT_SIG, a, nonce));
+});
+
+test("encodeCallWithTrailingBytes rejects a malformed static word", () => {
+  assert.throws(
+    () => encodeCallWithTrailingBytes(REVOKE_WITH_SIG_SIG, ["not-a-word"], "0xab"),
+    /Invalid static ABI word/,
+  );
+  assert.throws(
+    () => encodeCallWithTrailingBytes(REVOKE_WITH_SIG_SIG, ["0x" + "11".repeat(32)], "0xab"),
+    /Invalid static ABI word/,
+  );
 });
 

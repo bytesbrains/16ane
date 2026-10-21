@@ -40,8 +40,14 @@ export function abiBytesTail(hex: string): string {
 }
 
 // Calldata for a function whose arguments are static words followed by one trailing `bytes` argument (the
-// shape of every signature-carrying call the relayer makes).
+// shape of every signature-carrying call the relayer makes). Each staticWord must already be a 32-byte hex
+// word with no 0x prefix (as returned by abiWordUint / abiWordAddress / abiWordBytes32).
 export function encodeCallWithTrailingBytes(signature: string, staticWords: string[], bytesHex: string): string {
+  for (const word of staticWords) {
+    if (!/^[0-9a-fA-F]{64}$/.test(word)) {
+      throw new Error(`Invalid static ABI word (need 64 hex chars, no 0x): ${word}`);
+    }
+  }
   const offset = abiWordUint((staticWords.length + 1) * 32);
   return functionSelector(signature) + staticWords.join("") + offset + abiBytesTail(bytesHex);
 }

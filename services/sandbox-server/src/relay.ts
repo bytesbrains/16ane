@@ -33,8 +33,11 @@ import { readRequestBody, redactUrls, sendError, sendJson, sendLoggedError } fro
 // vault is funded), a vault creation, a vault policy and a revocation. Every check that can refuse a request
 // runs before anything is sent, so a refused request costs no gas: the shape, the deadline, the signer
 // (recovered locally), the target (the tANE token, the factory, or a vault the factory registered), the fee
-// ceiling, and finally a simulation of the exact call from the relayer's address. The only limit is cost: the
-// relayer's daily gas budget (#76); there are no per-agent counts (#61).
+// ceiling, and finally a simulation of the exact call from the relayer's address. The deadline is checked again
+// immediately before send, so a slow prepare/simulate cannot burn gas on an already-expired signature. Simulation
+// is best-effort at the node's latest state (no block override, no gas cap): a mining-block state change can still
+// revert on-chain, which surfaces as ANE-E-1206 after the send attempt. The only limit is cost: the relayer's
+// daily gas budget (#76); there are no per-agent counts (#61).
 
 export const MIN_DEADLINE_SECONDS = 30;
 export const MAX_DEADLINE_SECONDS = 3600;
@@ -107,7 +110,16 @@ const deadlineOk = (deadline: number, nowSec: number, what: string) => {
   }
 };
 
-type Prepared = { to: string; data: string; send: () => Promise<{ txHash: string; blockNumber: number; vaultAddress?: string }> };
+type Prepared = {
+  to: string;
+  data: string;
+  /** Unix seconds when the signature stops being valid (validBefore / deadline). */
+  expiresAtSec: number;
+  what: string;
+  send: (nowSec: number) => Promise<{ txHash: string; blockNumber: number; vaultAddress?: string }>;
+};
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 async function vaultOwner(ctx: RelayContext, vault: string): Promise<string> {
   const registered = await ctx.client.ethCall(
@@ -115,7 +127,10 @@ async function vaultOwner(ctx: RelayContext, vault: string): Promise<string> {
     functionSelector("isRegisteredVault(address)") + abiWordAddress(vault),
   );
   if (BigInt(registered.slice(0, 66)) === 0n) throw denied(`${vault} is not a vault created by the 16ane factory`);
-  return (await ctx.client.getAccountingSummary(vault)).owner;
+  const owner = (await ctx.client.getAccountingSummary(vault)).owner;
+  // Runtime boundary: a registered-but-uninitialized (or corrupt) summary must not be compared as a signer.
+  if (owner.toLowerCase() === ZERO_ADDRESS) throw denied(`${vault} has no owner`);
+  return owner;
 }
 
 // Parses and checks one action, without sending or simulating it.
@@ -136,7 +151,13 @@ async function prepare(ctx: RelayContext, body: Record<string, unknown>, nowSec:
       deadlineOk(Number(t.validBefore), nowSec, "transfer");
       const { digest } = hashTransferWithAuthorization(ctx.chainId, ctx.contracts.aneTestToken, t);
       signedBy(digest, t.signature, t.from, "transfer");
-      return { to: ctx.contracts.aneTestToken, data: transferCalldata(t), send: () => relayTransfer(client, relayerKey, t) };
+      return {
+        to: ctx.contracts.aneTestToken,
+        data: transferCalldata(t),
+        expiresAtSec: Number(t.validBefore),
+        what: "transfer",
+        send: () => relayTransfer(client, relayerKey, t),
+      };
     }
     case "createVault": {
       const c: SignedVaultCreation = {
@@ -150,7 +171,9 @@ async function prepare(ctx: RelayContext, body: Record<string, unknown>, nowSec:
       return {
         to: ctx.contracts.aneVaultFactory,
         data: createVaultCalldata(c.owner, c.salt),
-        send: () => relayCreateVault(client, relayerKey, c, nowSec),
+        expiresAtSec: c.deadline,
+        what: "createVault",
+        send: (atSec) => relayCreateVault(client, relayerKey, c, atSec),
       };
     }
     case "setPolicy": {
@@ -175,7 +198,13 @@ async function prepare(ctx: RelayContext, body: Record<string, unknown>, nowSec:
       deadlineOk(s.deadline, nowSec, "setPolicy");
       const owner = await vaultOwner(ctx, s.vault);
       signedBy(hashSetPolicy(ctx.chainId, s.vault, s.policy, s.expectedPolicyVersion, s.deadline), s.signature, owner, "setPolicy");
-      return { to: s.vault, data: setPolicyCalldata(s), send: () => relaySetPolicy(client, relayerKey, s) };
+      return {
+        to: s.vault,
+        data: setPolicyCalldata(s),
+        expiresAtSec: s.deadline,
+        what: "setPolicy",
+        send: () => relaySetPolicy(client, relayerKey, s),
+      };
     }
     case "revoke": {
       const r: SignedRevoke = {
@@ -187,7 +216,13 @@ async function prepare(ctx: RelayContext, body: Record<string, unknown>, nowSec:
       deadlineOk(r.deadline, nowSec, "revoke");
       const owner = await vaultOwner(ctx, r.vault);
       signedBy(hashRevoke(ctx.chainId, r.vault, r.expectedPolicyVersion, r.deadline), r.signature, owner, "revoke");
-      return { to: r.vault, data: revokeCalldata(r), send: () => relayRevoke(client, relayerKey, r) };
+      return {
+        to: r.vault,
+        data: revokeCalldata(r),
+        expiresAtSec: r.deadline,
+        what: "revoke",
+        send: () => relayRevoke(client, relayerKey, r),
+      };
     }
     default:
       throw bad("action must be one of transfer, createVault, setPolicy, revoke");
@@ -223,8 +258,13 @@ export async function handleRelay(ctx: RelayContext, req: http.IncomingMessage, 
       const why = redactUrls(err instanceof Error ? err.message : String(err)).slice(0, 300);
       return sendError(res, 422, "ANE-E-1204", `The action would revert, so it was not sent: ${why}`, false);
     }
+    // Re-check after prepare/simulate so a deadline that slid past during RPC work is refused without gas spend.
+    const sendAtSec = Math.floor(Date.now() / 1000);
+    if (prepared.expiresAtSec <= sendAtSec) {
+      return sendError(res, 403, "ANE-E-1202", `${prepared.what}: the deadline has passed`, false);
+    }
     try {
-      const sent = await prepared.send();
+      const sent = await prepared.send(sendAtSec);
       sendJson(res, 201, { action: action.action, ...sent, sponsored: true, disclaimer: SANDBOX_DISCLAIMER });
     } catch (err) {
       if (err instanceof RelayerGasBudgetExceededError) {

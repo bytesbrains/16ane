@@ -21,7 +21,13 @@ const OTHER_KEY = keccak256Utf8("16ane.test.relay.other");
 // An RPC that knows the registry, the faucet's views, the factory's registry of vaults and one vault's owner,
 // answers eth_gasPrice with `gasPrice`, and makes every simulation (eth_call with a `from`) revert when
 // `reverts` is set. It records each method, so a test can show that a refused request sent nothing.
-async function fakeRpc(opts: { gasPrice?: bigint; reverts?: boolean; vaultOwner: string }) {
+async function fakeRpc(opts: {
+  gasPrice?: bigint;
+  reverts?: boolean;
+  vaultOwner: string;
+  /** Called when eth_call carries a `from` (simulation); tests can advance a clock here. */
+  onSimulate?: () => void;
+}) {
   const methods: string[] = [];
   const server = http.createServer((req, res) => {
     let body = "";
@@ -35,6 +41,7 @@ async function fakeRpc(opts: { gasPrice?: bigint; reverts?: boolean; vaultOwner:
       if (method === "eth_gasPrice") result = "0x" + (opts.gasPrice ?? 1n).toString(16);
       else if (method === "eth_blockNumber") result = "0x10";
       else if (method === "eth_call" && call?.from) {
+        opts.onSimulate?.();
         if (opts.reverts) error = { code: 3, message: "execution reverted: custom error 0xdeadbeef" };
         else result = "0x";
       } else if (method === "eth_call") {
@@ -74,15 +81,26 @@ const other = signerFor(OTHER_KEY);
 
 async function withServer(
   t: test.TestContext,
-  opts: Partial<SandboxServerConfig> & { gasPrice?: bigint; reverts?: boolean },
+  opts: Partial<SandboxServerConfig> & {
+    gasPrice?: bigint;
+    reverts?: boolean;
+    vaultOwner?: string;
+    onSimulate?: () => void;
+  },
   run: (relay: (body: object) => Promise<{ status: number; code?: string; message?: string }>, methods: string[]) => Promise<void>,
 ) {
-  const rpc = await fakeRpc({ gasPrice: opts.gasPrice, reverts: opts.reverts, vaultOwner: owner.address });
+  const rpc = await fakeRpc({
+    gasPrice: opts.gasPrice,
+    reverts: opts.reverts,
+    vaultOwner: opts.vaultOwner ?? owner.address,
+    onSimulate: opts.onSimulate,
+  });
+  const { gasPrice: _g, reverts: _r, vaultOwner: _v, onSimulate: _o, ...serverOpts } = opts;
   const sandbox = await createSandboxServer({
     rpcUrl: rpc.url,
     registryAddress: "0x" + "ab".repeat(20),
     relayerPrivateKey: "0x" + "1".repeat(64),
-    ...opts,
+    ...serverOpts,
   });
   t.mock.method(console, "error", () => {});
   rpc.methods.length = 0;
@@ -177,4 +195,64 @@ test("a signed action that passes every check goes to the chain", async (t) => {
     assert.ok(methods.includes("simulate"));
     assert.ok(methods.some((m) => !["eth_call", "simulate"].includes(m)), "the relayer tried to send");
   });
+});
+
+test("a registered vault with a zero owner is refused before send", async (t) => {
+  await withServer(t, { vaultOwner: "0x" + "00".repeat(20) }, async (relay, methods) => {
+    const r = await relay({ action: "revoke", ...(await owner.signRevoke(VAULT)) });
+    assert.equal(r.status, 403);
+    assert.equal(r.code, "ANE-E-1202");
+    assert.match(r.message!, /has no owner/);
+    sendsNothing(methods);
+  });
+});
+
+test("a deadline that expires during prepare/simulate is refused without sending", async (t) => {
+  const realNow = Date.now;
+  let skewMs = 0;
+  Date.now = () => realNow() + skewMs;
+  t.after(() => {
+    Date.now = realNow;
+  });
+  await withServer(
+    t,
+    {
+      onSimulate: () => {
+        // Jump past the signature's deadline after prepare accepted it, before the pre-send re-check.
+        skewMs = 120_000;
+      },
+    },
+    async (relay, methods) => {
+      const deadline = Math.floor(realNow() / 1000) + 45;
+      const r = await relay({ action: "revoke", ...(await owner.signRevoke(VAULT, { deadline })) });
+      assert.equal(r.status, 403);
+      assert.equal(r.code, "ANE-E-1202");
+      assert.match(r.message!, /deadline has passed/);
+      assert.ok(methods.includes("simulate"));
+      assert.ok(methods.every((m) => m === "eth_call" || m === "simulate" || m === "eth_gasPrice"));
+    },
+  );
+});
+
+test("malformed JSON on /v1/relay is a 400 ANE-E-4000 (server SyntaxError handler), not a crash", async (t) => {
+  const rpc = await fakeRpc({ vaultOwner: owner.address });
+  const sandbox = await createSandboxServer({
+    rpcUrl: rpc.url,
+    registryAddress: "0x" + "ab".repeat(20),
+    relayerPrivateKey: "0x" + "1".repeat(64),
+  });
+  t.mock.method(console, "error", () => {});
+  try {
+    const res = await fetch(`${sandbox.url}/v1/relay`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    });
+    assert.equal(res.status, 400);
+    const { error } = (await res.json()) as { error: { code: string } };
+    assert.equal(error.code, "ANE-E-4000");
+  } finally {
+    await sandbox.close();
+    await rpc.close();
+  }
 });

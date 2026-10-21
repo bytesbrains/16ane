@@ -22,6 +22,9 @@ export const PROVIDER_KEY = keccak256Utf8("16ane.e2e.provider.key.v1");
 export const PEER_OWNER_KEY = keccak256Utf8("16ane.e2e.peer.owner.key.v1");
 export const PEER_SESSION_KEY = keccak256Utf8("16ane.e2e.peer.session.key.v1");
 
+/** One whole tANE in base units (18 decimals). Shared by the S1–S6 scenario modules (#65). */
+export const ONE_TANE = 10n ** 18n;
+
 async function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const srv = net.createServer();
@@ -165,3 +168,6 @@ export async function startSandboxStack(t: TestContext) {
     session,
   };
 }
+
+/** What `startSandboxStack` returns; the S1–S6 modules run against one shared stack in order. */
+export type SandboxStack = Awaited<ReturnType<typeof startSandboxStack>>;

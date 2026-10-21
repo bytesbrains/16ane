@@ -3,6 +3,7 @@ name: E2E flows
 on:
   # PR commits are covered by pull_request; push only runs for main so each commit runs once.
   # The schedule runs the fork job only (drift against Base Sepolia, not PR signal).
+  # A manual dispatch runs BOTH jobs: the local flows plus the fork drift check.
   push:
     branches: [main]
   pull_request:
@@ -67,8 +68,10 @@ jobs:
           {
             echo "## E2E flows: ${pass} passed, ${fail} failed"
             echo ""
-            grep -E '^ok [0-9]+ - ' e2e-results.tap | sed -E 's/^ok [0-9]+ - /- PASS /'
-            grep -E '^not ok' e2e-results.tap | sed -E 's/^not ok [0-9]* - /- FAIL /'
+            # Test names come from PR code: neutralize markdown/HTML so a hostile name
+            # cannot inject links, images or markup into the maintainer-visible summary.
+            grep -E '^ok [0-9]+ - ' e2e-results.tap | sed -E 's/^ok [0-9]+ - /- PASS /' | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/[][()\\`]/\\&/g'
+            grep -E '^not ok' e2e-results.tap | sed -E 's/^not ok [0-9]* - /- FAIL /' | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/[][()\\`]/\\&/g'
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload Anvil logs, deploy output and deployed addresses
@@ -138,8 +141,10 @@ jobs:
           {
             echo "## E2E fork flows: ${pass} passed, ${fail} failed"
             echo ""
-            grep -E '^ok [0-9]+ - ' e2e-results.tap | sed -E 's/^ok [0-9]+ - /- PASS /'
-            grep -E '^not ok' e2e-results.tap | sed -E 's/^not ok [0-9]* - /- FAIL /'
+            # Test names come from PR code: neutralize markdown/HTML so a hostile name
+            # cannot inject links, images or markup into the maintainer-visible summary.
+            grep -E '^ok [0-9]+ - ' e2e-results.tap | sed -E 's/^ok [0-9]+ - /- PASS /' | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/[][()\\`]/\\&/g'
+            grep -E '^not ok' e2e-results.tap | sed -E 's/^not ok [0-9]* - /- FAIL /' | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/[][()\\`]/\\&/g'
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload Anvil logs, deploy output and deployed addresses

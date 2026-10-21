@@ -18,6 +18,7 @@ test("fund, buy, deliver, earn, return (REQ-011)", async (t) => {
   const { sandbox, client, owner, vaultAddress, session } = stack;
   // Test idempotency label (not a secret); the marker below silences the generic-api-key rule.
   const journeyIdemKey = "idem-journey-001"; //gitleaks:allow
+  let buyPaidAmount = 0n;
 
   await t.test("fund: the vault holds the owner's 1,600 tANE", async () => {
     const summary = await client.getAccountingSummary(vaultAddress);
@@ -41,6 +42,7 @@ test("fund, buy, deliver, earn, return (REQ-011)", async (t) => {
     assert.equal(bought.status, 200);
     assert.ok(bought.data.summary.length > 0, "the service delivered its result");
     assert.ok(bought.receipt?.txHash.startsWith("0x"));
+    buyPaidAmount = BigInt(bought.data.paidAmount);
   });
 
   await t.test("earn: a peer's 50 tANE job lands as verified revenue", async () => {
@@ -81,6 +83,11 @@ test("fund, buy, deliver, earn, return (REQ-011)", async (t) => {
     const summary = await client.getAccountingSummary(vaultAddress);
     assert.equal(summary.tokenBalance, 0n);
     assert.equal(summary.active, false);
-    assert.ok((await client.getTokenBalance(owner.address)) > ownerBefore);
+    // The swept remainder is exact: funded 1,600, the buy above spent its paid
+    // amount, the earn step added 50 — nothing else moves the owner's tANE here.
+    assert.equal(
+      (await client.getTokenBalance(owner.address)) - ownerBefore,
+      1600n * ONE_TANE - buyPaidAmount + 50n * ONE_TANE,
+    );
   });
 });

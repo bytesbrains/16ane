@@ -14,7 +14,7 @@ import {
 test("every public response carries the no-cash-value disclaimer (REQ-012)", async (t) => {
   const stack = await startSandboxStack(t);
   await setupFundedSession(stack);
-  const { sandbox, client, owner, vaultAddress, session } = stack;
+  const { sandbox, client, owner, session } = stack;
   const headerOf = (res: Response) => res.headers.get("x-16ane-disclaimer");
   // Named const, not an inline literal: gitleaks flags `idempotencyKey: "…"` as a generic API key.
   const idemKey = "idem-disclaimer-001";
@@ -89,6 +89,4 @@ test("every public response carries the no-cash-value disclaimer (REQ-012)", asy
     assert.equal(headerOf(relayed), SANDBOX_DISCLAIMER);
     assert.equal(((await relayed.json()) as { disclaimer: string }).disclaimer, SANDBOX_DISCLAIMER);
   });
-
-  void vaultAddress;
 });

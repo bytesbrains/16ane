@@ -65,7 +65,14 @@ async function rpcCall(rpcUrl: string, method: string, params: unknown[]): Promi
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   });
   if (!res.ok) throw new Error(`RPC ${method} failed: HTTP ${res.status}`);
-  return ((await res.json()) as { result: unknown }).result;
+  const payload = (await res.json()) as {
+    result?: unknown;
+    error?: { code: number; message: string };
+  };
+  if (payload.error) {
+    throw new Error(`RPC ${method} failed (${payload.error.code}): ${payload.error.message}`);
+  }
+  return payload.result;
 }
 
 // Base64 Payment-Signature header for raw fetches against the sandbox: threat flows

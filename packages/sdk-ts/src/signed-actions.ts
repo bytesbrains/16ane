@@ -3,9 +3,9 @@
 // (revokeWithSig) and a vault creation. The first three are checked by the contracts; createVault needs no
 // signature on-chain, so its signature is checked by the relay server only, to stop anyone spending the
 // relayer's budget on vaults for addresses that didn't ask for one.
-import { abiWordAddress, abiWordBytes32, abiWordUint, encodeCallWithTrailingBytes, functionSelector } from "./abi.ts";
+import { abiBytesTail, abiWordAddress, abiWordBytes32, abiWordUint, encodeCallWithTrailingBytes, functionSelector } from "./abi.ts";
 import type { AneClient } from "./client.ts";
-import { hashEip712Domain, hashTypedDataDigest, type TransferWithAuthorization } from "./crypto.ts";
+import { hashEip712Domain, hashTypedDataDigest, type SpendIntent, type TransferWithAuthorization } from "./crypto.ts";
 import { keccak256, keccak256Utf8 } from "./keccak.ts";
 import type { SecretKey } from "./secret.ts";
 import { recoverAddress, toChecksumAddress } from "./secp256k1.ts";
@@ -176,6 +176,27 @@ export function revokeCalldata(r: SignedRevoke): string {
 
 export function createVaultCalldata(owner: string, salt: string): string {
   return functionSelector(CREATE_VAULT_SIG) + abiWordAddress(owner) + abiWordBytes32(salt);
+}
+
+export const SETTLE_PAYMENT_SIG =
+  "settlePayment((address,address,uint256,bytes32,bytes32,uint256,uint256,bytes32,uint64),bytes)";
+
+// The intent tuple holds only static fields, so it is encoded inline in the head (no tuple offset);
+// the signature follows as the trailing bytes argument.
+export function settlePaymentCalldata(intent: SpendIntent, signatureHex: string): string {
+  const tuple = [
+    abiWordAddress(intent.vault),
+    abiWordAddress(intent.merchant),
+    abiWordUint(intent.amount),
+    abiWordBytes32(intent.quoteId),
+    abiWordBytes32(intent.serviceIdHash),
+    abiWordUint(intent.validAfter),
+    abiWordUint(intent.validBefore),
+    abiWordBytes32(intent.nonce),
+    abiWordUint(intent.policyVersion),
+  ].join("");
+  const head = tuple + abiWordUint(tuple.length / 2 + 32);
+  return functionSelector(SETTLE_PAYMENT_SIG) + head + abiBytesTail(signatureHex);
 }
 
 // ---- submitting (the relayer pays the gas) ----------------------------------------------------------------

@@ -1,5 +1,7 @@
-# Only packages/sdk-ts/src and services/sandbox-server/src are copied; keep everything else, and every
-# secret, out of the build context.
+# Only the SDK and the service sources are copied; keep everything else, and every secret, out of
+# the build context. Each image's Dockerfile picks the directories it needs.
 *
 !packages/sdk-ts/src/
 !services/sandbox-server/src/
+!services/facilitator/src/
+!services/indexer/src/

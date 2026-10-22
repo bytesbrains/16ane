@@ -1,6 +1,6 @@
 import http from "node:http";
 import {
-  AneClient,
+  type AneClient,
   AnePaymentVerifier,
   privateKeyToAddress,
   SANDBOX_DISCLAIMER,
@@ -29,21 +29,13 @@ import {
   TurnstileVerifier,
 } from "./faucet.ts";
 import {
-  DEFAULT_RELAYER_GAS_BUDGET_WEI,
-  type GasReservation,
-  RelayerGasBudget,
-  RelayerGasBudgetExceededError,
-  sendBudgetExhausted,
-} from "./gas-budget.ts";
-import {
   DEFAULT_MAX_BODY_BYTES,
-  PayloadTooLargeError,
   readRequestBody,
   sendError,
   sendJson,
-  sendLoggedError,
 } from "./http.ts";
 import { createSentryReporter, type SentryFetch } from "./sentry.ts";
+import { createRelayerClient, fetchRelayerHealth, sendServerError } from "./service-shared.ts";
 
 export interface SandboxServerConfig {
   port?: number;
@@ -106,36 +98,21 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
   const chainId = config.chainId ?? 84532;
   const trustProxy = config.trustProxy ?? false;
   const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
-  const relayerKey =
-    config.relayerPrivateKey instanceof SecretKey
-      ? config.relayerPrivateKey
-      : new SecretKey(config.relayerPrivateKey);
+  const store = config.store ?? new MemoryKeyValueStore();
+  const { client, gasBudget, relayerKey, relayerAddress } = createRelayerClient({
+    rpcUrl: config.rpcUrl,
+    chainId,
+    registryAddress: config.registryAddress,
+    relayerPrivateKey: config.relayerPrivateKey,
+    store,
+    relayerGasBudgetWei: config.relayerGasBudgetWei,
+  });
   const providerKey = config.providerPrivateKey
     ? config.providerPrivateKey instanceof SecretKey
       ? config.providerPrivateKey
       : new SecretKey(config.providerPrivateKey)
     : relayerKey;
-
   const providerAddress = privateKeyToAddress(providerKey);
-  const relayerAddress = privateKeyToAddress(relayerKey);
-  const store = config.store ?? new MemoryKeyValueStore();
-  // Every transaction the relayer pays for (faucet claims, x402 settlements) reserves gas from its daily budget
-  // before it is sent, and is counted at its actual fee once mined.
-  const gasBudget = new RelayerGasBudget(store, config.relayerGasBudgetWei ?? DEFAULT_RELAYER_GAS_BUDGET_WEI);
-  const client = new AneClient({
-    rpcUrl: config.rpcUrl,
-    chainId,
-    registryAddress: config.registryAddress,
-    sendHooks: {
-      before: (from) => (from === relayerAddress ? gasBudget.reserve() : undefined),
-      after: (_from, feeWei, _txHash, ticket) => {
-        if (ticket) gasBudget.settle(ticket as GasReservation, feeWei);
-      },
-      failed: (_from, ticket) => {
-        if (ticket) gasBudget.release(ticket as GasReservation);
-      },
-    },
-  });
   const contracts = await client.resolveContracts();
   const faucetConfig = await readFaucetConfig(client, contracts.aneFaucet);
   const verifier = new AnePaymentVerifier({ client, relayerKey, store });
@@ -234,22 +211,12 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       // without exposing configuration beyond the public chain and registry.
       if (method === "GET" && pathname === "/healthz") {
         try {
-          const blockHex = await client.rpcCall<string>("eth_blockNumber", []);
-          const balanceWei = BigInt(await client.rpcCall<string>("eth_getBalance", [relayerAddress, "latest"]));
+          const health = await fetchRelayerHealth(client, gasBudget, relayerAddress);
           sendJson(res, 200, {
             status: "ok",
             chainId,
             registry: contracts.registry,
-            blockNumber: Number(BigInt(blockHex)),
-            relayer: {
-              address: relayerAddress,
-              balanceWei: balanceWei.toString(),
-              dailyGasBudgetWei: gasBudget.dailyBudgetWei.toString(),
-              spentTodayWei: gasBudget.spentTodayWei().toString(),
-              reservedTodayWei: gasBudget.reservedTodayWei().toString(),
-              remainingTodayWei: gasBudget.remainingTodayWei().toString(),
-              lowBalance: gasBudget.isLowBalance(balanceWei),
-            },
+            ...health,
             sponsored: {
               campaigns: quotaEngine.listCampaigns().map((c) => campaignHealthView(quotaEngine, c)),
             },
@@ -465,21 +432,7 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
 
       sendError(res, 404, "ANE-E-4040", `Route not found: ${method} ${pathname}`, false);
     } catch (err) {
-      if (err instanceof PayloadTooLargeError) {
-        res.setHeader("connection", "close");
-        sendError(res, 413, "ANE-E-4130", err.message, false);
-        return;
-      }
-      if (err instanceof RelayerGasBudgetExceededError) {
-        sendBudgetExhausted(res, err, "send the transaction yourself with your own gas");
-        return;
-      }
-      // JSON.parse and BigInt throw SyntaxError on malformed client input; their messages only echo that input.
-      if (err instanceof SyntaxError) {
-        sendError(res, 400, "ANE-E-4000", `Malformed request body: ${err.message}`, false);
-        return;
-      }
-      sendLoggedError(res, 500, "ANE-E-5000", "Internal server error", true, err, sentrySink);
+      sendServerError(res, err, "send the transaction yourself with your own gas", sentrySink);
     }
   });
 

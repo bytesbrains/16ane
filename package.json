@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc -p .",
-    "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts",
+    "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts",
     "test:sdk-py": "python3 -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' -v",
     "test:cli": "node --experimental-strip-types --test packages/cli/test/*.test.ts",
     "test:server": "node --experimental-strip-types --test services/sandbox-server/test/*.test.ts",
@@ -15,14 +15,18 @@
     "test:web": "node --experimental-strip-types --test test/web/site.test.ts",
     "test:scripts": "node --experimental-strip-types --test test/scripts/*.test.ts",
     "coverage:contracts": "forge coverage --report lcov --report-file coverage/forge.lcov --exclude-tests",
-    "coverage:sdk-ts": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/sdk-ts.lcov packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts",
+    "coverage:sdk-ts": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/sdk-ts.lcov packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts",
     "coverage:sdk-py": "python3 -m coverage run --branch --source=packages/sdk-py/ane_sdk --data-file=coverage/.coverage-py -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' && python3 -m coverage lcov --data-file=coverage/.coverage-py -o coverage/py.lcov",
     "coverage:cli": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/cli.lcov packages/cli/test/*.test.ts",
     "coverage:server": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/server.lcov services/sandbox-server/test/*.test.ts",
     "coverage:scripts": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/scripts.lcov test/scripts/*.test.ts",
     "coverage:e2e": "node --experimental-strip-types --test --test-concurrency=1 --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/e2e.lcov e2e/flows/*.test.ts",
-    "coverage:report": "node --experimental-strip-types scripts/coverage-report.ts --lcov coverage/forge.lcov --lcov coverage/sdk-ts.lcov --lcov coverage/cli.lcov --lcov coverage/server.lcov --lcov coverage/scripts.lcov --lcov coverage/e2e.lcov --lcov coverage/py.lcov",
-    "coverage": "mkdir -p coverage && npm run coverage:contracts && npm run coverage:sdk-ts && npm run coverage:cli && npm run coverage:server && npm run coverage:scripts && npm run coverage:sdk-py && npm run coverage:e2e && npm run coverage:report"
+    "coverage:report": "node --experimental-strip-types scripts/coverage-report.ts --lcov coverage/forge.lcov --lcov coverage/sdk-ts.lcov --lcov coverage/cli.lcov --lcov coverage/server.lcov --lcov coverage/scripts.lcov --lcov coverage/e2e.lcov --lcov coverage/py.lcov --lcov coverage/facilitator.lcov --lcov coverage/indexer.lcov",
+    "coverage": "mkdir -p coverage && npm run coverage:contracts && npm run coverage:sdk-ts && npm run coverage:cli && npm run coverage:server && npm run coverage:scripts && npm run coverage:sdk-py && npm run coverage:e2e && npm run coverage:facilitator && npm run coverage:indexer && npm run coverage:report",
+    "test:facilitator": "node --experimental-strip-types --test services/facilitator/test/*.test.ts",
+    "test:indexer": "node --experimental-strip-types --test services/indexer/test/*.test.ts",
+    "coverage:facilitator": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/facilitator.lcov services/facilitator/test/*.test.ts",
+    "coverage:indexer": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/indexer.lcov services/indexer/test/*.test.ts"
   },
   "devDependencies": {
     "typescript": "7.0.2",

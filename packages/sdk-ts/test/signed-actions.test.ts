@@ -16,6 +16,8 @@ import {
   SecretKey,
   SET_POLICY_WITH_SIG_SIG,
   setPolicyCalldata,
+  SETTLE_PAYMENT_SIG,
+  settlePaymentCalldata,
   toPolicyFields,
   TRANSFER_WITH_AUTHORIZATION_SIG,
   transferCalldata,
@@ -111,6 +113,25 @@ test("calldata builders match cast calldata", () => {
     cast(REVOKE_WITH_SIG_SIG, "4", "1900000200", sig65),
   );
   assert.equal(createVaultCalldata(a, nonce), cast(CREATE_VAULT_SIG, a, nonce));
+  const intent = {
+    vault: a,
+    merchant: b,
+    amount: 16n * 10n ** 18n,
+    quoteId: nonce,
+    serviceIdHash: keccak256Utf8("demo"),
+    validAfter: 0,
+    validBefore: 1_900_000_000,
+    nonce,
+    policyVersion: 1,
+  };
+  assert.equal(
+    settlePaymentCalldata(intent, sig65),
+    cast(
+      SETTLE_PAYMENT_SIG,
+      `(${a},${b},16000000000000000000,${nonce},${keccak256Utf8("demo")},0,1900000000,${nonce},1)`,
+      sig65,
+    ),
+  );
 });
 
 test("encodeCallWithTrailingBytes rejects a malformed static word", () => {

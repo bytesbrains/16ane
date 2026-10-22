@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: 16ane Standalone Facilitator and Indexer API
+  version: 0.1.0
+  description: >
+    HTTP API of the self-hostable x402 facilitator (services/facilitator) and service-directory
+    indexer (services/indexer). All settlements use simulated tANE ("TEST TOKENS (tANE) - NO CASH VALUE").
+    1 INR = 16 Annas (1 Anna = 1/16 Rupee = 6.25 paise).
+    The facilitator's /verify, /settle and /supported shapes follow the x402 facilitator interface
+    (coinbase/x402 typescript/packages/core/src/types/facilitator.ts, checked 2026-10-21).
+  license:
+    name: MIT
+servers:
+  - url: http://127.0.0.1:8788
+    description: Local standalone facilitator
+  - url: http://127.0.0.1:8789
+    description: Local standalone indexer
+paths:
+  /supported:
+    get:
+      summary: List the payment schemes and networks this facilitator settles
+      operationId: facilitatorSupported
+      responses:
+        "200":
+          description: Supported kinds, extensions and settling signers
+  /verify:
+    post:
+      summary: Check whether a payment authorization would settle, without settling it
+      operationId: facilitatorVerify
+      description: >-
+        Verifies the authorization against the requirements (scheme, network, asset, amount, payee,
+        expiry, signature, replay) and simulates the settlement without sending it. Answers 200 with
+        the verdict for every evaluated payment; 400 only for requests that cannot be evaluated
+        (malformed body, x402Version other than 2, unsupported scheme or network, an asset other than
+        tANE, accepted/requirements mismatch). The facilitator never sees the merchant's request, so
+        resource/request binding stays the merchant's check at delivery time.
+      responses:
+        "200":
+          description: The verdict (isValid true or false, with payer and ANE-E reason codes)
+        "400":
+          description: Unevaluable request (isValid false, invalidReason ANE-E-4001)
+  /settle:
+    post:
+      summary: Verify and settle a payment authorization, paying its gas from the relayer key
+      operationId: facilitatorSettle
+      description: >-
+        Runs the same checks as /verify, then settles on-chain: vault intents only to factory-registered
+        vaults, exact authorizations to tANE. A settled proof retried after a lost response gets its stored
+        receipt back (extra.replayed). Answers 200 with the verdict; 400 for unevaluable requests;
+        503 when the gas price is above ANE_RELAYER_MAX_FEE_WEI or the daily gas budget is used up
+        (Retry-After; settle it yourself with your own gas in the meantime). No per-agent or
+        per-wallet count limits anywhere on this path (#61).
+      responses:
+        "200":
+          description: The settlement receipt, or the failure with ANE-E reason codes
+        "400":
+          description: Unevaluable request (success false, errorReason ANE-E-4001)
+        "503":
+          description: Gas policy refusal (fee ceiling ANE-E-1205, budget ANE-E-1006)
+  /v1/payments/{id}:
+    get:
+      summary: Look up a settlement receipt by payment, intent or transaction id
+      operationId: facilitatorReceipt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The stored x402 receipt
+        "404":
+          description: Unknown receipt (ANE-E-4012)
+  /v1/services:
+    get:
+      summary: List indexed AneServiceDirectory anchors, optionally filtered
+      operationId: indexerServices
+      description: >-
+        Anchors are untrusted advertisements. Fetch the manifest from manifestUri yourself and verify
+        its signature offline with the SDK; the indexer never fetches third-party URLs.
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, PAUSED, DEPRECATED, NONE]
+      responses:
+        "200":
+          description: The anchor set
+        "400":
+          description: Bad provider or status filter (ANE-E-4001)
+  /v1/services/{serviceIdHash}:
+    get:
+      summary: Fetch one anchor by its service id hash (keccak256 of the service id)
+      operationId: indexerService
+      parameters:
+        - name: serviceIdHash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The anchor record
+        "400":
+          description: Malformed service id hash (ANE-E-4001)
+        "404":
+          description: No anchor for this id (ANE-E-4020)

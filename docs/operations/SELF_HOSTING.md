@@ -77,3 +77,131 @@ only what you're prepared to lose, and watch `/healthz`. Leave `ANE_FAUCET_OPEN_
 
 ## Not yet
 The web faucet page that shows the Turnstile widget is part of the dashboard (#17).
+
+---
+
+# Running the standalone facilitator yourself
+
+`services/facilitator` is the x402 facilitator third-party operators and merchants run instead of
+16ane's servers (REQ-106, ADR-0005): `POST /verify`, `POST /settle` and `GET /supported` for the
+`ane-vault-v1` and `exact` schemes on `eip155:84532`, plus `GET /healthz` and receipt lookup at
+`GET /v1/payments/:id`. The wire shapes follow the x402 facilitator interface
+(`openapi/standalone.yaml`); verdicts answer HTTP 200 with the canonical body, and 4xx/5xx are
+reserved for requests that cannot be evaluated. There are no per-agent or per-wallet count limits
+anywhere on this path (#61): the only limits are cost-based (below).
+
+> `tANE` is a free test token with no cash value. Run this only against the sandbox (Base Sepolia,
+> `84532`) or a local chain.
+
+## Build
+
+```bash
+docker build -f services/facilitator/Dockerfile -t 16ane-facilitator .
+```
+
+The image holds Node 24, a checksum-verified Foundry `cast` (settlements are sent with it), and the
+facilitator, SDK and shared server-module sources. It contains **no secrets**.
+
+Without Docker, run it straight from a checkout (needs `cast` on `PATH` for settlements):
+
+```bash
+ANE_RPC_URL=... ANE_REGISTRY_ADDRESS=0x... ANE_RELAYER_PRIVATE_KEY=0x... \
+  node --experimental-strip-types services/facilitator/src/main.ts
+```
+
+## Run
+
+```bash
+docker run --rm -p 127.0.0.1:8788:8788 \
+  -e ANE_RPC_URL=https://sepolia.base.org \
+  -e ANE_REGISTRY_ADDRESS=0x01d5daB670DE5868305eB862721ebE62772C3Df3 \
+  -e ANE_RELAYER_PRIVATE_KEY \
+  16ane-facilitator
+```
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `ANE_RPC_URL` | yes | Base Sepolia (or local) JSON-RPC endpoint |
+| `ANE_REGISTRY_ADDRESS` | yes | `AneRegistry`; the sandbox's is in `networks/sandbox-sepolia.json` |
+| `ANE_RELAYER_PRIVATE_KEY` | yes | Pays the gas for settlements. Use a **dedicated** key with a small amount of Base Sepolia ETH, never an admin or deployer key |
+| `ANE_HOST` / `ANE_PORT` | no | Listen address and port (`0.0.0.0` / `8788` in the image) |
+| `ANE_CHAIN_ID` | no | Defaults to `84532`; the facilitator serves only this chain's CAIP-2 network |
+| `ANE_RELAYER_MAX_FEE_WEI` | no | The relayer's gas-price ceiling in wei (`ADR-0006`). Above it, `/settle` sends nothing and answers `503 ANE-E-1205` with `Retry-After: 60`. Unset: no ceiling |
+| `ANE_RELAYER_GAS_BUDGET_WEI` | no | Most the relayer may spend on gas per UTC day, in wei (default `50000000000000000` = 0.05 ETH). Once reached, settlements get `503 ANE-E-1006` with `Retry-After` until 00:00 UTC and a hint to settle with your own gas |
+| `ANE_STATE_PATH` | no | SQLite file for consumed payment proofs, receipts and gas spend. The image sets `/data/facilitator.sqlite`; mount a volume at `/data` to keep it across container re-creation. Unset outside the image: memory only, with a startup warning — and a restart would let a settled proof settle again |
+
+A bad configuration exits with code 2 and lists every problem, without printing key values.
+
+**Settling costs real gas from your relayer key for whoever asks.** Before exposing it publicly,
+set a gas budget you can afford to lose per day and watch `/healthz` (`spentTodayWei`,
+`remainingTodayWei`, `lowBalance`). Every settlement is simulated from the relayer's address first,
+so what would revert is refused (`402 ANE-E-4011`) without spending gas; vault intents settle only
+to factory-registered vaults (`403 ANE-E-4013` otherwise), and exact authorizations only to `tANE`.
+
+## Check it
+
+- `GET /healthz`: `200 {"status":"ok", …}` when the RPC answers, `503` otherwise. The image's
+  Docker `HEALTHCHECK` uses it.
+- `GET /supported`: both schemes on your network, with the relayer in `signers`.
+- `POST /verify` then `POST /settle` with a canonical x402 payment: see `openapi/standalone.yaml`.
+  A settled proof retried after a lost response gets its stored receipt back (`extra.replayed`).
+- `scripts/docker-smoke-standalone.sh` runs the whole acceptance check (both schemes end to end
+  plus the indexer below) against a local Anvil chain. CI runs it on every PR.
+
+Trust boundary to keep in mind: the facilitator never sees the merchant's request, so it does not
+check resource/request binding — merchants still must, at delivery time
+(`AnePaymentVerifier.verifyAndSettle` does). A receipt only attests that the authorization settled.
+
+---
+
+# Running the standalone indexer yourself
+
+`services/indexer` polls `ServiceAnchored` events from standard RPC logs and serves the anchor set
+at `GET /v1/services` (with `?provider=` and `?status=` filters), `GET /v1/services/:serviceIdHash`
+and `GET /healthz` (REQ-101, REQ-106, ADR-0007). It is read-only and needs **no private keys**.
+
+Anchors are untrusted advertisements: fetch the manifest from `manifestUri` yourself and verify its
+signature offline with the SDK (`AneClient.verifyServiceManifest`). The indexer never fetches
+third-party URLs and never judges a manifest.
+
+## Build
+
+```bash
+docker build -f services/indexer/Dockerfile -t 16ane-indexer .
+```
+
+The image holds Node 24 and the indexer, SDK and shared server-module sources (no `cast`: it never
+sends). Without Docker:
+
+```bash
+ANE_RPC_URL=... ANE_REGISTRY_ADDRESS=0x... \
+  node --experimental-strip-types services/indexer/src/main.ts
+```
+
+## Run
+
+```bash
+docker run --rm -p 127.0.0.1:8789:8789 \
+  -e ANE_RPC_URL=https://sepolia.base.org \
+  -e ANE_REGISTRY_ADDRESS=0x01d5daB670DE5868305eB862721ebE62772C3Df3 \
+  16ane-indexer
+```
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `ANE_RPC_URL` | yes | Base Sepolia (or local) JSON-RPC endpoint |
+| `ANE_REGISTRY_ADDRESS` | yes | `AneRegistry`; the sandbox's is in `networks/sandbox-sepolia.json` |
+| `ANE_HOST` / `ANE_PORT` | no | Listen address and port (`0.0.0.0` / `8789` in the image) |
+| `ANE_CHAIN_ID` | no | Defaults to `84532` |
+| `ANE_INDEX_FROM_BLOCK` | no | Where a fresh store starts scanning: a block number, `latest` (no backfill, the default) or `earliest`. On Base Sepolia set the directory's deployment block; the scan advances in `ANE_INDEX_MAX_RANGE` chunks so public-RPC range caps are respected |
+| `ANE_INDEX_POLL_MS` | no | Milliseconds between scans (default `5000`, minimum `1000`) |
+| `ANE_INDEX_MAX_RANGE` | no | Most blocks per `eth_getLogs` call (default `2000`) |
+| `ANE_STATE_PATH` | no | SQLite file for the anchor set and scan cursor. The image sets `/data/indexer.sqlite`; mount a volume at `/data` to keep it across container re-creation. Unset: a restart rescans from `ANE_INDEX_FROM_BLOCK` |
+
+## Check it
+
+- `GET /healthz`: `200 {"status":"ok", …}` with `latestBlock`, `lastScannedBlock`, `services`,
+  `lastScanAt` and, when the last scan failed, `lastError` (a failed scan is retried, never fatal).
+- Anchor a service on-chain (`AneServiceDirectory.anchorService`) and watch it appear in
+  `GET /v1/services`; pause it (`setServiceStatus`) and watch the record follow. The standalone
+  smoke script above does exactly this.

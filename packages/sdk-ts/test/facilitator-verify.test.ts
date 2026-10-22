@@ -63,7 +63,7 @@ const decoded = (scheme: "ane-vault-v1" | "exact", payload: Record<string, unkno
 
 // A chain that answers registration reads and simulations from flags and records every send; nothing
 // reaches a chain, so a test can show that a refused payment sent nothing.
-function mockChain(opts: { registered?: boolean; reverts?: boolean; verified?: boolean } = {}) {
+function mockChain(opts: { registered?: boolean; reverts?: boolean; verified?: boolean; unreachable?: boolean } = {}) {
   const sent: string[] = [];
   const client = {
     chainId: 84532,
@@ -75,6 +75,7 @@ function mockChain(opts: { registered?: boolean; reverts?: boolean; verified?: b
       throw new Error(`unexpected eth_call ${data.slice(0, 18)}`);
     },
     simulateCall: async () => {
+      if (opts.unreachable) throw new TypeError("fetch failed");
       if (opts.reverts) throw new Error("execution reverted: expired");
       return "0x";
     },
@@ -205,4 +206,43 @@ test("settleDecoded preflight refuses before any send; without it merchants are 
   const replay = await plain.verifier.settleDecoded({ decoded: decoded("exact", exactPayload()), endpoint });
   assert.equal(replay.ok, false);
   if (!replay.ok) assert.equal(replay.code, "ANE-E-4005");
+});
+
+test("settleDecoded without a request carries empty binding hashes on the receipt", async () => {
+  const { verifier } = mockChain();
+  const unbound = await verifier.settleDecoded({ decoded: decoded("exact", exactPayload()), endpoint });
+  assert.equal(unbound.ok, true);
+  if (unbound.ok) {
+    assert.equal(unbound.receipt.resourceHash, "");
+    assert.equal(unbound.receipt.requestHash, "");
+  }
+
+  const bound = await verifier.settleDecoded({
+    decoded: decoded("exact", exactPayload({ nonce: keccak256Utf8("enonce-2") })),
+    endpoint,
+    method: "POST",
+    canonicalUrl: "http://127.0.0.1:8788/paid",
+    rawBody: "{}",
+  });
+  assert.equal(bound.ok, true);
+  if (bound.ok) {
+    assert.notEqual(bound.receipt.resourceHash, "");
+    assert.notEqual(bound.receipt.requestHash, "");
+  }
+});
+
+test("an unreachable chain during simulation throws instead of rejecting the payment", async () => {
+  const { verifier } = mockChain({ unreachable: true });
+  await assert.rejects(
+    verifier.verifyPayment({ decoded: decoded("exact", exactPayload()), endpoint }),
+    /fetch failed/,
+  );
+  await assert.rejects(
+    verifier.settleDecoded({
+      decoded: decoded("exact", exactPayload()),
+      endpoint,
+      preflight: { simulate: true, requireRegisteredVault: true },
+    }),
+    /fetch failed/,
+  );
 });

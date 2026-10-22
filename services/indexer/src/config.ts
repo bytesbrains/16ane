@@ -34,7 +34,7 @@ export function parseIndexerConfig(env: Record<string, string | undefined>): Ind
   const fromRaw = get("ANE_INDEX_FROM_BLOCK") ?? "latest";
   let fromBlock: number | "latest" | "earliest" = "latest";
   if (fromRaw === "latest" || fromRaw === "earliest") fromBlock = fromRaw;
-  else if (/^\d+$/.test(fromRaw)) fromBlock = Number(fromRaw);
+  else if (/^\d+$/.test(fromRaw) && Number.isSafeInteger(Number(fromRaw))) fromBlock = Number(fromRaw);
   else problems.push("ANE_INDEX_FROM_BLOCK must be a block number, 'latest' or 'earliest'");
 
   const host = readHostSetting(get);

@@ -246,10 +246,7 @@ test("POST /verify rejects what this facilitator cannot serve with 400 ANE-E-400
       const r = await post("/verify", body);
       assert.equal(r.status, 400, name);
       const reason = r.json.isValid === false ? r.json.invalidReason : r.json.error?.code;
-      assert.ok(
-        reason === "ANE-E-4001" || reason === "ANE-E-4000",
-        `${name}: got ${JSON.stringify(r.json)}`,
-      );
+      assert.equal(reason, "ANE-E-4001", `${name}: got ${JSON.stringify(r.json)}`);
     }
   });
 });
@@ -278,29 +275,33 @@ test("POST /settle refuses before any send: bad proof, unregistered vault, rever
   });
 });
 
+function storedReceipt(structHash: string): X402Receipt {
+  return {
+    x402Version: 2,
+    success: true,
+    scheme: "exact",
+    network: NETWORK,
+    txHash: "0x" + "dd".repeat(32),
+    blockNumber: 9,
+    intentId: structHash,
+    paymentId: structHash,
+    payer: FROM,
+    payTo: MERCHANT,
+    asset: TOKEN,
+    amount: "16",
+    resourceHash: "",
+    requestHash: "",
+    settledAt: new Date().toISOString(),
+    sponsored: false,
+    disclaimer: "TEST TOKENS (tANE) - NO CASH VALUE",
+  };
+}
+
 test("POST /settle replays the stored receipt for an honest retry after a lost response", async (t) => {
   await withFacilitator(t, {}, async (post, api) => {
     const payload = exactPayload();
     const { structHash } = hashTransferWithAuthorization(84532, TOKEN, payload);
-    const receipt: X402Receipt = {
-      x402Version: 2,
-      success: true,
-      scheme: "exact",
-      network: NETWORK,
-      txHash: "0x" + "dd".repeat(32),
-      blockNumber: 9,
-      intentId: structHash,
-      paymentId: structHash,
-      payer: FROM,
-      payTo: MERCHANT,
-      asset: TOKEN,
-      amount: "16",
-      resourceHash: "",
-      requestHash: "",
-      settledAt: new Date().toISOString(),
-      sponsored: false,
-      disclaimer: "TEST TOKENS (tANE) - NO CASH VALUE",
-    };
+    const receipt = storedReceipt(structHash);
     api.seedProof([structHash]);
     api.seedReceipt(receipt);
     const r = await post("/settle", canonicalRequest("exact", payload));
@@ -310,6 +311,25 @@ test("POST /settle replays the stored receipt for an honest retry after a lost r
     assert.equal(r.json.extra.replayed, true);
     sendsNothing(api.methods);
   });
+});
+
+test("POST /settle replays the stored receipt even while the fee ceiling refuses new work", async (t) => {
+  await withFacilitator(
+    t,
+    { gasPrice: 100n, server: { relayerMaxFeeWei: 10n } },
+    async (post, api) => {
+      const payload = exactPayload();
+      const { structHash } = hashTransferWithAuthorization(84532, TOKEN, payload);
+      const receipt = storedReceipt(structHash);
+      api.seedProof([structHash]);
+      api.seedReceipt(receipt);
+      const r = await post("/settle", canonicalRequest("exact", payload));
+      assert.equal(r.status, 200);
+      assert.equal(r.json.success, true);
+      assert.equal(r.json.transaction, receipt.txHash);
+      assert.equal(r.json.extra.replayed, true);
+    },
+  );
 });
 
 test("POST /settle honors the gas policy: fee ceiling 503s before reads settle anything", async (t) => {
@@ -361,6 +381,11 @@ test("GET /healthz reports the chain and the relayer budget, 503 when the RPC is
 
 test("GET /v1/payments/:id serves stored receipts, 404 otherwise", async (t) => {
   await withFacilitator(t, {}, async (_post, api) => {
+    const receipt = storedReceipt("0x" + "ee".repeat(32));
+    api.seedReceipt(receipt);
+    const hit = await fetch(`${api.url}/v1/payments/${receipt.txHash}`);
+    assert.equal(hit.status, 200);
+    assert.equal(((await hit.json()) as X402Receipt).txHash, receipt.txHash);
     const missing = await fetch(`${api.url}/v1/payments/0xdead`);
     assert.equal(missing.status, 404);
   });

@@ -358,6 +358,10 @@ export class AnePaymentVerifier {
     try {
       await this.client.simulateCall(privateKeyToAddress(this.relayerKey), to, data);
     } catch (err) {
+      // A fetch-level failure (DNS, refused, reset) is the chain being unreachable, not a bad
+      // payment: let it surface as a 500 "cannot evaluate" instead of a 402 rejection. An EVM
+      // revert always arrives as an RPC error payload, never as a TypeError.
+      if (err instanceof TypeError) throw err;
       const why = (err instanceof Error ? err.message : String(err)).slice(0, 300);
       return { status: 402, code: "ANE-E-4011", message: `Settlement would revert, so nothing was sent: ${why}` };
     }
@@ -529,7 +533,10 @@ export class AnePaymentVerifier {
       params.method !== undefined && params.canonicalUrl !== undefined
         ? computeResourceHash(params.method, params.canonicalUrl)
         : "";
-    const expectedRequestHash = computeRequestHash(params.rawBody);
+    const expectedRequestHash =
+      params.method !== undefined && params.canonicalUrl !== undefined
+        ? computeRequestHash(params.rawBody)
+        : "";
     const requiredAmount = BigInt(params.endpoint.priceAmount);
     const expectedPayTo = toChecksumAddress(params.endpoint.payTo);
     const expectedAsset = toChecksumAddress(params.endpoint.assetAddress);

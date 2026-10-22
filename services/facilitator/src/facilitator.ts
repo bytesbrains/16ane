@@ -16,6 +16,7 @@ import {
   type AneContractAddresses,
   type AnePaymentVerifier,
   type X402DecodedPayment,
+  type X402Receipt,
 } from "../../../packages/sdk-ts/src/index.ts";
 import {
   refuseAboveFeeCeiling,
@@ -185,6 +186,35 @@ function receiptIds(scheme: string, payload: Record<string, unknown>, chainId: n
   }
 }
 
+// A stored receipt for this payload, for an honest retry after a lost response. Served before the
+// gas policy in handleSettle, so a retry during a gas spike (or with an exhausted budget) still
+// gets its receipt instead of a 503 for a payment that already settled.
+function findStoredReceipt(
+  ctx: FacilitatorContext,
+  request: ParsedFacilitatorRequest,
+): X402Receipt | undefined {
+  for (const id of receiptIds(
+    request.paymentRequirements.scheme,
+    request.paymentPayload.payload,
+    ctx.client.chainId,
+    request.paymentRequirements.asset,
+  )) {
+    const receipt = ctx.verifier.getReceipt(id);
+    if (receipt) return receipt;
+  }
+  return undefined;
+}
+
+function sendReplayedReceipt(res: http.ServerResponse, receipt: X402Receipt): void {
+  sendJson(res, 200, {
+    success: true,
+    payer: receipt.payer,
+    transaction: receipt.txHash,
+    network: receipt.network,
+    extra: { receipt, replayed: true },
+  });
+}
+
 export function supportedBody(ctx: FacilitatorContext): Record<string, unknown> {
   const network = `eip155:${ctx.client.chainId}`;
   const kinds = ["ane-vault-v1", "exact"].map((scheme) => ({
@@ -201,7 +231,13 @@ async function readParsedBody(
   req: http.IncomingMessage,
 ): Promise<{ ok: true; request: ParsedFacilitatorRequest } | { ok: false; reason: string }> {
   const rawBody = await readRequestBody(req, ctx.maxBodyBytes);
-  return parseFacilitatorRequest(rawBody ? JSON.parse(rawBody) : {});
+  let body: unknown;
+  try {
+    body = rawBody ? JSON.parse(rawBody) : {};
+  } catch {
+    return { ok: false, reason: "the request body must be valid JSON" };
+  }
+  return parseFacilitatorRequest(body);
 }
 
 function servingFailure(ctx: FacilitatorContext, request: ParsedFacilitatorRequest): string | undefined {
@@ -277,6 +313,11 @@ export async function handleSettle(
     failed(400, "ANE-E-4001", unsupported);
     return;
   }
+  const replayed = findStoredReceipt(ctx, request);
+  if (replayed) {
+    sendReplayedReceipt(res, replayed);
+    return;
+  }
   if (
     await refuseAboveFeeCeiling(
       (m, p) => ctx.client.rpcCall(m, p),
@@ -315,25 +356,13 @@ export async function handleSettle(
     return;
   }
   if (settled.code === "ANE-E-4005") {
-    // An honest retry after a lost response: the proof is consumed, so hand back the stored receipt
-    // instead of failing a payment that already settled. Still in flight: nothing stored yet, retry.
-    for (const id of receiptIds(
-      request.paymentRequirements.scheme,
-      request.paymentPayload.payload,
-      ctx.client.chainId,
-      request.paymentRequirements.asset,
-    )) {
-      const receipt = ctx.verifier.getReceipt(id);
-      if (receipt) {
-        sendJson(res, 200, {
-          success: true,
-          payer: receipt.payer,
-          transaction: receipt.txHash,
-          network: receipt.network,
-          extra: { receipt, replayed: true },
-        });
-        return;
-      }
+    // The proof was consumed between the pre-ceiling lookup and the settle (a concurrent retry):
+    // hand back the stored receipt instead of failing a payment that already settled. Still in
+    // flight: nothing stored yet, retry.
+    const receipt = findStoredReceipt(ctx, request);
+    if (receipt) {
+      sendReplayedReceipt(res, receipt);
+      return;
     }
   }
   failed(200, settled.code, settled.message, payer);

@@ -41,6 +41,17 @@ test("optional settings parse", () => {
   assert.equal(parseIndexerConfig({ ...BASE, ANE_INDEX_FROM_BLOCK: "earliest" }).fromBlock, "earliest");
 });
 
+test("an unsafe-integer from block is rejected, the largest safe one parses", () => {
+  assert.throws(
+    () => parseIndexerConfig({ ...BASE, ANE_INDEX_FROM_BLOCK: "9007199254740993" }),
+    /ANE_INDEX_FROM_BLOCK must be a block number/,
+  );
+  assert.equal(
+    parseIndexerConfig({ ...BASE, ANE_INDEX_FROM_BLOCK: "9007199254740991" }).fromBlock,
+    9007199254740991,
+  );
+});
+
 test("every problem is reported together", () => {
   try {
     parseIndexerConfig({

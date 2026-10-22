@@ -4,6 +4,7 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "allowImportingTsExtensions": true,
+    "allowJs": true,
     "erasableSyntaxOnly": true,
     "noEmit": true,
     "strict": true,
@@ -21,6 +22,7 @@
     "services/sandbox-server/test",
     "e2e",
     "scripts",
-    "test/web"
+    "test/web",
+    "test/dashboard/*.ts"
   ]
 }

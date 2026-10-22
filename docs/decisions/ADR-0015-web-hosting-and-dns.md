@@ -104,3 +104,16 @@ Adopt **Option A**:
 - `node --test test/web/site.test.ts` (CI: `.github/workflows/site.yml`) checks headers, the disclosure, promotional wording, local references and external links.
 - `npx wrangler deploy --dry-run` packages the Worker without uploading it.
 - After cutover, attach the `curl -sI` header captures and `dig` output to #36.
+
+## Addendum (2026-10-22): `app.16ane.com` dashboard worker (#17, REQ-104)
+The owner/provider dashboard repeats this ADR's Option A on a second Worker
+rather than extending `16ane-site`: a separate assets-only Worker
+`16ane-dashboard` (`wrangler.dashboard.jsonc`, same account, `workers_dev`
+off, `preview_urls` off, non-production branch builds off) serves `dashboard/`
+on the `app.16ane.com` custom domain, deployed by Workers Builds from `main`.
+The split keeps the apex page script-free while the dashboard runs its own
+first-party scripts under a script-allowlisted CSP (`script-src 'self'`, no
+inline scripts/styles/handlers; `connect-src` limited to that environment's RPC
+and API by `scripts/dashboard-env.cjs`). Nothing here changes the apex
+decision; runbook in `docs/operations/DEPLOY_APP.md`, checks in
+`test/dashboard/` (CI: `.github/workflows/dashboard.yml`).

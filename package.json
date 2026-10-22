@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "typecheck": "tsc -p .",
+    "typecheck": "tsc -p . && tsc -p test/dashboard/e2e",
     "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts",
     "test:sdk-py": "python3 -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' -v",
     "test:cli": "node --experimental-strip-types --test packages/cli/test/*.test.ts",
@@ -14,6 +14,10 @@
     "test:e2e": "node --experimental-strip-types --test --test-concurrency=1 e2e/flows/*.test.ts",
     "test:e2e:ci": "node --experimental-strip-types --test --test-concurrency=1 --test-reporter=spec --test-reporter=tap --test-reporter-destination=stdout --test-reporter-destination=e2e-results.tap e2e/flows/*.test.ts",
     "test:web": "node --experimental-strip-types --test test/web/site.test.ts",
+    "test:dashboard": "node --experimental-strip-types --test test/dashboard/*.test.ts",
+    "test:e2e:dashboard-smoke": "playwright test --project=smoke",
+    "test:e2e:dashboard-tier1": "playwright test --project=tier1",
+    "test:e2e:dashboard-tier2": "playwright test -c playwright.tier2.config.ts",
     "test:scripts": "node --experimental-strip-types --test test/scripts/*.test.ts",
     "coverage:contracts": "forge coverage --report lcov --report-file coverage/forge.lcov --exclude-tests",
     "coverage:sdk-ts": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/sdk-ts.lcov packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts",
@@ -31,8 +35,12 @@
     "coverage:indexer": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/indexer.lcov services/indexer/test/*.test.ts"
   },
   "devDependencies": {
-    "typescript": "7.0.2",
+    "@playwright/test": "1.64.1",
+    "@synthetixio/synpress": "4.1.2",
     "@types/node": "26.6.5",
+    "axe-core": "4.14.0",
+    "playwright": "1.64.1",
+    "typescript": "7.0.2",
     "wrangler": "4.151.1"
   }
 }

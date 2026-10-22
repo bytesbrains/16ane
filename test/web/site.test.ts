@@ -160,3 +160,10 @@ test("the site workflow checks but never deploys, and runs no install scripts (A
   assert.doesNotMatch(wf, /wrangler deploy(?! --dry-run)/);
   for (const line of wf.match(/npm (ci|install)\b.*/g) ?? []) assert.match(line, /--ignore-scripts/);
 });
+
+test("mark-square.png is the square wallet mark the dashboard offers (EIP-747)", () => {
+  const png = readFileSync(path.join(WEB, "mark-square.png"));
+  assert.equal(png.readUInt32BE(16), png.readUInt32BE(20), "wallet marks are square");
+  assert.ok(png.readUInt32BE(16) >= 128, "wallet mark is legible at token-list size");
+  assert.ok(png.length <= 100 * 1024, "wallet mark stays small enough for wallets to fetch");
+});

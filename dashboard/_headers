@@ -1,0 +1,12 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://16ane.com data:; connect-src 'self' https://sepolia.base.org https://api.16ane.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+# Branch previews (<branch>-<name>.workers.dev) and the Worker's own workers.dev address
+# are copies of the dashboard, not the dashboard: keep them out of search.
+https://:version.:subdomain.workers.dev/*
+  X-Robots-Tag: noindex

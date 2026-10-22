@@ -1,0 +1,12 @@
+{
+  // The Playwright specs resolve like a bundler (Playwright does the loading),
+  // and Synpress ships extensionless .d.ts imports that nodenext rejects
+  // (TS2834 collapses its exports to zero under skipLibCheck). Everything else
+  // inherits the root config; only module resolution differs here.
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["."]
+}

@@ -122,14 +122,17 @@ export async function signedClaimBody(client: AneClient, recipientKey: string): 
 // vault-backed agent session. Teardown is registered on `t`. Two env knobs drive CI:
 // ANVIL_FORK_URL (fork Base Sepolia instead of an empty chain) and E2E_ARTIFACT_DIR
 // (per-stack anvil.log, deploy.log and stack.json for failure artifacts).
-export async function startSandboxStack(t: TestContext) {
+// `chainId` defaults to 84532; the dashboard Tier-2 spec passes 31337 so a real
+// MetaMask can add the test chain without colliding with built-in Base Sepolia.
+export async function startSandboxStack(t: TestContext, opts: { chainId?: number } = {}) {
+  const chainId = opts.chainId ?? 84532;
   const anvilPort = await findFreePort();
   const rpcUrl = `http://127.0.0.1:${anvilPort}`;
   const forkUrl = process.env.ANVIL_FORK_URL;
   const artifactDir = process.env.E2E_ARTIFACT_DIR;
   if (artifactDir) mkdirSync(artifactDir, { recursive: true });
 
-  const anvilArgs = ["--port", String(anvilPort), "--chain-id", "84532"];
+  const anvilArgs = ["--port", String(anvilPort), "--chain-id", String(chainId)];
   if (forkUrl) {
     anvilArgs.push("--fork-url", forkUrl);
   } else {
@@ -207,7 +210,7 @@ export async function startSandboxStack(t: TestContext) {
   // Start Reference Sandbox Server
   const sandbox = await createSandboxServer({
     rpcUrl,
-    chainId: 84532,
+    chainId,
     registryAddress,
     relayerPrivateKey: DEPLOYER_KEY,
     providerPrivateKey: PROVIDER_KEY,
@@ -218,7 +221,7 @@ export async function startSandboxStack(t: TestContext) {
 
   const client = new AneClient({
     rpcUrl,
-    chainId: 84532,
+    chainId,
     registryAddress,
   });
   const contracts = await client.resolveContracts();
@@ -254,6 +257,7 @@ export async function startSandboxStack(t: TestContext) {
       JSON.stringify(
         {
           rpcUrl,
+          chainId,
           registryAddress,
           vaultAddress,
           owner: owner.address,
@@ -269,6 +273,8 @@ export async function startSandboxStack(t: TestContext) {
 
   return {
     rpcUrl,
+    chainId,
+    anvilPid: anvilProc.pid,
     repoRoot,
     registryAddress,
     sandbox,

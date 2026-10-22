@@ -13,7 +13,6 @@ import {
   type SecretKey,
   type ServiceManifestPayload,
   type VaultAccountingSummary,
-  type X402QuoteEnvelope,
   type X402Receipt,
 } from "../../sdk-ts/src/index.ts";
 
@@ -31,7 +30,16 @@ export interface McpBackendConfig {
   /** Optional server-side per-call purchase ceiling in tANE base units. */
   maxPaymentCeiling?: bigint;
   fetchImpl?: typeof fetch;
+  /** Quote-probe response cap in bytes; defaults to DEFAULT_PROBE_MAX_BYTES. */
+  probeMaxBytes?: number;
+  /** Quote-probe fetch timeout in ms; defaults to DEFAULT_PROBE_TIMEOUT_MS. */
+  probeTimeoutMs?: number;
 }
+
+/** Quote probes only need headers and small JSON manifests; never buffer more. */
+export const DEFAULT_PROBE_MAX_BYTES = 256 * 1024;
+/** A hanging merchant must fail the probe, not the MCP request. */
+export const DEFAULT_PROBE_TIMEOUT_MS = 30_000;
 
 export interface VaultBalances {
   tokenBalance: bigint;
@@ -73,12 +81,6 @@ export interface McpBackend {
 
 function joinUrl(base: string, path: string): string {
   return base.replace(/\/+$/, "") + path;
-}
-
-export function decodeQuoteEnvelope(paymentRequiredB64: string): X402QuoteEnvelope {
-  return JSON.parse(
-    Buffer.from(paymentRequiredB64, "base64").toString("utf8"),
-  ) as X402QuoteEnvelope;
 }
 
 export class LiveBackend implements McpBackend {
@@ -177,12 +179,39 @@ export class LiveBackend implements McpBackend {
     url: string,
     init: { method: string; headers: Record<string, string>; body?: string },
   ): Promise<{ status: number; headers: Record<string, string>; text: string }> {
-    const res = await this.#fetch(url, { method: init.method, headers: init.headers, body: init.body });
+    const maxBytes = this.config.probeMaxBytes ?? DEFAULT_PROBE_MAX_BYTES;
+    const timeoutMs = this.config.probeTimeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
+    const res = await this.#fetch(url, {
+      method: init.method,
+      headers: init.headers,
+      body: init.body,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     const headers: Record<string, string> = {};
     res.headers.forEach((v, k) => {
       headers[k.toLowerCase()] = v;
     });
-    return { status: res.status, headers, text: await res.text() };
+    if (!res.body) {
+      return { status: res.status, headers, text: "" };
+    }
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new Error(
+          `Quote probe of ${new URL(url).origin} exceeded the ${maxBytes}-byte response cap`,
+        );
+      }
+      chunks.push(value);
+    }
+    return { status: res.status, headers, text: Buffer.concat(chunks).toString("utf8") };
   }
 }
 

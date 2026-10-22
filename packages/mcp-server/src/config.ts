@@ -190,7 +190,18 @@ export async function wireLiveBackend(config: McpConfig): Promise<LiveWiring> {
  * closed: refusing to serve is safer than serving with the wrong key.
  */
 export async function verifyDelegation(client: AneClient, config: McpConfig): Promise<void> {
-  const summary = await client.getAccountingSummary(config.vaultAddress);
+  let summary;
+  try {
+    summary = await client.getAccountingSummary(config.vaultAddress);
+  } catch (err) {
+    // A misconfigured vault (EOA, unrelated contract, wrong chain) fails here
+    // with a raw RPC revert; say what to check instead of surfacing it bare.
+    throw new Error(
+      `Vault delegation check failed for ${config.vaultAddress}: ` +
+        `${err instanceof Error ? err.message : String(err)}. ` +
+        `Is ANE_VAULT_ADDRESS a delegated AneAgentVault on this chain?`,
+    );
+  }
   if (summary.agentSigner.toLowerCase() !== config.sessionAddress.toLowerCase()) {
     throw new Error(
       `ANE_AGENT_PRIVATE_KEY does not match the vault's delegated agentSigner ` +

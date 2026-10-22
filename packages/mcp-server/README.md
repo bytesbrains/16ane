@@ -42,6 +42,8 @@ structured output.
 - The key is held in the SDK's `SecretKey` wrapper and never appears in tool
   results, errors, logs or stdio output; `test/security.test.ts` proves it
   against prompt-injection fixtures.
+- Quote probes (`get_quote`) cap merchant responses at 256 KiB and fail after
+  30 s, so a malicious or broken endpoint cannot exhaust memory or hang a call.
 - Streamable HTTP binds `127.0.0.1` by default, validates `Origin`, enforces
   the `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name` header/body mirrors, and
   supports an `ANE_MCP_AUTH_TOKEN` bearer token (set one whenever the endpoint

@@ -99,4 +99,14 @@ test("verifyDelegation fails closed unless the held key is the active agentSigne
     getAccountingSummary: async () => mockAccounting({ active: false }),
   } as unknown as AneClient;
   await assert.rejects(() => verifyDelegation(revoked, config), /not active/);
+
+  const notAVault = {
+    getAccountingSummary: async () => {
+      throw new Error("RPC error (3): execution reverted");
+    },
+  } as unknown as AneClient;
+  await assert.rejects(
+    () => verifyDelegation(notAVault, config),
+    /Vault delegation check failed.*Is ANE_VAULT_ADDRESS a delegated AneAgentVault/,
+  );
 });

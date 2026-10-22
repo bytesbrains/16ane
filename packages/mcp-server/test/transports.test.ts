@@ -332,6 +332,47 @@ test("Streamable HTTP maps protocol errors to statuses", async () => {
   assert.equal((toolError.json?.["result"] as Record<string, unknown>)["isError"], true);
 });
 
+test("Streamable HTTP parses the content-type media type strictly", async () => {
+  const listBody = { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } };
+  const withType = (contentType: string): Promise<{ status: number }> =>
+    post(listBody, { ...rpcHeaders("tools/list"), "content-type": contentType }).then((r) => ({
+      status: r.status,
+    }));
+
+  assert.equal((await withType("application/json")).status, 200);
+  assert.equal((await withType("application/json; charset=utf-8")).status, 200);
+  assert.equal((await withType("Application/JSON")).status, 200);
+  assert.equal((await withType("application/jsonp")).status, 400);
+  assert.equal((await withType("text/application/json")).status, 400);
+  assert.equal((await withType("text/plain")).status, 400);
+});
+
+test("Streamable HTTP rejects wrong bearer tokens of any length without throwing", async () => {
+  const options = { authToken: "secret-token" };
+  const listBody = { jsonrpc: "2.0", id: 1, method: "tools/list", params: { _meta: META } };
+  const short = await post(
+    listBody,
+    { ...rpcHeaders("tools/list"), authorization: "Bearer short" },
+    options,
+  );
+  assert.equal(short.status, 401);
+  const long = await post(
+    listBody,
+    { ...rpcHeaders("tools/list"), authorization: "Bearer a-much-longer-wrong-token-value" },
+    options,
+  );
+  assert.equal(long.status, 401);
+  const duplicated = await post(
+    listBody,
+    {
+      ...rpcHeaders("tools/list"),
+      authorization: ["Bearer secret-token", "Bearer secret-token"] as unknown as string,
+    },
+    options,
+  );
+  assert.equal(duplicated.status, 401);
+});
+
 test("Streamable HTTP answers accepted notifications with 202 and no body", async () => {
   const res = await post(
     { jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 1 } },

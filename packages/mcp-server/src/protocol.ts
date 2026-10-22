@@ -129,7 +129,11 @@ export class McpProtocolHandler {
       return null;
     }
     const id = message["id"];
-    if ((typeof id !== "string" && typeof id !== "number") || id === null) {
+    if (
+      (typeof id !== "string" && typeof id !== "number") ||
+      id === null ||
+      (typeof id === "number" && !Number.isInteger(id))
+    ) {
       return errorResponse(null, -32600, "Invalid Request: id must be a string or integer");
     }
 

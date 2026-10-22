@@ -158,6 +158,16 @@ test("malformed messages are rejected with -32600", async () => {
   );
 });
 
+test("non-integer numeric ids are rejected with -32600", async () => {
+  const res = await handler().handleMessage({
+    jsonrpc: "2.0",
+    id: 1.5,
+    method: "tools/list",
+    params: { _meta: META },
+  });
+  assert.equal(res?.error?.code, -32600);
+});
+
 test("adapter crashes surface as -32603 without hanging the session", async () => {
   const exploding: ToolAdapter = {
     listTools: () => listToolDefinitions(),

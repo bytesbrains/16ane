@@ -3,6 +3,7 @@
 // JSON object (SSE streams are a per-request server choice; notifications and
 // subscriptions are not needed for a static tool list).
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { McpProtocolHandler, errorResponse } from "./protocol.ts";
 
@@ -82,6 +83,21 @@ function decodeMirroredName(headerValue: string): string | null {
   }
 }
 
+/** Constant-time bearer check: hash-then-compare so lengths never leak or throw. */
+export function bearerMatches(header: string | string[] | undefined, token: string): boolean {
+  if (typeof header !== "string") {
+    return false;
+  }
+  const seen = createHash("sha256").update(header).digest();
+  const want = createHash("sha256").update(`Bearer ${token}`).digest();
+  return timingSafeEqual(seen, want);
+}
+
+/** Strict media-type parse: `application/json` optionally followed by parameters. */
+export function isJsonMediaType(contentType: string): boolean {
+  return contentType.split(";")[0]?.trim().toLowerCase() === "application/json";
+}
+
 export function createRequestListener(
   handler: McpProtocolHandler,
   options: StreamableHttpOptions = {},
@@ -108,14 +124,12 @@ export function createRequestListener(
           return;
         }
         if (options.authToken !== undefined) {
-          const auth = req.headers["authorization"];
-          if (auth !== `Bearer ${options.authToken}`) {
+          if (!bearerMatches(req.headers["authorization"], options.authToken)) {
             sendJson(res, 401, errorResponse(null, MCP_HTTP_UNAUTHORIZED, "Unauthorized: bad or missing bearer token"));
             return;
           }
         }
-        const contentType = req.headers["content-type"] ?? "";
-        if (!contentType.includes("application/json")) {
+        if (!isJsonMediaType(req.headers["content-type"] ?? "")) {
           sendJson(res, 400, errorResponse(null, -32600, "Invalid Request: content-type must be application/json"));
           return;
         }

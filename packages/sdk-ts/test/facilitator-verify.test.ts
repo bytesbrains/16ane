@@ -199,11 +199,14 @@ test("settleDecoded preflight refuses before any send; without it merchants are 
   assert.deepEqual(reverting.sent, []);
 
   // Preflight off: the mock chain settles and the proof is consumed, as merchants expect.
+  // One payload object for both calls: exactPayload() stamps Date.now(), so two calls straddling
+  // a second boundary would differ in validBefore and the "replay" would legitimately settle.
   const plain = mockChain();
-  const r3 = await plain.verifier.settleDecoded({ decoded: decoded("exact", exactPayload()), endpoint });
+  const payload = exactPayload();
+  const r3 = await plain.verifier.settleDecoded({ decoded: decoded("exact", payload), endpoint });
   assert.equal(r3.ok, true);
   assert.deepEqual(plain.sent, [TOKEN]);
-  const replay = await plain.verifier.settleDecoded({ decoded: decoded("exact", exactPayload()), endpoint });
+  const replay = await plain.verifier.settleDecoded({ decoded: decoded("exact", payload), endpoint });
   assert.equal(replay.ok, false);
   if (!replay.ok) assert.equal(replay.code, "ANE-E-4005");
 });

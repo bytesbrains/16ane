@@ -11,6 +11,9 @@
 - **Base** developer docs — https://docs.base.org/
 Research compatibility, token/chain restrictions, audit maturity, deployment availability, licensing, cost and maintainers. Do not assume all standards are finalized, universally adopted, or support tANE out of the box.
 
+## Research log
+- **2026-10-22, x402 schemes re-check (#62, ADR-0017):** `https://docs.x402.org/schemes/overview`, `/schemes/upto`, `/schemes/batch-settlement`, and the EVM spec at `https://github.com/x402-foundation/x402/blob/main/specs/schemes/batch-settlement/scheme_batch_settlement_evm.md`. Four schemes now exist (`exact`, `upto`, `batch-settlement`, `auth-capture`); `upto` still settles once per request; `batch-settlement` (EVM) uses escrow deposits plus cumulative off-chain vouchers with batched claims, no voucher expiry, and timed-withdrawal exits. Limitations: EVM wire details live mostly in `@x402/evm` code with thin adoption (secondary practitioner report); the May 2026 Cantina audit was seen only as a snippet (vouchers valid for full channel lifetime, no on-chain invalidation without migration) and is cited as directional only. Custom-ERC-20/tANE support on hosted facilitators was not re-verified — ADR-0005's USDC-only finding stands until rechecked.
+
 ## ADR queue
 - **ADR-001** Testnet chain and continuity policy.
 - **ADR-002** tANE ERC-20 mint roles, decimals, supply and metadata.
@@ -26,6 +29,9 @@ Research compatibility, token/chain restrictions, audit maturity, deployment ava
 - **ADR-012** Future ANE issuance/redemption and regulated partner boundaries.
 - **ADR-013** Open-source licenses and contribution governance.
 - **ADR-014** Brand/domain collision with existing 16ane business marketplace.
+- **ADR-015** Web hosting and DNS.
+- **ADR-016** Hosted faucet and demo server.
+- **ADR-017** High-frequency settlement via vault-native cumulative vouchers (proposed, #62).
 
 ## ADR template
 `Context`, `Options`, `Evidence and sources`, `Security and legal impacts`, `Decision`, `Consequences`, `Alternatives rejected`, `Open risks`, `Validation plan`, `Date and owners`.

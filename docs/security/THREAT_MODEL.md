@@ -31,5 +31,14 @@ Minimal delegated scopes; enforce limits in contract; allowlist contract methods
 9. Indexer outage -> direct on-chain verification path works.
 10. Delivery failure after settlement -> documented refund/claim workflow, no fictitious automatic rollback.
 
+## Voucher settlement additions (ADR-0017, proposed)
+
+- Vouchers outstanding to several merchants jointly exceed the remaining budget; later claims revert and merchants go uncompensated. Vault guarantee (settled spend never exceeds budget) holds regardless; merchants bound the risk with exposure caps, short voucher TTLs, vault-state mirroring, and prompt claims.
+- Merchant serves on stale mirrored vault state and over-extends credit. Reference implementation re-mirrors on a mandatory cadence; loss bounded by the merchant's own exposure cap.
+- Revocation, signer rotation, or expiry voids served-but-unclaimed vouchers. By design; bounded by TTL and claim cadence and disclosed to merchants and agents.
+- Same-voucher resubmission or stale voucher claim reverts on non-positive delta; distinct EIP-712 struct typehash prevents `SpendIntent`/`Voucher` cross-replay.
+- Over-claiming beyond the signed cumulative is protocol-impossible (claims pay `signedCumulative - claimed`), unlike trust-based actuals.
+- Compromised agent key mints vouchers up to the remaining budget until revocation: equivalent to today's compromised-signer exposure, bounded additionally by voucher TTL.
+
 ## Launch gates
 Threat model reviewed, tests automated, secrets scanned, source verified, contract roles disclosed, rollback/migration rehearsed, hosted spend caps configured, abuse reporting contact live. For future real-value mainnet, require external security audits and explicit legal/compliance sign-off; a public testnet launch does not satisfy those requirements.

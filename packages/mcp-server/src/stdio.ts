@@ -25,7 +25,6 @@ export async function runStdio(
 ): Promise<void> {
   const { stdin, stdout, stderr } = streams;
   const cancelled = new Set<string | number>();
-  const pending = new Map<string | number, { settled: boolean }>();
   let buffer = "";
 
   const onLine = async (line: string): Promise<void> => {
@@ -54,12 +53,17 @@ export async function runStdio(
     }
     const id = record.id;
     if (typeof id === "string" || typeof id === "number") {
-      pending.set(id, { settled: false });
+      // A cancel that arrived before its request must skip execution, not just
+      // the response: on this ordered channel we know before spending anything.
+      if (cancelled.has(id)) {
+        cancelled.delete(id);
+        return;
+      }
     }
     const response = await handler.handleMessage(message);
     if (typeof id === "string" || typeof id === "number") {
-      pending.get(id)!.settled = true;
-      pending.delete(id);
+      // A cancel that arrived mid-execution still drops the response; work
+      // already done (e.g. a sent transaction) cannot be taken back.
       if (cancelled.has(id)) {
         cancelled.delete(id);
         return;

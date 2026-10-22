@@ -25,7 +25,10 @@ function handler(): McpProtocolHandler {
   return new McpProtocolHandler(new SixteenAneAdapter(new MockBackend()));
 }
 
-async function runStdioSession(lines: string[]): Promise<{ stdout: string[]; stderr: string }> {
+async function runStdioSession(
+  lines: string[],
+  h: McpProtocolHandler = handler(),
+): Promise<{ stdout: string[]; stderr: string }> {
   const stdin = new PassThrough();
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -37,7 +40,7 @@ async function runStdioSession(lines: string[]): Promise<{ stdout: string[]; std
   stderr.on("data", (chunk: Buffer) => {
     err += chunk.toString("utf8");
   });
-  const serving = runStdio(handler(), { stdin, stdout, stderr });
+  const serving = runStdio(h, { stdin, stdout, stderr });
   for (const line of lines) {
     stdin.write(`${line}\n`);
   }
@@ -85,6 +88,28 @@ test("stdio drops the response for a cancelled request", async () => {
   // Cancellation is in-order on the shared channel: id 5 was already abandoned.
   assert.equal(stdout.length, 1);
   assert.equal((JSON.parse(stdout[0]) as { id: number }).id, 6);
+});
+
+test("stdio skips an already-cancelled purchase without spending", async () => {
+  const backend = new MockBackend();
+  const h = new McpProtocolHandler(new SixteenAneAdapter(backend));
+  const { stdout, stderr } = await runStdioSession(
+    [
+      JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/cancelled",
+        params: { requestId: 5 },
+      }),
+      msg(5, "tools/call", {
+        name: "purchase_service",
+        arguments: { url: "https://merchant.test/sum", max_payment: "16" },
+      }),
+    ],
+    h,
+  );
+  assert.equal(backend.purchaseCalls.length, 0);
+  assert.deepEqual(stdout, []);
+  assert.equal(stderr, "");
 });
 
 test("httpStatusFor pins the spec's status mapping", () => {

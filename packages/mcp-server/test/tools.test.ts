@@ -232,6 +232,14 @@ test("purchase_service clamps to the ceiling and requires max_payment", async ()
     max_payment: "1.5",
   });
   assert.equal(badAmount.isError, true);
+
+  const overUint256 = await a.callTool("purchase_service", {
+    url: "https://merchant.test/sum",
+    max_payment: `1${"0".repeat(100)}`,
+  });
+  assert.equal(overUint256.isError, true);
+  assert.match(String((overUint256.structuredContent as Record<string, unknown>)["error"]), /uint256/);
+  assert.equal(backend.purchaseCalls.length, 1);
 });
 
 test("purchase_service surfaces quote-over-max and backend failures as tool errors", async () => {

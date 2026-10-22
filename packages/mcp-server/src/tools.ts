@@ -9,7 +9,10 @@
 
 import { SANDBOX_DISCLAIMER } from "./backend.ts";
 import type { McpBackend } from "./backend.ts";
-import type { ServiceManifestPayload } from "../../sdk-ts/src/index.ts";
+import type {
+  ServiceManifestEndpoint,
+  ServiceManifestPayload,
+} from "../../sdk-ts/src/index.ts";
 import type { ToolAdapter, ToolDefinition, ToolResult } from "./protocol.ts";
 
 export const UNTRUSTED_BEGIN =
@@ -71,6 +74,8 @@ function optionalBoolean(args: Record<string, unknown>, field: string, fallback:
   return value;
 }
 
+const MAX_UINT256 = (1n << 256n) - 1n;
+
 /** Parses a non-negative base-units amount ("16", "0", never floats or symbols). */
 export function parseAmount(value: unknown, field: string): bigint {
   if (typeof value !== "string" || !/^(0|[1-9][0-9]*)$/.test(value)) {
@@ -78,7 +83,13 @@ export function parseAmount(value: unknown, field: string): bigint {
       `Argument '${field}' must be a base-units integer string (e.g. \"16\"), got ${JSON.stringify(value)}`,
     );
   }
-  return BigInt(value);
+  // Every amount flows to a uint256 on-chain; reject what could never settle
+  // here with a clear error instead of a confusing downstream revert.
+  const amount = BigInt(value);
+  if (amount > MAX_UINT256) {
+    throw new ToolError(`Argument '${field}' exceeds the uint256 maximum`);
+  }
+  return amount;
 }
 
 function requireHttpUrl(raw: string, field: string): string {
@@ -326,6 +337,45 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
 
 export function listToolDefinitions(): ToolDefinition[] {
   return TOOL_DEFINITIONS;
+}
+
+/** Validates the `endpoints` argument of `publish_service` into manifest form. */
+export function parseManifestEndpoints(endpoints: unknown): ServiceManifestEndpoint[] {
+  if (!Array.isArray(endpoints) || endpoints.length === 0) {
+    throw new ToolError("Argument 'endpoints' must be a non-empty array");
+  }
+  return endpoints.map((e, i) => {
+    if (!isRecord(e)) {
+      throw new ToolError(`endpoints[${i}] must be an object`);
+    }
+    const rawMethod = e["method"];
+    if (rawMethod !== "GET" && rawMethod !== "POST" && rawMethod !== "PUT" && rawMethod !== "DELETE") {
+      throw new ToolError(`endpoints[${i}].method must be one of GET, POST, PUT, DELETE`);
+    }
+    const method: "GET" | "POST" | "PUT" | "DELETE" = rawMethod;
+    const rawScheme = e["scheme"];
+    if (rawScheme !== "ane-vault-v1" && rawScheme !== "exact") {
+      throw new ToolError(`endpoints[${i}].scheme must be 'ane-vault-v1' or 'exact'`);
+    }
+    const scheme: "ane-vault-v1" | "exact" = rawScheme;
+    for (const f of ["id", "path", "price_amount"] as const) {
+      if (typeof e[f] !== "string" || (e[f] as string).length === 0) {
+        throw new ToolError(`endpoints[${i}].${f} must be a non-empty string`);
+      }
+    }
+    parseAmount(e["price_amount"], `endpoints[${i}].price_amount`);
+    if (e["description"] !== undefined && typeof e["description"] !== "string") {
+      throw new ToolError(`endpoints[${i}].description must be a string`);
+    }
+    return {
+      id: e["id"] as string,
+      method,
+      path: e["path"] as string,
+      priceAmount: e["price_amount"] as string,
+      scheme,
+      ...(typeof e["description"] === "string" ? { description: e["description"] } : {}),
+    };
+  });
 }
 
 export class SixteenAneAdapter implements ToolAdapter {
@@ -672,42 +722,7 @@ export class SixteenAneAdapter implements ToolAdapter {
     const name = requireString(a, "name");
     const version = requireString(a, "version");
     const description = optionalString(a, "description");
-    const endpoints = a["endpoints"];
-    if (!Array.isArray(endpoints) || endpoints.length === 0) {
-      throw new ToolError("Argument 'endpoints' must be a non-empty array");
-    }
-    const manifestEndpoints = endpoints.map((e, i) => {
-      if (!isRecord(e)) {
-        throw new ToolError(`endpoints[${i}] must be an object`);
-      }
-      const rawMethod = e["method"];
-      if (rawMethod !== "GET" && rawMethod !== "POST" && rawMethod !== "PUT" && rawMethod !== "DELETE") {
-        throw new ToolError(`endpoints[${i}].method must be one of GET, POST, PUT, DELETE`);
-      }
-      const method: "GET" | "POST" | "PUT" | "DELETE" = rawMethod;
-      const rawScheme = e["scheme"];
-      if (rawScheme !== "ane-vault-v1" && rawScheme !== "exact") {
-        throw new ToolError(`endpoints[${i}].scheme must be 'ane-vault-v1' or 'exact'`);
-      }
-      const scheme: "ane-vault-v1" | "exact" = rawScheme;
-      for (const f of ["id", "path", "price_amount"] as const) {
-        if (typeof e[f] !== "string" || (e[f] as string).length === 0) {
-          throw new ToolError(`endpoints[${i}].${f} must be a non-empty string`);
-        }
-      }
-      parseAmount(e["price_amount"], `endpoints[${i}].price_amount`);
-      if (e["description"] !== undefined && typeof e["description"] !== "string") {
-        throw new ToolError(`endpoints[${i}].description must be a string`);
-      }
-      return {
-        id: e["id"] as string,
-        method,
-        path: e["path"] as string,
-        priceAmount: e["price_amount"] as string,
-        scheme,
-        ...(typeof e["description"] === "string" ? { description: e["description"] } : {}),
-      };
-    });
+    const manifestEndpoints = parseManifestEndpoints(a["endpoints"]);
     // Wallet-side policy: an agent publishes its own endpoint; revenue is
     // addressed to its vault, in tANE, on the configured network. No overrides.
     const unsigned = {

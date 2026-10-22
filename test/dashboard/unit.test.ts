@@ -11,7 +11,7 @@ import {
   abiWordUint,
   functionSelector,
 } from "../../dashboard/assets/abi.js";
-import { campaignControlMessage } from "../../dashboard/assets/api.js";
+import { campaignControlMessage, getReceipt } from "../../dashboard/assets/api.js";
 import {
   accountingSummary,
   createVaultData,
@@ -110,8 +110,52 @@ test("read decoders parse scripted RPC responses", async () => {
       assert.equal(summary.budgetMode, "FIXED");
       assert.equal(summary.active, true);
       const record = await paymentRecord(VAULT, "0x" + "cc".repeat(32));
+      assert.ok(record);
       assert.equal(record.amountPaid, 16n);
       assert.equal(record.settledAt, 100);
+    },
+  );
+});
+
+test("vaultsByOwner rejects truncated factory responses", async () => {
+  // Length word says two vaults but only one address word follows.
+  const truncated = "0x" + word(32n) + word(2n) + addrWord(VAULT);
+  await withFetch(rpcResponder({ "0xac818711": truncated }), async () => {
+    await assert.rejects(() => vaultsByOwner(VAULT, OWNER), /Unexpected vault list/);
+  });
+  await withFetch(rpcResponder({ "0xac818711": "0x" }), async () => {
+    await assert.rejects(() => vaultsByOwner(VAULT, OWNER), /Unexpected vault list/);
+  });
+});
+
+test("paymentRecord returns null when the target holds no vault record", async () => {
+  const id = "0x" + "cc".repeat(32);
+  await withFetch(rpcResponder({ "0x0716326d": "0x" }), async () => {
+    assert.equal(await paymentRecord(VAULT, id), null);
+  });
+  await withFetch(rpcResponder({ "0x0716326d": "0x" + addrWord(OWNER) + word(16n) }), async () => {
+    assert.equal(await paymentRecord(VAULT, id), null);
+  });
+});
+
+test("getReceipt maps 404 to null and surfaces other failures", async () => {
+  const id = "0x" + "cc".repeat(32);
+  await withFetch(
+    (url) => (url.includes("/v1/payments/") ? { status: 404, json: {} } : { status: 200, json: {} }),
+    async () => {
+      assert.equal(await getReceipt(id), null);
+    },
+  );
+  await withFetch(() => ({ status: 500, json: {} }), async () => {
+    await assert.rejects(() => getReceipt(id), /HTTP 500/);
+  });
+  await withFetch(
+    (url) =>
+      url.includes("/v1/payments/")
+        ? { status: 200, json: { txHash: "0xabc", payer: VAULT } }
+        : { status: 404, json: {} },
+    async () => {
+      assert.deepEqual(await getReceipt(id), { txHash: "0xabc", payer: VAULT });
     },
   );
 });

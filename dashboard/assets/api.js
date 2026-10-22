@@ -6,7 +6,9 @@ async function getJson(path) {
   const res = await fetch(`${NETWORK.apiUrl.replace(/\/$/, "")}${path}`, {
     headers: { accept: "application/json" },
   });
-  if (!res.ok) throw new Error(`API ${path} failed: HTTP ${res.status}`);
+  if (!res.ok) {
+    throw Object.assign(new Error(`API ${path} failed: HTTP ${res.status}`), { status: res.status });
+  }
   return res.json();
 }
 
@@ -46,7 +48,7 @@ export async function getReceipt(id) {
   try {
     return await getJson(`/v1/payments/${encodeURIComponent(id)}`);
   } catch (err) {
-    if (err instanceof Error && err.message.includes("HTTP 404")) return null;
+    if (err && err.status === 404) return null;
     throw err;
   }
 }

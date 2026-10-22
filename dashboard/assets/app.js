@@ -519,7 +519,7 @@ async function lookupPayment(event) {
     let record = null;
     for (const vault of candidates) {
       const candidate = await paymentRecord(vault, id);
-      if (candidate.settledAt > 0 || candidate.amountPaid > 0n) {
+      if (candidate && (candidate.settledAt > 0 || candidate.amountPaid > 0n)) {
         record = candidate;
         break;
       }

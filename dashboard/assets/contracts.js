@@ -48,7 +48,9 @@ export async function tokenBalanceOf(token, account) {
 export async function vaultsByOwner(factory, owner) {
   const out = await ethCall(factory, functionSelector("getVaultsByOwner(address)") + abiWordAddress(owner));
   const w = splitWords(out);
+  if (w.length < 2) throw new Error("Unexpected vault list response from the factory.");
   const length = wordToNumber(w[1]);
+  if (w.length < 2 + length) throw new Error("Unexpected vault list response from the factory.");
   return w.slice(2, 2 + length).map(wordToAddress);
 }
 
@@ -85,12 +87,16 @@ export async function accountingSummary(vault) {
   };
 }
 
+// Null when the target holds no decodable record: eth_call to an address with
+// no vault code answers empty, and lookupPayment probes several candidates, so
+// "no record here" is routine (skip it), not an error (abort the lookup).
 export async function paymentRecord(vault, paymentId) {
   const out = await ethCall(
     vault,
     functionSelector("payments(bytes32)") + abiWordBytes32(paymentId),
   );
   const w = splitWords(out);
+  if (w.length < 4) return null;
   return {
     merchant: wordToAddress(w[0]),
     amountPaid: wordToBigInt(w[1]),

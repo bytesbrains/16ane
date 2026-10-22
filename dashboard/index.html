@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>16ane dashboard (sandbox)</title>
+  <meta name="description" content="Owner and provider dashboard for the 16ane testnet sandbox: fund a wallet, set an agent budget, watch spending and earnings. tANE has no cash value.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0B1A3A">
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="https://app.16ane.com/">
+  <link rel="icon" href="https://16ane.com/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="https://16ane.com/apple-touch-icon.png">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="bar">
+    <a class="brand" href="#/overview" aria-label="16ane dashboard home">
+      <img src="https://16ane.com/mark.png" alt="" width="34" height="24">
+      <span>16ane dashboard</span>
+    </a>
+    <nav aria-label="Dashboard">
+      <ul class="nav">
+        <li><a href="#/overview" data-route="overview">Overview</a></li>
+        <li><a href="#/fund" data-route="fund">Fund</a></li>
+        <li><a href="#/vaults" data-route="vaults">Vaults</a></li>
+        <li><a href="#/delegate" data-route="delegate">Delegate</a></li>
+        <li><a href="#/earn" data-route="earn">Earn</a></li>
+        <li><a href="#/campaigns" data-route="campaigns">Campaigns</a></li>
+        <li><a href="#/activity" data-route="activity">Activity</a></li>
+      </ul>
+    </nav>
+    <div class="wallet" id="wallet">
+      <span class="wallet-address" id="wallet-address" hidden></span>
+      <button type="button" class="button small" id="connect">Connect wallet</button>
+    </div>
+  </header>
+
+  <p class="sandbox" role="note"><strong>Sandbox.</strong> TEST TOKENS (tANE) — NO CASH VALUE. Nothing here is money, backing, or a promise of anything.</p>
+
+  <main id="main">
+    <p id="status" class="status-line" role="status" aria-live="polite"></p>
+
+    <section data-screen="overview" aria-labelledby="overview-title" hidden>
+      <h2 id="overview-title" tabindex="-1">Overview</h2>
+      <p class="lede">Your test wallet and agent budget at a glance. Connect a wallet on the dashboard network to begin.</p>
+      <dl class="stats" id="overview-stats">
+        <div><dt>Wallet tANE</dt><dd id="stat-wallet">—</dd></div>
+        <div><dt>Vault tANE</dt><dd id="stat-vault">—</dd></div>
+        <div><dt>Spendable now</dt><dd id="stat-spendable">—</dd></div>
+        <div><dt>Verified revenue</dt><dd id="stat-revenue">—</dd></div>
+      </dl>
+      <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
+      <div class="actions">
+        <button type="button" class="button" id="add-token">Add tANE to wallet</button>
+        <a class="button" href="#/fund">Fund wallet</a>
+        <a class="button" href="#/vaults">Manage vaults</a>
+      </div>
+      <p class="fine" id="network-line">Network: loading…</p>
+    </section>
+
+    <section data-screen="fund" aria-labelledby="fund-title" hidden>
+      <h2 id="fund-title" tabindex="-1">Fund</h2>
+      <p class="lede">Claim free test tokens from the sandbox faucet. One claim per account per window; the faucet never asks for payment or keys.</p>
+      <form id="faucet-form">
+        <p>
+          <label for="faucet-to">Recipient address</label>
+          <input id="faucet-to" name="to" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="0x…" required>
+        </p>
+        <p class="actions">
+          <button type="submit" class="button primary" id="faucet-claim">Claim test tokens</button>
+          <button type="button" class="button" id="faucet-fill">Use connected wallet</button>
+        </p>
+      </form>
+      <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
+      <h3>Faucet status</h3>
+      <dl class="stats" id="faucet-stats">
+        <div><dt>Claim status</dt><dd id="faucet-used">—</dd></div>
+        <div><dt>Next claim after</dt><dd id="faucet-next">—</dd></div>
+        <div><dt>Faucet balance</dt><dd id="faucet-balance">—</dd></div>
+      </dl>
+    </section>
+
+    <section data-screen="vaults" aria-labelledby="vaults-title" hidden>
+      <h2 id="vaults-title" tabindex="-1">Vaults</h2>
+      <p class="lede">An agent vault holds one agent's budget apart from your own wallet. Create one, then open it to see policy, spending, and controls.</p>
+      <form id="vault-create-form">
+        <fieldset>
+          <legend>Create a vault</legend>
+          <p>The vault starts empty and agentless. After creating it, send it test tokens, then set a budget on the Delegate screen.</p>
+          <p class="actions"><button type="submit" class="button primary">Create vault</button></p>
+        </fieldset>
+      </form>
+      <h3>Your vaults</h3>
+      <ul class="vault-list" id="vault-list"></ul>
+      <form id="vault-open-form">
+        <p>
+          <label for="vault-address">Open a vault by address</label>
+          <input id="vault-address" name="address" type="text" autocomplete="off" spellcheck="false" placeholder="0x…">
+        </p>
+        <p class="actions"><button type="submit" class="button">Open vault</button></p>
+      </form>
+      <div id="vault-detail" hidden>
+        <h3>Vault <code id="vault-detail-address"></code></h3>
+        <dl class="stats" id="vault-stats">
+          <div><dt>Balance</dt><dd id="vault-balance">—</dd></div>
+          <div><dt>Spendable now</dt><dd id="vault-spendable">—</dd></div>
+          <div><dt>Cumulative spent</dt><dd id="vault-spent">—</dd></div>
+          <div><dt>Agent signer</dt><dd id="vault-agent-signer">—</dd></div>
+          <div><dt>Budget mode</dt><dd id="vault-mode">—</dd></div>
+          <div><dt>Status</dt><dd id="vault-status">—</dd></div>
+        </dl>
+        <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
+        <div class="actions">
+          <a class="button" href="#/delegate">Change delegation</a>
+          <button type="button" class="button danger" id="vault-revoke">Revoke agent</button>
+          <button type="button" class="button" id="vault-withdraw">Withdraw leftover</button>
+        </div>
+      </div>
+    </section>
+
+    <section data-screen="delegate" aria-labelledby="delegate-title" hidden>
+      <h2 id="delegate-title" tabindex="-1">Delegate</h2>
+      <p class="lede">Give an agent a bounded budget on the open vault. The agent key never leaves your hands: every signature is requested in your wallet.</p>
+      <form id="delegate-form">
+        <p>
+          <label for="delegate-agent">Agent signer address</label>
+          <input id="delegate-agent" name="agent" type="text" autocomplete="off" spellcheck="false" placeholder="0x…" required>
+        </p>
+        <p>
+          <label for="delegate-max">Maximum total spend in tANE (whole units)</label>
+          <input id="delegate-max" name="maxTotalSpend" type="text" inputmode="numeric" autocomplete="off" required>
+        </p>
+        <p>
+          <label for="delegate-per-tx">Maximum per payment in tANE (0 for none)</label>
+          <input id="delegate-per-tx" name="maxPerTx" type="text" inputmode="numeric" autocomplete="off" value="0">
+        </p>
+        <p class="actions"><button type="submit" class="button primary">Sign delegation</button></p>
+      </form>
+      <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
+      <p class="fine">Delegating rotates any previous agent key: outstanding payment authorizations from the old key stop working.</p>
+    </section>
+
+    <section data-screen="earn" aria-labelledby="earn-title" hidden>
+      <h2 id="earn-title" tabindex="-1">Earn</h2>
+      <p class="lede">Services in the sandbox directory and what your vaults have earned by serving other agents.</p>
+      <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
+      <h3>Directory services</h3>
+      <ul class="service-list" id="service-list"></ul>
+      <h3>Revenue</h3>
+      <dl class="stats" id="revenue-stats">
+        <div><dt>Verified revenue</dt><dd id="revenue-verified">—</dd></div>
+        <div><dt>Budget mode</dt><dd id="revenue-mode">—</dd></div>
+      </dl>
+      <p class="fine">Under a fixed budget, what an agent earns never raises what it may spend.</p>
+    </section>
+
+    <section data-screen="campaigns" aria-labelledby="campaigns-title" hidden>
+      <h2 id="campaigns-title" tabindex="-1">Campaigns</h2>
+      <p class="lede">Provider-sponsored trial campaigns: who pays for the free calls, what is left, and provider controls.</p>
+      <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
+      <ul class="campaign-list" id="campaign-list"></ul>
+      <form id="campaign-control-form" hidden>
+        <fieldset>
+          <legend>Control a campaign (provider signature required)</legend>
+          <p>
+            <label for="campaign-id">Campaign id</label>
+            <input id="campaign-id" name="id" type="text" autocomplete="off" spellcheck="false" required>
+          </p>
+          <p class="actions">
+            <button type="submit" class="button" name="op" value="pause">Pause</button>
+            <button type="submit" class="button" name="op" value="resume">Resume</button>
+          </p>
+        </fieldset>
+      </form>
+    </section>
+
+    <section data-screen="activity" aria-labelledby="activity-title" hidden>
+      <h2 id="activity-title" tabindex="-1">Activity</h2>
+      <p class="lede">Look up any payment by its id: the on-chain record and, when settled through the sandbox, its verifiable receipt.</p>
+      <form id="payment-form">
+        <p>
+          <label for="payment-id">Payment id</label>
+          <input id="payment-id" name="id" type="text" autocomplete="off" spellcheck="false" placeholder="0x…" required>
+        </p>
+        <p class="actions"><button type="submit" class="button primary">Look up payment</button></p>
+      </form>
+      <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
+      <div id="payment-result" hidden>
+        <h3>Payment</h3>
+        <dl class="stats" id="payment-stats">
+          <div><dt>Merchant</dt><dd id="payment-merchant">—</dd></div>
+          <div><dt>Paid</dt><dd id="payment-paid">—</dd></div>
+          <div><dt>Refunded</dt><dd id="payment-refunded">—</dd></div>
+          <div><dt>Settled at</dt><dd id="payment-settled">—</dd></div>
+          <div><dt>Receipt</dt><dd id="payment-receipt">—</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <noscript><p>This dashboard needs JavaScript to talk to your wallet. Everything it does is also possible from the <code>ane</code> CLI in the repository.</p></noscript>
+  </main>
+
+  <footer class="foot">
+    <p>16ane dashboard for the testnet sandbox. tANE has no cash value and never converts into anything. <span id="contracts-line">Contracts: loading…</span></p>
+    <p>Code under the <a href="https://github.com/bytesbrains/16ane/blob/main/LICENSE">MIT License</a>. Found a vulnerability? Follow the <a href="https://github.com/bytesbrains/16ane/blob/main/SECURITY.md">security policy</a>.</p>
+  </footer>
+</body>
+</html>

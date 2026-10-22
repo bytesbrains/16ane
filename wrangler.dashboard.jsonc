@@ -1,0 +1,22 @@
+{
+  // app.16ane.com: an assets-only Worker serving dashboard/ (ADR-0015, #17). Deployed by
+  // Cloudflare Workers Builds from main; there is no Worker script, so _headers applies to
+  // every response. Uses a separate worker from 16ane-site so the marketing site stays
+  // script-free while the dashboard runs its own first-party scripts.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "16ane-dashboard",
+  // The BytesBrains Cloudflare account that holds the 16ane.com zone; pinned so a deploy cannot land elsewhere.
+  "account_id": "1539190079828744a96d18d3fa1b4241",
+  "compatibility_date": "2026-10-22",
+  "assets": {
+    "directory": "./dashboard",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "app.16ane.com", "custom_domain": true }
+  ],
+  "workers_dev": false,
+  // Workers Builds builds only main (non-production branch builds are off in the dashboard, ADR-0015),
+  // so there are no per-branch preview URLs. Explicit, although false is the default.
+  "preview_urls": false
+}

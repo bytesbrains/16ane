@@ -70,7 +70,9 @@ export function buildDemoManifest(
     description:
       "Reference x402 v2 paid agent endpoints settling in simulated tANE (TEST TOKENS - NO CASH VALUE)",
     version: "0.1.0",
-    network: "eip155:84532",
+    // The network string must agree with the chainId field: on a 31337 test
+    // stack a hardcoded 84532 advertises a chain this server is not on.
+    network: `eip155:${chainId}` as "eip155:84532" | "eip155:31337",
     chainId,
     payTo: ctx.providerAddress,
     tokenAddress: ctx.contracts.aneTestToken,
@@ -162,7 +164,7 @@ export async function handleDemoRequest(
     priceAmount: PRICE_BY_PATH[pathname],
     payTo: providerAddress,
     assetAddress: contracts.aneTestToken,
-    network: "eip155:84532",
+    network: `eip155:${ctx.client.chainId}` as "eip155:84532" | "eip155:31337",
     description: `16ane Sandbox Demo (${pathname})`,
   };
 
@@ -201,7 +203,7 @@ export async function handleDemoRequest(
           x402Version: 2,
           success: true,
           scheme: "sponsored-trial",
-          network: "eip155:84532",
+          network: `eip155:${ctx.client.chainId}` as "eip155:84532" | "eip155:31337",
           txHash: "0x" + "00".repeat(32),
           blockNumber: 0,
           payer: toChecksumAddress(

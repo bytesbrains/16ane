@@ -30,7 +30,7 @@ COPRA is commodity-referenced and therefore has variable INR purchasing power. 1
 - Support India-first content and examples while allowing global sandbox participation.
 
 ## First five-minute success story
-_Target experience against the public sandbox (`https://api.16ane.com`, live since 2026-10-21 for faucet claims, demo APIs and the service directory; `docs.16ane.com` and the owner dashboard below don't exist yet)._
+_Target experience against the public sandbox (`https://api.16ane.com`, live since 2026-10-21 for faucet claims, demo APIs and the service directory; `docs.16ane.com` doesn't exist yet, and the owner dashboard below ships in this repository but is not yet connected at `app.16ane.com`)._
 
 1. Developer opens `docs.16ane.com` and creates an agent wallet on the public sandbox.
 2. Faucet grants 16,000 **tANE** (not rupees); owner delegates a fixed budget.

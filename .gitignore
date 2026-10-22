@@ -81,3 +81,8 @@ lcov.info
 # E2E run output (TAP report and per-stack logs; CI uploads them on failure)
 e2e-results.tap
 e2e-artifacts/
+
+# Playwright run output (traces and reports; CI uploads them on failure)
+test-results/
+playwright-report/
+playwright/.auth/

@@ -1,0 +1,21 @@
+{
+  "name": "@16ane/mcp-server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol adapter for the 16ane Agent Economy sandbox (tANE, no cash value)",
+  "type": "module",
+  "main": "./src/main.ts",
+  "bin": {
+    "16ane-mcp-server": "./bin/mcp-server.mjs"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "license": "MIT",
+  "homepage": "https://16ane.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bytesbrains/16ane.git",
+    "directory": "packages/mcp-server"
+  },
+  "bugs": "https://github.com/bytesbrains/16ane/issues"
+}

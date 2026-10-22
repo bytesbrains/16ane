@@ -14,6 +14,8 @@
   "include": [
     "packages/sdk-ts/src",
     "packages/sdk-ts/test",
+    "packages/mcp-server/src",
+    "packages/mcp-server/test",
     "packages/cli/test",
     "services/sandbox-server/src",
     "services/sandbox-server/test",

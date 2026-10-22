@@ -1,11 +1,11 @@
-.PHONY: all build test test-contracts test-sdk-ts test-sdk-py test-cli test-server test-facilitator test-indexer test-e2e typecheck fmt fmt-check lint lint-py clean deploy-dry-run coverage coverage-contracts coverage-sdk-ts coverage-sdk-py coverage-cli coverage-server coverage-facilitator coverage-indexer coverage-scripts coverage-e2e coverage-report
+.PHONY: all build test test-contracts test-sdk-ts test-sdk-py test-cli test-mcp test-server test-facilitator test-indexer test-e2e typecheck fmt fmt-check lint lint-py clean deploy-dry-run coverage coverage-contracts coverage-sdk-ts coverage-sdk-py coverage-cli coverage-mcp coverage-server coverage-facilitator coverage-indexer coverage-scripts coverage-e2e coverage-report
 
 all: build test lint
 
 build:
 	forge build --sizes
 
-test: test-contracts test-sdk-ts test-sdk-py test-cli test-server test-facilitator test-indexer test-e2e
+test: test-contracts test-sdk-ts test-sdk-py test-cli test-mcp test-server test-facilitator test-indexer test-e2e
 
 test-contracts:
 	forge test -vvv
@@ -18,6 +18,9 @@ test-sdk-py:
 
 test-cli:
 	npm run test:cli
+
+test-mcp:
+	npm run test:mcp
 
 test-server:
 	npm run test:server
@@ -47,6 +50,9 @@ coverage-sdk-py:
 
 coverage-cli:
 	mkdir -p coverage && npm run coverage:cli
+
+coverage-mcp:
+	mkdir -p coverage && npm run coverage:mcp
 
 coverage-server:
 	mkdir -p coverage && npm run coverage:server

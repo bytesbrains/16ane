@@ -64,7 +64,7 @@ jobs:
           PRIVATE_KEY: '1'
         run: forge script script/DeploySandbox.s.sol:DeploySandbox --chain-id 84532
 
-      - name: Type-check TypeScript (SDK, CLI, server, E2E)
+      - name: Type-check TypeScript (SDK, CLI, MCP server, server, E2E)
         run: npm run typecheck
 
       - name: Lint Python SDK
@@ -78,6 +78,9 @@ jobs:
 
       - name: Run CLI unit tests
         run: npm run test:cli
+
+      - name: Run MCP server unit tests
+        run: npm run test:mcp
 
       - name: Run sandbox server unit tests
         run: npm run test:server
@@ -135,6 +138,9 @@ jobs:
 
       - name: Collect CLI coverage
         run: npm run coverage:cli
+
+      - name: Collect MCP server coverage
+        run: npm run coverage:mcp
 
       - name: Collect sandbox server coverage
         run: npm run coverage:server

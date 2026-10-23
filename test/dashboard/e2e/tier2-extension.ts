@@ -63,9 +63,13 @@ async function downloadZip(zipPath: string): Promise<void> {
   writeFileSync(zipPath, Buffer.from(await res.arrayBuffer()));
 }
 
+// Absolute path, never resolved through PATH; present on macOS and the Ubuntu
+// CI runners alike.
+const UNZIP = "/usr/bin/unzip";
+
 function unzip(zipPath: string, outDir: string): void {
   mkdirSync(outDir, { recursive: true });
-  execFileSync("python3", ["-m", "zipfile", "-e", zipPath, outDir], { stdio: "pipe" });
+  execFileSync(UNZIP, ["-q", "-o", zipPath, "-d", outDir], { stdio: "pipe" });
 }
 
 export async function ensureExtension(): Promise<string> {

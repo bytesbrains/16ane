@@ -68,11 +68,10 @@ test("dashboard CSP connect-src matches the committed network's RPC and API", ()
     rpcUrl: string;
   };
   const csp = headerRule("/*").match(/Content-Security-Policy: ([^\n]+)/)?.[1] ?? "";
-  // Compare whole sources, not substrings: "https://api.16ane.com.evil" must not pass.
+  // The exact source list: same-origin, the network RPC and the sandbox API,
+  // nothing more and no look-alike hosts.
   const connect = (csp.match(/connect-src ([^;]+)/)?.[1] ?? "").trim().split(/\s+/);
-  assert.ok(connect.includes("'self'"), "connect-src allows same-origin");
-  assert.ok(connect.includes(net.rpcUrl), "connect-src allows the network RPC");
-  assert.ok(connect.includes("https://api.16ane.com"), "connect-src allows the sandbox API");
+  assert.deepEqual(connect, ["'self'", net.rpcUrl, "https://api.16ane.com"]);
 });
 
 test("every dashboard screen carries the no-cash-value disclosure", () => {

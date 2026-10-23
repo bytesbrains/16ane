@@ -91,7 +91,7 @@ npm run kit:owner -- setup --network sandbox
 npm run kit:buyer:ts           # pays the hosted demo API at https://api.16ane.com
 ```
 
-The owner and the buyer still need no ETH, because the sandbox relays their transactions. A **seller** on the public sandbox is different: settling a payment is a transaction. The TypeScript seller pays that gas from its own key, so send a little Base Sepolia ETH to the address it prints. The Python seller uses a facilitator instead: run your own ([self-hosting guide](../operations/SELF_HOSTING.md)) and set `FACILITATOR_URL`. The faucet has a per-address cooldown. Always identify `tANE` by its contract address in [`networks/sandbox-sepolia.json`](../../networks/sandbox-sepolia.json), never by its symbol.
+The buyer and the owner's `setup`, `status` and `revoke` still need no ETH, because the sandbox relays them. `withdraw` is the exception: it is the owner's own transaction, so send a little Base Sepolia ETH to the owner address that `setup` prints before you run it. A **seller** on the public sandbox is different: settling a payment is a transaction. The TypeScript seller pays that gas from its own key, so send a little Base Sepolia ETH to the address it prints. The Python seller uses a facilitator instead: run your own ([self-hosting guide](../operations/SELF_HOSTING.md)) and set `FACILITATOR_URL`. The faucet has a per-address cooldown. Always identify `tANE` by its contract address in [`networks/sandbox-sepolia.json`](../../networks/sandbox-sepolia.json), never by its symbol.
 
 ## Keep it safe
 

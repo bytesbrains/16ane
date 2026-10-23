@@ -15,7 +15,7 @@ npm run kit:demo     # the whole journey on a throwaway local chain; CI holds it
 | File | What it is |
 |---|---|
 | [`local-sandbox.ts`](local-sandbox.ts) | `npm run kit:sandbox`: Anvil with the 16ane contracts, the sandbox API (faucet, gasless relay, demo endpoints) and an x402 facilitator |
-| [`owner.ts`](owner.ts) | `npm run kit:owner -- setup \| status \| revoke \| withdraw`: the owner signs, the sandbox relays, so the owner needs no ETH |
+| [`owner.ts`](owner.ts) | `npm run kit:owner -- setup \| status \| revoke \| withdraw`: the owner signs and the sandbox relays, so only `withdraw` (the owner's own transaction) needs ETH, and only on the public sandbox |
 | [`typescript/seller.ts`](typescript/seller.ts) | `npm run kit:seller:ts`: `POST /v1/word-count` for 16 tANE, verified and settled by the seller itself |
 | [`typescript/buyer.ts`](typescript/buyer.ts) | `npm run kit:buyer:ts -- <url>`: pays any x402 endpoint, up to `MAX_PAYMENT` |
 | [`python/seller.py`](python/seller.py) | `POST /v1/digits` for 8 tANE (2024 → २०२४), settled through a facilitator |

@@ -29,7 +29,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const text = process.argv[3] ?? "Sixteen annas made one rupee. Agents pay each other in test tokens.";
   console.log(`[${net.name}] ${SANDBOX_DISCLAIMER}\nbuying ${url}`);
   const { status, data, txHash } = await buy(url, { text });
-  console.log(JSON.stringify({ status, data, txHash }, null, 2));
+  // JSON.stringify escapes control characters, so a seller's answer cannot forge lines in this output.
+  console.log(JSON.stringify({ status, data, txHash }, null, 2)); // NOSONAR
   const s = await clientFor(net).getAccountingSummary(readAgent().vaultAddress);
   console.log(`spent so far ${tane(s.cumulativeSpent)}; may still spend ${tane(s.spendableNow)}`);
   if (status !== 200) process.exitCode = 1;

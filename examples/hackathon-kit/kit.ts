@@ -111,7 +111,8 @@ export function readAgent(): AgentState {
 export function tane(amount: bigint | string): string {
   const v = BigInt(amount);
   const whole = v / ONE_TANE;
-  const frac = (v % ONE_TANE).toString().padStart(18, "0").replace(/0+$/, "");
+  let frac = (v % ONE_TANE).toString().padStart(18, "0");
+  while (frac.endsWith("0")) frac = frac.slice(0, -1);
   return `${whole}${frac ? "." + frac : ""} tANE`;
 }
 

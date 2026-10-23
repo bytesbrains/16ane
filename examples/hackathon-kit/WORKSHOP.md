@@ -36,7 +36,7 @@ For whoever runs a 16ane session at a college, meetup or hackathon. Participants
 
 - **"Can I sell my tANE?"** No. It has no value, and nobody should pay for it. If someone offers to buy or sell it, that is a scam.
 - **"Is this the real ANE?"** No. Any future real-value ANE is a separate proposal that needs legal and regulatory review. Nothing in this workshop relates to it.
-- **"Where does the gas come from?"** On the local chain, Anvil gives test ETH for free. On the public sandbox, the sandbox's relayer pays for owner actions and demo payments, within daily limits.
+- **"Where does the gas come from?"** On the local chain, Anvil gives test ETH for free. On the public sandbox, the sandbox's relayer pays for owner actions and demo payments, within daily limits. The exception is `withdraw`, the owner's own transaction, which needs a little Base Sepolia ETH.
 - **"Why does the agent have its own key?"** So that a leaked or misbehaving agent can lose at most its budget, and the owner can revoke it at any time.
 
 ## After the session

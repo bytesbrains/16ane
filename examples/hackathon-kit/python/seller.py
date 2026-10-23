@@ -42,6 +42,7 @@ SERVICE_ID = "hackathon-devanagari-digits"
 PATH = "/v1/digits"
 PRICE = 8 * ONE_TANE
 DEVANAGARI = str.maketrans("0123456789", "०१२३४५६७८९")
+MAX_BODY = 64 * 1024
 
 
 def work(payload: dict) -> dict:
@@ -54,6 +55,27 @@ def b64json(value: dict) -> str:
     return base64.b64encode(json.dumps(value).encode("utf-8")).decode("ascii")
 
 
+def parse_input(raw_body: str) -> dict | None:
+    """The request body as a JSON object, or None. Checked before quoting, so a buyer never pays for
+    a request this seller cannot serve."""
+    try:
+        value = json.loads(raw_body or "{}")
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def uint(value: object) -> int | None:
+    """A non-negative integer from a JSON number or decimal string, else None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.isascii() and value.isdigit():
+        return int(value)
+    return None
+
+
 class Seller:
     def __init__(self) -> None:
         self.net = read_network()
@@ -64,6 +86,9 @@ class Seller:
         self.asset = client_for(self.net).resolve_contracts()["aneTestToken"]
         self.network = f"eip155:{self.net['chainId']}"
         self.answers: dict[str, tuple[str, int, dict, dict]] = {}  # idempotency key -> first answer
+        # Keys whose paid request is settling right now: a concurrent retry gets 409 instead of a
+        # second settlement.
+        self.in_flight: set[str] = set()
         self.lock = threading.Lock()
 
     def requirements(self, url: str) -> dict:
@@ -92,18 +117,23 @@ class Seller:
         body = {"error": {"code": "ANE-E-4002", "message": f"Pay {tane(PRICE)} to use {PATH}"}}
         return 402, body, {"payment-required": b64json(envelope)}
 
-    def settle(self, url: str, raw_body: str, header: str) -> tuple[int, dict, dict]:
+    def settle(self, url: str, raw_body: str, params: dict, header: str) -> tuple[int, dict, dict]:
         try:
-            decoded = json.loads(base64.b64decode(header))
-            payload = decoded["payload"]
+            payload = json.loads(base64.b64decode(header))["payload"]
         except (ValueError, KeyError, TypeError):
+            payload = None
+        if not isinstance(payload, dict) or not all(
+            isinstance(payload.get(k), str) for k in ("resourceHash", "requestHash", "merchant")
+        ):
             return 400, {"error": {"code": "ANE-E-4001", "message": "Malformed PAYMENT-SIGNATURE header"}}, {}
         # Bind the payment to this request, so a payment for one call can't be replayed on another.
-        if payload.get("resourceHash", "").lower() != compute_resource_hash("POST", url).lower() or payload.get(
-            "requestHash", ""
-        ).lower() != compute_request_hash(raw_body).lower():
+        if (
+            payload["resourceHash"].lower() != compute_resource_hash("POST", url).lower()
+            or payload["requestHash"].lower() != compute_request_hash(raw_body).lower()
+        ):
             return 400, {"error": {"code": "ANE-E-4006", "message": "Payment is for a different request"}}, {}
-        if payload.get("merchant", "").lower() != self.pay_to.lower() or int(payload.get("amount", 0)) < PRICE:
+        amount = uint(payload.get("amount"))
+        if payload["merchant"].lower() != self.pay_to.lower() or amount is None or amount < PRICE:
             return 402, {"error": {"code": "ANE-E-4008", "message": f"Pay {tane(PRICE)} to {self.pay_to}"}}, {}
 
         requirements = self.requirements(url)
@@ -126,15 +156,24 @@ class Seller:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 result = json.loads(resp.read())
         except urllib.error.HTTPError as err:
-            result = json.loads(err.read() or b"{}")
+            try:
+                result = json.loads(err.read() or b"{}")
+            except ValueError:
+                result = None
+        except (OSError, ValueError):  # unreachable, timed out, or not JSON
+            result = None
+        if not isinstance(result, dict):
+            return 502, {"error": {"code": "ANE-E-4009", "message": "The facilitator gave no usable answer"}}, {}
         if not result.get("success"):
-            message = result.get("errorMessage", "settlement failed")
-            return 402, {"error": {"code": result.get("errorReason", "ANE-E-4009"), "message": message}}, {}
+            message = str(result.get("errorMessage", "settlement failed"))
+            return 402, {"error": {"code": str(result.get("errorReason", "ANE-E-4009")), "message": message}}, {}
+        receipt = (result.get("extra") or {}).get("receipt")
+        if not isinstance(receipt, dict) or not isinstance(result.get("transaction"), str):
+            return 502, {"error": {"code": "ANE-E-4009", "message": "The facilitator settled but sent no receipt"}}, {}
 
-        receipt = result["extra"]["receipt"]
         body = {
             "serviceId": SERVICE_ID,
-            **work(json.loads(raw_body or "{}")),
+            **work(params),
             "paid": tane(receipt["amount"]),
             "txHash": result["transaction"],
             "disclaimer": SANDBOX_DISCLAIMER,
@@ -158,30 +197,52 @@ def make_handler(seller: Seller) -> type[BaseHTTPRequestHandler]:
             if self.path != PATH:
                 self.send(404, {"error": f"try POST {PATH}", "disclaimer": SANDBOX_DISCLAIMER}, {})
                 return
-            length = int(self.headers.get("content-length") or 0)
-            if length > 64 * 1024:
-                self.send(413, {"error": "body too large"}, {})
+            length = uint(self.headers.get("content-length") or "0")
+            if length is None or length > MAX_BODY:
+                self.close_connection = True
+                self.send(413, {"error": {"code": "ANE-E-4001", "message": f"Body over {MAX_BODY} bytes"}}, {})
                 return
-            raw_body = self.rfile.read(length).decode("utf-8")
-            url = f"http://{self.headers.get('host', '127.0.0.1')}{self.path}"
+            raw_body = self.rfile.read(length).decode("utf-8", errors="replace")
+            params = parse_input(raw_body)
+            if params is None:
+                self.send(400, {"error": {"code": "ANE-E-4001", "message": "Body must be a JSON object"}}, {})
+                return
+            # Plain HTTP on purpose: the seller listens on 127.0.0.1 only.
+            url = f"http://{self.headers.get('host', '127.0.0.1')}{self.path}"  # NOSONAR
             key = self.headers.get("idempotency-key")
             request_hash = compute_request_hash(raw_body)
+            header = self.headers.get("payment-signature")
 
-            # A retry with the same Idempotency-Key gets the first answer back and is never charged twice.
+            # A retry with the same Idempotency-Key gets the first answer back and is never charged twice:
+            # the cache lookup and the in-flight reservation happen under one lock.
             with seller.lock:
                 cached = seller.answers.get(key) if key else None
+                busy = not cached and bool(key) and bool(header) and key in seller.in_flight
+                if not cached and not busy and key and header:
+                    seller.in_flight.add(key)
             if cached:
                 if cached[0] != request_hash:
                     self.send(409, {"error": {"code": "ANE-E-4004", "message": "Idempotency-Key reused"}}, {})
                 else:
                     self.send(cached[1], cached[2], cached[3])
                 return
+            if busy:
+                message = "A request with this Idempotency-Key is still settling; retry shortly"
+                self.send(409, {"error": {"code": "ANE-E-4005", "message": message}}, {})
+                return
+            if not header:
+                self.send(*seller.quote(url))
+                return
 
-            header = self.headers.get("payment-signature")
-            status, body, headers = seller.settle(url, raw_body, header) if header else seller.quote(url)
-            if status == 200 and key:
-                with seller.lock:
-                    seller.answers[key] = (request_hash, status, body, headers)
+            try:
+                status, body, headers = seller.settle(url, raw_body, params, header)
+                if status == 200 and key:
+                    with seller.lock:
+                        seller.answers[key] = (request_hash, status, body, headers)
+            finally:
+                if key:
+                    with seller.lock:
+                        seller.in_flight.discard(key)
             self.send(status, body, headers)
 
         def log_message(self, fmt: str, *args: object) -> None:
@@ -193,7 +254,7 @@ def make_handler(seller: Seller) -> type[BaseHTTPRequestHandler]:
 def main() -> None:
     seller = Seller()
     server = ThreadingHTTPServer(("127.0.0.1", int(os.environ.get("PORT", "9102"))), make_handler(seller))
-    url = f"http://127.0.0.1:{server.server_address[1]}{PATH}"
+    url = f"http://127.0.0.1:{server.server_address[1]}{PATH}"  # NOSONAR: local only
     print(f"Seller (Python) on {url}: {tane(PRICE)} per call, paid to {seller.pay_to}. {SANDBOX_DISCLAIMER}", flush=True)
     server.serve_forever()
 

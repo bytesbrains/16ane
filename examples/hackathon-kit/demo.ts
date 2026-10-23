@@ -32,8 +32,10 @@ function check(condition: boolean, message: string): void {
 }
 
 // Starts the Python seller on a free port and resolves with its URL once it is listening.
+// Both spawns run the participant's own python3 from PATH, as the guide does, with a fixed argument list
+// and no shell. Reviewed, not a finding.
 function startPythonSeller(): Promise<{ url: string; proc: ChildProcess }> {
-  const proc = spawn("python3", [path.join(KIT_DIR, "python", "seller.py")], {
+  const proc = spawn("python3", [path.join(KIT_DIR, "python", "seller.py")], { // NOSONAR
     env: { ...process.env, PORT: "0" },
     stdio: ["ignore", "pipe", "inherit"],
   });
@@ -49,7 +51,7 @@ function startPythonSeller(): Promise<{ url: string; proc: ChildProcess }> {
 
 function runPythonBuyer(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("python3", [path.join(KIT_DIR, "python", "buyer.py"), url, "Room 2024, floor 16"], {
+    const proc = spawn("python3", [path.join(KIT_DIR, "python", "buyer.py"), url, "Room 2024, floor 16"], { // NOSONAR
       stdio: ["ignore", "pipe", "inherit"],
     });
     let out = "";

@@ -206,6 +206,10 @@ export async function startSandboxStack(t: TestContext, opts: { chainId?: number
   const regMatch = deployOut.match(/AneRegistry:\s*(0x[0-9a-fA-F]{40})/);
   assert.ok(regMatch, `Failed to parse AneRegistry from deploy output:\n${deployOut}`);
   const registryAddress = regMatch[1];
+  // AneTaskEscrow is not in the registry (#21), so flows take its address from the deploy output.
+  const escrowMatch = deployOut.match(/AneTaskEscrow:\s*(0x[0-9a-fA-F]{40})/);
+  assert.ok(escrowMatch, `Failed to parse AneTaskEscrow from deploy output:\n${deployOut}`);
+  const taskEscrowAddress = escrowMatch[1];
   if (artifactDir) {
     writeFileSync(
       path.join(artifactDir, `deploy-${anvilPort}.log`),
@@ -283,6 +287,7 @@ export async function startSandboxStack(t: TestContext, opts: { chainId?: number
     anvilPid: anvilProc.pid,
     repoRoot,
     registryAddress,
+    taskEscrowAddress,
     sandbox,
     client,
     contracts,

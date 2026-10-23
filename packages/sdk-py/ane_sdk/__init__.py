@@ -1,9 +1,12 @@
 from .client import REDACTED_PRIVATE_KEY, AgentSession, AneClient, SecretKey, redact_secrets
 from .crypto import (
+    compute_payment_id,
     compute_request_hash,
     compute_resource_hash,
+    compute_task_quote_id,
     hash_service_manifest,
     hash_spend_intent,
+    hash_task_release,
     keccak256,
     keccak256_utf8,
     private_key_to_address,
@@ -29,5 +32,8 @@ __all__ = [
     "hash_service_manifest",
     "compute_resource_hash",
     "compute_request_hash",
+    "compute_payment_id",
+    "compute_task_quote_id",
+    "hash_task_release",
     "random_bytes32_hex",
 ]

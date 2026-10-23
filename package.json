@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc -p . && tsc -p test/dashboard/e2e",
-    "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts",
+    "test:sdk-ts": "node --experimental-strip-types --test packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts packages/sdk-ts/test/escrow.test.ts",
     "test:sdk-py": "python3 -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' -v",
     "test:cli": "node --experimental-strip-types --test packages/cli/test/*.test.ts",
     "test:mcp": "node --experimental-strip-types --test packages/mcp-server/test/*.test.ts",
@@ -26,7 +26,7 @@
     "kit:buyer:ts": "node --experimental-strip-types examples/hackathon-kit/typescript/buyer.ts",
     "kit:demo": "node --experimental-strip-types examples/hackathon-kit/demo.ts",
     "coverage:contracts": "forge coverage --report lcov --report-file coverage/forge.lcov --exclude-tests",
-    "coverage:sdk-ts": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/sdk-ts.lcov packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts",
+    "coverage:sdk-ts": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/sdk-ts.lcov packages/sdk-ts/test/sdk.test.ts packages/sdk-ts/test/send-retry.test.ts packages/sdk-ts/test/keystore.test.ts packages/sdk-ts/test/merchant-replay.test.ts packages/sdk-ts/test/read-consistency.test.ts packages/sdk-ts/test/transactions.test.ts packages/sdk-ts/test/signed-actions.test.ts packages/sdk-ts/test/campaigns.test.ts packages/sdk-ts/test/facilitator-verify.test.ts packages/sdk-ts/test/escrow.test.ts",
     "coverage:sdk-py": "python3 -m coverage run --branch --source=packages/sdk-py/ane_sdk --data-file=coverage/.coverage-py -m unittest discover -s packages/sdk-py/tests -p 'test_*.py' && python3 -m coverage lcov --data-file=coverage/.coverage-py -o coverage/py.lcov",
     "coverage:cli": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/cli.lcov packages/cli/test/*.test.ts",
     "coverage:mcp": "node --experimental-strip-types --test --experimental-test-coverage --test-reporter=spec --test-reporter=lcov --test-reporter-destination=stdout --test-reporter-destination=coverage/mcp.lcov packages/mcp-server/test/*.test.ts",

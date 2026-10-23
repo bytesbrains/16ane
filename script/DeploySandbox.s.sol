@@ -7,6 +7,7 @@ import {AneTestToken} from "../src/AneTestToken.sol";
 import {AneVaultFactory} from "../src/AneVaultFactory.sol";
 import {AneFaucet} from "../src/AneFaucet.sol";
 import {AneServiceDirectory} from "../src/AneServiceDirectory.sol";
+import {AneTaskEscrow} from "../src/AneTaskEscrow.sol";
 
 /// @title DeploySandbox — Deterministic Sandbox & Dev Environment Deployment Script
 /// @notice Deploys and wires the 16ane public sandbox contracts on Base Sepolia (84532) or Anvil (31337).
@@ -28,6 +29,7 @@ contract DeploySandbox is Script {
         AneVaultFactory vaultFactory;
         AneFaucet faucet;
         AneServiceDirectory serviceDirectory;
+        AneTaskEscrow taskEscrow;
     }
 
     function run() external returns (DeployedStack memory stack) {
@@ -63,6 +65,9 @@ contract DeploySandbox is Script {
             address(stack.taneToken), deployer, DEFAULT_FAUCET_CLAIM, DEFAULT_FAUCET_COOLDOWN, DEFAULT_FAUCET_DAILY_CAP
         );
         stack.serviceDirectory = new AneServiceDirectory();
+        // Deployed last, so the addresses above don't move. Not in the registry (it has no slot for it):
+        // clients take its address from the deploy output or the network file (#21).
+        stack.taskEscrow = new AneTaskEscrow(address(stack.taneToken), address(stack.vaultFactory));
 
         stack.taneToken.grantRole(stack.taneToken.MINTER_ROLE(), address(stack.faucet));
         stack.registry
@@ -78,6 +83,7 @@ contract DeploySandbox is Script {
         console.log("AneVaultFactory:", address(stack.vaultFactory));
         console.log("AneFaucet:", address(stack.faucet));
         console.log("AneServiceDirectory:", address(stack.serviceDirectory));
+        console.log("AneTaskEscrow:", address(stack.taskEscrow));
     }
 
     function _resolveRegistrySalt() internal view returns (bytes32) {

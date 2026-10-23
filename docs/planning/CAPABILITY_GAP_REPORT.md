@@ -52,7 +52,7 @@ Per `README.md` ("Reuse open wallet/payment infrastructure where possible; do no
 | **Sponsored Trial Campaign & Real-Compute Quota Engine** | REQ-014, REQ-103 | E14 | Missing | P1 |
 | **Owner & Provider Web Dashboard (`app.16ane.com` static + wallet UI)** | REQ-104, REQ-ACC | E15 | Missing | P1 |
 | **Self-Hostable x402 Facilitator & Manifest Indexer Package** | REQ-001, REQ-106 | E16 | Missing | P1 |
-| **Asynchronous Task Escrow Contract (`AneTaskEscrow`)** | REQ-201 | E18 | Missing | P2 |
+| **Asynchronous Task Escrow Contract (`AneTaskEscrow`)** | REQ-201 | E18 | Implemented (#21); not yet deployed to the public sandbox | P2 |
 | **ERC-8004 Portable Agent Identity & Reputation Adapter** | REQ-202 | E19 | Missing | P2 |
 | **Multi-Asset / Cross-Rail Payment Adapter** | REQ-204 | E20 | Missing | P2 |
 | **India-First Multilingual Guides & Hackathon Kit** | REQ-DOC | E21 | Missing | P1 |

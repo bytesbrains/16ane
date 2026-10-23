@@ -40,5 +40,18 @@ Minimal delegated scopes; enforce limits in contract; allowlist contract methods
 - Over-claiming beyond the signed cumulative is protocol-impossible (claims pay `signedCumulative - claimed`), unlike trust-based actuals.
 - Compromised agent key mints vouchers up to the remaining budget until revocation: equivalent to today's compromised-signer exposure, bounded additionally by voucher TTL.
 
+## Task escrow additions (ADR-0009 addendum, ISS-021)
+
+Each case below has a test in `test/AneTaskEscrow.t.sol`.
+
+- **The seller (or anyone) tries to open a task on terms the agent did not sign:** a different seller, deadline or job. The `quoteId` commits to all three, so `openTask` reverts (`TermsMismatch`).
+- **An agent locks more than its policy allows.** The lock is a vault `settlePayment`, so the vault's budget, per-payment and daily limits apply unchanged.
+- **The buyer stalls after delivery to take the funds back.** No reclaim is possible on or before the deadline. Milestone releases limit what the seller has at risk.
+- **The seller stalls to keep the funds locked.** After the deadline anyone can return them, and only to the vault. The deadline is capped at 30 days from the lock.
+- **Someone settles the signed lock on the vault directly, skipping `openTask`.** `openTask` adopts the vault's payment record (amount and payee must match), so the funds are never stranded.
+- **A third party pre-refunds the task's payment through `refundPayment`.** The return refunds only what is still refundable and transfers the rest, so it cannot revert.
+- **Forged or replayed receipts.** The escrow accepts only the owner, or the agent while active. Receipts are bound to the escrow, the chain and the task. Cumulative amounts make a replay pay nothing more, and revoking the agent voids its receipts.
+- **Reentrancy.** Every state-changing function is `nonReentrant`. The task is recorded before the vault call, and the token is tANE.
+
 ## Launch gates
 Threat model reviewed, tests automated, secrets scanned, source verified, contract roles disclosed, rollback/migration rehearsed, hosted spend caps configured, abuse reporting contact live. For future real-value mainnet, require external security audits and explicit legal/compliance sign-off; a public testnet launch does not satisfy those requirements.

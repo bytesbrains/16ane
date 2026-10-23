@@ -279,6 +279,12 @@ EIP712_DOMAIN_TYPEHASH = keccak256_utf8(
 SPEND_INTENT_TYPEHASH = keccak256_utf8(
     "SpendIntent(address vault,address merchant,uint256 amount,bytes32 quoteId,bytes32 serviceIdHash,uint256 validAfter,uint256 validBefore,bytes32 nonce,uint64 policyVersion)"
 )
+TASK_TERMS_TYPEHASH = keccak256_utf8(
+    "TaskTerms(address escrow,address seller,uint64 deadline,bytes32 specHash)"
+)
+TASK_RELEASE_TYPEHASH = keccak256_utf8(
+    "Release(bytes32 taskId,uint256 cumulativeAmount,bytes32 deliveryHash)"
+)
 SERVICE_MANIFEST_TYPEHASH = keccak256_utf8(
     "ServiceManifest(string serviceId,string version,uint256 chainId,address payTo,address tokenAddress,bytes32 endpointsHash,uint64 updatedAt)"
 )
@@ -313,6 +319,45 @@ def hash_spend_intent(chain_id: int, intent: Dict[str, Any]) -> Tuple[str, str]:
     )
     digest = keccak256("0x1901" + abi_word_bytes32(domain) + abi_word_bytes32(struct_hash))
     return struct_hash, digest
+
+
+def compute_payment_id(chain_id: int, vault: str, merchant: str, quote_id: str, nonce: str) -> str:
+    """The vault's id for a payment; for an AneTaskEscrow lock it is also the task's id (#21)."""
+    return keccak256(
+        "0x"
+        + abi_word_uint(chain_id)
+        + abi_word_address(vault)
+        + abi_word_address(merchant)
+        + abi_word_bytes32(quote_id)
+        + abi_word_bytes32(nonce)
+    )
+
+
+def compute_task_quote_id(escrow: str, seller: str, deadline: int, spec_hash: str) -> str:
+    """The SpendIntent quoteId that commits an AneTaskEscrow lock to its terms (#21)."""
+    return keccak256(
+        "0x"
+        + abi_word_bytes32(TASK_TERMS_TYPEHASH)
+        + abi_word_address(escrow)
+        + abi_word_address(seller)
+        + abi_word_uint(deadline)
+        + abi_word_bytes32(spec_hash)
+    )
+
+
+def hash_task_release(
+    chain_id: int, escrow: str, task_id: str, cumulative_amount: int | str, delivery_hash: str
+) -> str:
+    """The EIP-712 digest of an AneTaskEscrow delivery receipt for a cumulative amount (#21)."""
+    domain = hash_eip712_domain("AneTaskEscrow", "1", chain_id, escrow)
+    struct_hash = keccak256(
+        "0x"
+        + abi_word_bytes32(TASK_RELEASE_TYPEHASH)
+        + abi_word_bytes32(task_id)
+        + abi_word_uint(cumulative_amount)
+        + abi_word_bytes32(delivery_hash)
+    )
+    return keccak256("0x1901" + abi_word_bytes32(domain) + abi_word_bytes32(struct_hash))
 
 
 def hash_service_manifest(

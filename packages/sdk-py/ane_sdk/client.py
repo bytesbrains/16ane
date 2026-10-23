@@ -13,10 +13,13 @@ from urllib.parse import urlparse
 
 from .crypto import (
     abi_word_address,
+    compute_payment_id,
     compute_request_hash,
     compute_resource_hash,
+    compute_task_quote_id,
     hash_service_manifest,
     hash_spend_intent,
+    hash_task_release,
     keccak256_utf8,
     private_key_to_address,
     random_bytes32_hex,
@@ -243,6 +246,44 @@ class AgentSession:
             "signature": signature,
             "intentId": struct_hash,
         }
+
+    def sign_task_lock(
+        self,
+        escrow: str,
+        amount: int | str,
+        seller: str,
+        deadline: int,
+        spec_hash: str,
+        service_id_hash: str,
+        valid_before: int,
+        nonce: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Signs a lock of `amount` for an AneTaskEscrow task (#21). Nothing moves until someone submits
+        it to the escrow's openTask; the vault then checks the signature and its whole policy."""
+        seller = to_checksum_address(seller)
+        signed = self.sign_spend_intent(
+            merchant=escrow,
+            amount=amount,
+            quote_id=compute_task_quote_id(escrow, seller, deadline, spec_hash),
+            service_id_hash=service_id_hash,
+            valid_before=valid_before,
+            nonce=nonce,
+            policy_version=self.client.get_policy_version(self.vault_address),
+        )
+        intent = signed["intent"]
+        signed["terms"] = {"seller": seller, "deadline": deadline, "specHash": spec_hash}
+        signed["taskId"] = compute_payment_id(
+            self.client.chain_id, intent["vault"], intent["merchant"], intent["quoteId"], intent["nonce"]
+        )
+        return signed
+
+    def sign_task_release(
+        self, escrow: str, task_id: str, cumulative_amount: int | str, delivery_hash: str
+    ) -> str:
+        """Signs a delivery receipt paying the seller up to `cumulative_amount` in total. The escrow
+        accepts it only while this agent's delegation is active."""
+        digest = hash_task_release(self.client.chain_id, escrow, task_id, cumulative_amount, delivery_hash)
+        return sign_digest(digest, self._session_key._unsafe_unwrap())
 
     def purchase(
         self,

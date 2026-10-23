@@ -1,7 +1,7 @@
 # Deploying the sandbox contracts to Base Sepolia
 
 Runbook for launch gate **G1-12** (`docs/planning/LAUNCH_READINESS.md`): deploy `AneRegistry`, `tANE`
-(`AneTestToken`), `AneVaultFactory`, `AneFaucet` and `AneServiceDirectory` to Base Sepolia (`eip155:84532`),
+(`AneTestToken`), `AneVaultFactory`, `AneFaucet`, `AneServiceDirectory` and `AneTaskEscrow` to Base Sepolia (`eip155:84532`),
 verify them on Basescan, and publish the addresses.
 
 > `tANE` is a free test token with no cash value. Nothing here touches a mainnet: `DeploySandbox.s.sol`
@@ -53,12 +53,12 @@ forge script script/DeploySandbox.s.sol:DeploySandbox \
   --rpc-url $RPC_URL --account sandbox-deployer --sender $DEPLOYER \
   --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
 ```
-The console prints the five addresses (`AneRegistry: 0x…` and so on). It doesn't print the sixth contract, the
+The console prints the six addresses (`AneRegistry: 0x…` and so on). It doesn't print the seventh contract, the
 `AneAgentVault` implementation that `AneVaultFactory` deploys in its constructor; read it with
 `cast call <factory> 'vaultImplementation()(address)' --rpc-url $RPC_URL`. The transaction log is in
 `broadcast/DeploySandbox.s.sol/84532/run-latest.json`, which git ignores. **Copy it somewhere safe straight away:** the
 E2E suite and local tests run Anvil with chain id `84532` too, so the next local run overwrites that file, and
-`--resume` would then pick up the wrong deployment. The chain stays the source of truth: the deployer's nonces 0–6
+`--resume` would then pick up the wrong deployment. The chain stays the source of truth: the deployer's nonces 0–7
 are the deployment's transactions.
 - **Public-RPC lag.** Load-balanced endpoints can briefly answer from a node that hasn't seen your last
   transaction. The SDK retries stale-nonce rejections (#68), and the smoke test waits for its own writes.
@@ -93,8 +93,8 @@ It prints `[smoke] PASS` on success. The same script runs in the E2E suite again
 (`e2e/smoke-script.ts`), so it stays in step with the contracts and SDK.
 
 ## 6. Publish (one PR)
-- **`networks/sandbox-sepolia.json`:** add `"registryAddress"` and a `"contracts"` object with the six addresses (the five above plus
-  `aneAgentVaultImplementation`),
+- **`networks/sandbox-sepolia.json`:** add `"registryAddress"` and a `"contracts"` object with the seven addresses (the six above plus
+  `aneAgentVaultImplementation`; the escrow's key is `aneTaskEscrow`),
   plus the deployment block number and the commit it was deployed from.
 - **`docs/planning/LAUNCH_READINESS.md`:** set **G1-12** to PASS, with Basescan links for each contract.
 - **README status line and 16ane.com:** move "Contracts on the Base Sepolia testnet" from *Not live yet* to live,
@@ -109,3 +109,16 @@ From then on, `ADR-0001`'s continuity policy applies: at least 30 days' notice b
   registry uses `Ownable2Step`.
 - **Faucet sizing:** change it on-chain with `AneFaucet.setFaucetConfig` (`ADR-0006`, #61); no redeploy is needed.
   The reference server reads the live values at startup.
+
+## Adding `AneTaskEscrow` to the live sandbox (#21)
+The sandbox deployed on 2026-10-20 predates the escrow. Adding it does not redeploy anything else, so the
+continuity notice does not apply. It still needs the same maintainer authorization as section 0.
+```bash
+REGISTRY_ADDRESS=$(jq -r .registryAddress networks/sandbox-sepolia.json) \
+forge script script/DeployTaskEscrow.s.sol:DeployTaskEscrow \
+  --rpc-url $RPC_URL --account sandbox-deployer --sender $DEPLOYER \
+  --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
+```
+The script reads the token and vault factory from the registry and refuses any chain but Base Sepolia or a local
+one. Then add `"aneTaskEscrow"` to `contracts` in `networks/sandbox-sepolia.json`. The registry has no slot for the
+escrow, so clients read its address from that file.

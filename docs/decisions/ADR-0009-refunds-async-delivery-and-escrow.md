@@ -54,3 +54,21 @@ Adopt **Option A**:
 ## Validation plan
 - Foundry test verifying `refundPayment` reverts if `amount > amountPaid - amountRefunded` or if `paymentId` does not exist, and verifying that a valid refund restores `cumulativeSpent` by the exact refunded amount.
 - Integration test for Scenario `S4` (timeout retry returns identical receipt with zero second charge; failed delivery triggers `refundPayment` with linked `original_tx_hash` and `refund_tx_hash`).
+
+## Addendum (2026-10-24): `AneTaskEscrow` implemented (ISS-021, REQ-201)
+Decision 3 is implemented in `src/AneTaskEscrow.sol`, with these choices, which the decision left open:
+
+- **No vault change.** A lock is a `settlePayment` whose merchant is the escrow. Its `quoteId` is `keccak256(TaskTerms(escrow, seller, deadline, specHash))`, so the agent's signature authorizes the exact seller, deadline and job, and the vault's policy bounds the amount. A return uses the vault's `refundPayment`, so `cumulativeSpent` is restored only by what was not released (the security rule above). Existing vaults work unchanged.
+- **The "signed delivery receipt" is signed by the buyer.** It is `Release(taskId, cumulativeAmount, deliveryHash)`, signed by the vault owner, or by the agent while its delegation is active and unexpired. There is no seller-asserted delivery and no arbitration. Cumulative amounts give milestones and make each receipt idempotent.
+- **Deadline griefing.**
+  - The buyer cannot reclaim on or before the deadline.
+  - Neither side can hold the funds after it: `reclaim` is permissionless and can only pay the vault.
+  - The deadline is signed by the agent and capped at 30 days from the lock.
+  - The seller may `cancel` early.
+- **Stranding.** Two paths could leave funds stuck in the escrow, and both are closed and tested:
+  - Anyone holding the signed lock could settle it on the vault directly and skip `openTask`. `openTask` then adopts the vault's payment record.
+  - A third party could call `refundPayment` on the task's payment first. The return then refunds only what is still refundable and transfers the rest.
+- **Deployment.** A fresh `DeploySandbox` includes the escrow. A live sandbox adds it with `script/DeployTaskEscrow.s.sol`, without redeploying. It is not in `AneRegistry`, which has no slot for it, so clients read its address from the network file.
+- **Known limitation.** A release to a seller that is itself a vault is a plain transfer, so it does not count as that vault's `verifiedRevenue` in REVOLVING mode. Only registered vaults may notify revenue.
+
+Validation: `test/AneTaskEscrow.t.sol` (19 tests, including a fuzz of fund conservation), `e2e/flows/task-escrow.test.ts`, `packages/sdk-ts/test/escrow.test.ts` and `packages/sdk-py/tests/test_sdk.py`.

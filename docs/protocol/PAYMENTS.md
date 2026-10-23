@@ -17,6 +17,15 @@ Insufficient balance, expired quote, wrong chain/asset, stale fee estimate, repl
 ## Refunds
 A finalized on-chain transfer cannot be reversed unilaterally. Merchant-initiated refund is a new transfer or escrow release. Reference refund to original `payment_id`, show original and refund tx hashes, and disclose partial/nonrefundable cases.
 
+## Asynchronous tasks (escrow)
+A task that runs longer than one HTTP call pays through `AneTaskEscrow` (REQ-201, ADR-0009, `src/AneTaskEscrow.sol`) instead of a direct payment:
+
+1. **Lock.** The buyer's agent signs an ordinary `SpendIntent` whose `merchant` is the escrow and whose `quoteId` is `taskQuoteId(seller, deadline, specHash)`. Anyone (usually the seller) submits it with `openTask`. The vault checks the signature and its whole policy, exactly as for any payment, so a lock can never exceed the owner's budget, per-payment or daily limit. The task's id is the vault's `paymentId`.
+2. **Release.** The buyer pays the seller in milestones by signing a delivery receipt, `Release(taskId, cumulativeAmount, deliveryHash)`, on or before the deadline. Amounts are cumulative, so a replayed receipt pays nothing more. Only the vault owner, or its agent while the delegation is active, can approve. Revoking the agent voids its outstanding receipts, as it voids its spend intents.
+3. **Return.** After the deadline, anyone can call `reclaim`. Whatever was not released goes back to the vault through `refundPayment`, which restores the agent's budget by that amount. The seller can `cancel` at any time to return it sooner.
+
+There is no arbitration (a `VISION.md` non-goal). The seller is protected by seeing the funds locked before working, and by milestone releases. The buyer is protected by the deadline: at most 30 days from the lock. The SDK helpers are `signTaskLock`, `openTaskOnChain`, `signTaskRelease`, `releaseTaskOnChain`, `reclaimTaskOnChain`, `cancelTaskOnChain` and `getEscrowTask` in TypeScript, and `AgentSession.sign_task_lock` and `sign_task_release` in Python.
+
 ## Micropayment economics
 Benchmark fee/latency for one-shot transfers; add batching, payment channels or metered session settlement only if measured economics justify complexity. Hosted relay costs must be explicitly budgeted. Never assert sub-cent payment viability without data.
 

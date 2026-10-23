@@ -68,6 +68,7 @@ await owner.revokeSession(vaultAddress);
 | Signed actions (#77) | `OwnerWallet.signTransfer`, `signPolicy`, `signRevoke`, `signVaultCreation`; `relayTransfer`, `relaySetPolicy`, `relayRevoke`, `relayCreateVault` for a relayer to submit them and pay the gas, so an owner never needs ETH |
 | `AgentSession` | Agent actions with a delegated session key: `purchase` (x402 flow), `signSpendIntent`, `settleDirectSpend` |
 | `AnePaymentVerifier` | Merchant side: verify and settle x402 payment proofs, idempotency, receipts |
+| Task escrow (#21) | `signTaskLock` (an agent locks tANE for an asynchronous task, within its vault's policy), `openTaskOnChain`, `signTaskRelease` / `releaseTaskOnChain` (milestone receipts), `reclaimTaskOnChain` (after the deadline), `cancelTaskOnChain`, `getEscrowTask`; see `AneTaskEscrow` in [PAYMENTS.md](https://github.com/bytesbrains/16ane/blob/main/docs/protocol/PAYMENTS.md#asynchronous-tasks-escrow) |
 | `TrialQuotaTracker` | Per-caller and global quotas for provider-sponsored trial calls |
 | `SecretKey`, `redactSecrets`, `generateKeypair` | Key handling: a `SecretKey` never prints or serializes its value (`toString`, `toJSON` and `util.inspect` show `[REDACTED_PRIVATE_KEY]`) |
 | `hashSpendIntent`, `hashServiceManifest`, `computeRequestHash`, … | EIP-712 hashing and x402 helpers, matching the Solidity contracts |

@@ -8,6 +8,8 @@ import {AneVaultFactory} from "../src/AneVaultFactory.sol";
 import {AneFaucet} from "../src/AneFaucet.sol";
 import {AneServiceDirectory} from "../src/AneServiceDirectory.sol";
 import {DeploySandbox} from "../script/DeploySandbox.s.sol";
+import {DeployTaskEscrow} from "../script/DeployTaskEscrow.s.sol";
+import {AneTaskEscrow} from "../src/AneTaskEscrow.sol";
 
 contract AneRegistryTest is Test {
     DeploySandbox internal deployerScript;
@@ -53,6 +55,28 @@ contract AneRegistryTest is Test {
         }
         vm.stopPrank();
         assertEq(sandbox.taneToken.balanceOf(address(1003)), 16_000e18);
+    }
+
+    function test_TaskEscrowIsWiredToTheSandboxTokenAndFactory() public {
+        // ISS-021: the escrow only accepts vaults from this deployment's factory, paying in its tANE.
+        DeploySandbox.DeployedStack memory sandbox =
+            deployerScript.deployForTest(deployer, deployerScript.SANDBOX_REGISTRY_SALT());
+        assertEq(sandbox.taskEscrow.taneToken(), address(sandbox.taneToken));
+        assertEq(sandbox.taskEscrow.vaultFactory(), address(sandbox.vaultFactory));
+    }
+
+    function test_TaskEscrowCanBeAddedToALiveSandboxFromItsRegistry() public {
+        // ISS-021 / ADR-0001: a live sandbox gains the escrow without a redeployment.
+        DeploySandbox.DeployedStack memory sandbox =
+            deployerScript.deployForTest(deployer, deployerScript.SANDBOX_REGISTRY_SALT());
+        DeployTaskEscrow escrowScript = new DeployTaskEscrow();
+        AneTaskEscrow escrow = escrowScript.deployForTest(sandbox.registry);
+        assertEq(escrow.taneToken(), address(sandbox.taneToken));
+        assertEq(escrow.vaultFactory(), address(sandbox.vaultFactory));
+
+        vm.chainId(8453); // Base mainnet
+        vm.expectRevert(abi.encodeWithSelector(DeployTaskEscrow.SandboxTestnetOnly.selector, 8453));
+        escrowScript.deployForTest(sandbox.registry);
     }
 
     function test_MainnetChainIdRefusal() public {

@@ -21,6 +21,8 @@ export function friendlyWalletError(err) {
   if (code === 4902) return "The wallet does not know this network and refused to add it.";
   if (code === -32002) return "A wallet request is already pending. Open the wallet to answer it.";
   if (err instanceof Error && err.message) return err.message;
+  // EIP-1193 providers reject with plain {code, message} objects, not Errors.
+  if (err && typeof err === "object" && typeof err.message === "string" && err.message) return err.message;
   return String(err);
 }
 

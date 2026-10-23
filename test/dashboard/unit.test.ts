@@ -194,4 +194,6 @@ test("wallet errors map to human messages", () => {
   assert.match(friendlyWalletError({ code: 4902 }), /refused to add/);
   assert.match(friendlyWalletError({ code: -32002 }), /already pending/);
   assert.match(friendlyWalletError(new Error("boom")), /boom/);
+  // MetaMask rejects with plain objects; never render "[object Object]".
+  assert.equal(friendlyWalletError({ code: -32603, message: "execution reverted" }), "execution reverted");
 });

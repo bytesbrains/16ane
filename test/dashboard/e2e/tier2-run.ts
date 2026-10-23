@@ -7,10 +7,10 @@
 //   node --experimental-strip-types test/dashboard/e2e/tier2-run.ts
 import { execFileSync } from "node:child_process";
 import { bootTier2Stack } from "./tier2-boot.ts";
-import { ensurePatchedExtension } from "./tier2-extension.ts";
+import { ensureExtension } from "./tier2-extension.ts";
 
 // Extension first (fails fast on network/version drift), then the stack.
-await ensurePatchedExtension();
+await ensureExtension();
 const tier = await bootTier2Stack();
 let status = 0;
 try {

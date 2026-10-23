@@ -1,17 +1,19 @@
-// Tier-2 extension prep: ensures the pinned MetaMask build is downloaded,
-// unpacked, and patched for automation BEFORE `npx synpress` runs (Synpress
-// reuses .cache-synpress content, so whatever is here wins).
+// Tier-2 extension prep: ensures the pinned MetaMask build is downloaded and
+// unpacked BEFORE `npx synpress` runs (Synpress skips its own download/unzip
+// when .cache-synpress content already exists, so whatever is here wins).
 //
-// The patch: MetaMask 13.13.1's onboarding completion page ("Your wallet is
-// ready!") calls chrome.sidePanel.open() when the build's IS_SIDEPANEL flag is
-// set — and that call never settles in an automation-driven Chromium, so the
-// "Open wallet" button silently does nothing and onboarding can never finish.
-// Forcing the flag off takes the classic completion path (which also keeps
-// confirmations in popup pages, the UX Synpress automates).
+// The build is used PRISTINE: an earlier revision patched the bundle's baked
+// side-panel flag so onboarding completion would land the tab on the wallet
+// home page, but bisecting the snapshot proved the patched bundle walks the
+// UI to home while the backend never creates the vault — the cache restored
+// as a fresh wallet everywhere. wallet.setup.ts instead hides
+// `sidePanel.open` in the onboarding page so the completion click takes
+// MetaMask's own non-side-panel path, then waits for the onboarding flag and
+// vault to be persisted; do not re-add bundle patching without re-verifying
+// the snapshot contains a vault.
 //
-// Pinned-exact: the patch asserts the precise 13.13.1 bundle bytes, and the
-// Synpress default version is cross-checked below. Any drift fails loudly
-// here instead of hanging later in onboarding.
+// Pinned-exact: the Synpress default version is cross-checked below. Any drift
+// fails loudly here instead of breaking later in onboarding.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -22,10 +24,6 @@ const EXTENSION_DIR_NAME = `metamask-chrome-${METAMASK_VERSION}`;
 const EXTENSION_ZIP_NAME = `${EXTENSION_DIR_NAME}.zip`;
 const DOWNLOAD_URL =
   `https://github.com/MetaMask/metamask-extension/releases/download/v${METAMASK_VERSION}/${EXTENSION_ZIP_NAME}`;
-
-// getIsSidePanelFeatureEnabled with IS_SIDEPANEL baked true (13.13.1 ui bundle).
-const FLAG_ON = 'n.getIsSidePanelFeatureEnabled=()=>{var e;if("true"!==(null===(e=!0)?void 0:e.toString()))re';
-const FLAG_OFF = FLAG_ON.replace("(e=!0)", "(e=!1)");
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
 
@@ -49,7 +47,7 @@ function crossCheckSynpressDefault(): void {
     if (match) {
       if (match[1] !== METAMASK_VERSION) {
         throw new Error(
-          `tier2: Synpress ships MetaMask ${match[1]} but tier2-extension.ts pins ${METAMASK_VERSION}; update the pin and the patch bytes together`,
+          `tier2: Synpress ships MetaMask ${match[1]} but tier2-extension.ts pins ${METAMASK_VERSION}; update the pin together with the setup flow`,
         );
       }
       return;
@@ -70,25 +68,11 @@ function unzip(zipPath: string, outDir: string): void {
   execFileSync("python3", ["-m", "zipfile", "-e", zipPath, outDir], { stdio: "pipe" });
 }
 
-function applyPatch(bundlePath: string): void {
-  const src = readFileSync(bundlePath, "utf8");
-  if (src.includes(FLAG_OFF)) return; // already patched
-  if (src.split(FLAG_ON).length - 1 !== 1) {
-    throw new Error(
-      `tier2: side-panel patch bytes not found exactly once in ${bundlePath}; refusing to guess (MetaMask drift?)`,
-    );
-  }
-  writeFileSync(bundlePath, src.replace(FLAG_ON, FLAG_OFF));
-  console.log("tier2: applied the side-panel automation patch");
-}
-
-export async function ensurePatchedExtension(): Promise<string> {
+export async function ensureExtension(): Promise<string> {
   crossCheckSynpressDefault();
   const dir = cacheDir();
   mkdirSync(dir, { recursive: true });
   const extDir = path.join(dir, EXTENSION_DIR_NAME);
-  const marker = path.join(extDir, ".16ane-sidepanel-patched");
-  if (existsSync(marker)) return extDir;
   if (!existsSync(path.join(extDir, "manifest.json"))) {
     const zipPath = path.join(dir, EXTENSION_ZIP_NAME);
     if (!existsSync(zipPath)) await downloadZip(zipPath);
@@ -97,7 +81,5 @@ export async function ensurePatchedExtension(): Promise<string> {
   if (!existsSync(path.join(extDir, "manifest.json"))) {
     throw new Error(`tier2: extension unpack failed (${extDir})`);
   }
-  applyPatch(path.join(extDir, "common-12.js"));
-  writeFileSync(marker, `${METAMASK_VERSION}\n`);
   return extDir;
 }

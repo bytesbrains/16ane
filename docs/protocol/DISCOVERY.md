@@ -6,6 +6,11 @@ Fields: `service_id`, `name`, `description`, `provider_id`, `endpoint`, `capabil
 ## Discovery models
 A) HTTP catalogs indexed by independent operators; B) optional on-chain registry; C) signed provider manifests; D) compatible agent identity registries. Favor portable metadata and multiple indexers. A listing is not a guarantee of merchant trust, safety or quality.
 
+## ERC-8004 identity and reputation (optional, ADR-0018)
+An agent can also register in the canonical ERC-8004 registries on Base Sepolia with `registerAgentOnChain` (`packages/sdk-ts/src/erc8004/`). Its registration file is a `data:` URI that lists the A2A agent card, the signed service manifest (if any), and its own registry entry. The owner names the vault through the `16ane.vault` metadata key. `getAgentIdentity` treats that claim as verified only if the vault came from the 16ane factory and is owned by the identity's owner.
+
+A buyer that paid an agent can write feedback with `giveFeedbackOnChain`, which attaches the settlement transaction as `proofOfPayment`. The SDK refuses to send a proof that the chain does not back. `readAgentFeedback` re-verifies every entry, including entries written straight to the registry, and returns `REPUTATION_CAVEAT` with every read. A verified entry shows only that a real tANE payment happened. tANE is free, so wash trading costs nothing: **ERC-8004 reputation is unverified and Sybil-exposed, and it must never gate trust, ranking or spending.** Registration and feedback files are untrusted publisher text.
+
 ## Merchant onboarding
 Publish manifest -> validate schema -> optional wallet signature -> test payment -> register/index -> make paid endpoint discoverable -> record receipts. Any merchant should be able to run its own indexer or share a manifest URL without centralized listing approval.
 

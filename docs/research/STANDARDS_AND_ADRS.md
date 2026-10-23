@@ -13,6 +13,7 @@ Research compatibility, token/chain restrictions, audit maturity, deployment ava
 
 ## Research log
 - **2026-10-22, x402 schemes re-check (#62, ADR-0017):** `https://docs.x402.org/schemes/overview`, `/schemes/upto`, `/schemes/batch-settlement`, and the EVM spec at `https://github.com/x402-foundation/x402/blob/main/specs/schemes/batch-settlement/scheme_batch_settlement_evm.md`. Four schemes now exist (`exact`, `upto`, `batch-settlement`, `auth-capture`); `upto` still settles once per request; `batch-settlement` (EVM) uses escrow deposits plus cumulative off-chain vouchers with batched claims, no voucher expiry, and timed-withdrawal exits. Limitations: EVM wire details live mostly in `@x402/evm` code with thin adoption (secondary practitioner report); the May 2026 Cantina audit was seen only as a snippet (vouchers valid for full channel lifetime, no on-chain invalidation without migration) and is cited as directional only. Custom-ERC-20/tANE support on hosted facilitators was not re-verified — ADR-0005's USDC-only finding stands until rechecked.
+- **2026-10-24, ERC-8004 re-check (#22, ADR-0018):** `https://eips.ethereum.org/EIPS/eip-8004` is still Draft but has changed since 2026-10-19. `giveFeedback` now takes a signed `int128 value` with `valueDecimals` and needs no pre-authorization. `agentWallet` is a reserved key that requires an EIP-712 or ERC-1271 signature from the new wallet. Feedback files may carry `proofOfPayment`. The canonical v2.0.0 registries from `https://github.com/erc-8004/erc-8004-contracts` (CC0, head `b9e466c`) are live on Base Sepolia at `0x8004A818…BD9e` (identity) and `0x8004B663…8713` (reputation). These were verified on-chain as third-party-owned UUPS proxies. No ValidationRegistry address is published.
 
 ## ADR queue
 - **ADR-001** Testnet chain and continuity policy.
@@ -28,6 +29,7 @@ Research compatibility, token/chain restrictions, audit maturity, deployment ava
 - **ADR-011** Upgrade authority, ownership and emergency response.
 - **ADR-012** Future ANE issuance/redemption and regulated partner boundaries.
 - **ADR-013** Open-source licenses and contribution governance.
+- **ADR-018** ERC-8004 identity and reputation adapter (canonical registries, vault named by metadata, payment-backed feedback).
 - **ADR-014** Brand/domain collision with existing 16ane business marketplace.
 - **ADR-015** Web hosting and DNS.
 - **ADR-016** Hosted faucet and demo server.

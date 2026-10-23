@@ -28,8 +28,8 @@ function read(rel: string): string {
 
 function text(html: string): string {
   return html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script\b[\s\S]*?<\/script\b[^>]*>/gi, " ")
+    .replace(/<style\b[\s\S]*?<\/style\b[^>]*>/gi, " ")
     .replace(/<[^>]+>/g, " ");
 }
 
@@ -68,7 +68,8 @@ test("dashboard CSP connect-src matches the committed network's RPC and API", ()
     rpcUrl: string;
   };
   const csp = headerRule("/*").match(/Content-Security-Policy: ([^\n]+)/)?.[1] ?? "";
-  const connect = csp.match(/connect-src ([^;]+)/)?.[1] ?? "";
+  // Compare whole sources, not substrings: "https://api.16ane.com.evil" must not pass.
+  const connect = (csp.match(/connect-src ([^;]+)/)?.[1] ?? "").trim().split(/\s+/);
   assert.ok(connect.includes("'self'"), "connect-src allows same-origin");
   assert.ok(connect.includes(net.rpcUrl), "connect-src allows the network RPC");
   assert.ok(connect.includes("https://api.16ane.com"), "connect-src allows the sandbox API");
@@ -98,7 +99,7 @@ for (const page of PAGES) {
 
   test(`${page}: no inline scripts, styles or event handlers`, () => {
     const html = read(page);
-    for (const tag of html.match(/<script[^>]*>/g) ?? []) {
+    for (const tag of html.match(/<script\b[^>]*>/gi) ?? []) {
       assert.match(tag, /src="/, "script tags load files, never inline code");
     }
     assert.doesNotMatch(html, /\sstyle=|<style/i);

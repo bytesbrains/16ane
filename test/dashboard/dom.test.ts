@@ -251,7 +251,13 @@ function makeNet(): StubNet {
       g["localStorage"] = dom.localStorage;
       g["fetch"] = (async (url: unknown, init: { body?: string; method?: string } = {}) => {
         const href = String(url);
-        if (href.includes("sepolia.base.org")) {
+        let isSepoliaBaseHost = false;
+        try {
+          isSepoliaBaseHost = new URL(href).hostname === "sepolia.base.org";
+        } catch {
+          isSepoliaBaseHost = false;
+        }
+        if (isSepoliaBaseHost) {
           const body = JSON.parse(String(init.body)) as { id: number; params: { data?: string }[] };
           const data = (body.params[0]?.data ?? "").toLowerCase();
           net.ethCalls.push(data);

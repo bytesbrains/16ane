@@ -88,7 +88,7 @@ lint:
 
 # Needs ruff on PATH (CI pins ruff==0.16.10).
 lint-py:
-	ruff check packages/sdk-py
+	ruff check packages/sdk-py examples/hackathon-kit/python
 
 deploy-dry-run:
 	PRIVATE_KEY=1 forge script script/DeploySandbox.s.sol:DeploySandbox --chain-id 84532

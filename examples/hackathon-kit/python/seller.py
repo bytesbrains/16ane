@@ -254,7 +254,8 @@ def make_handler(seller: Seller) -> type[BaseHTTPRequestHandler]:
 def main() -> None:
     seller = Seller()
     server = ThreadingHTTPServer(("127.0.0.1", int(os.environ.get("PORT", "9102"))), make_handler(seller))
-    url = f"http://127.0.0.1:{server.server_address[1]}{PATH}"  # NOSONAR: local only
+    # Plain HTTP on purpose: the server binds 127.0.0.1 only. (Sonar honours only a bare NOSONAR.)
+    url = f"http://127.0.0.1:{server.server_address[1]}{PATH}"  # NOSONAR
     print(f"Seller (Python) on {url}: {tane(PRICE)} per call, paid to {seller.pay_to}. {SANDBOX_DISCLAIMER}", flush=True)
     server.serve_forever()
 

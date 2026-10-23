@@ -7,10 +7,13 @@ title = "16ane Protocol Gitleaks Configuration"
 useDefault = true
 
 [allowlist]
-description = "Global allowlist for Solidity contract names, Anvil account 0 test key, and anchored 20-byte EVM addresses"
+description = "Global allowlist for Solidity contract names, Anvil account 0 test key, the public abandon-mnemonic account 0 test key (e2e owner / Tier-2 MetaMask), and anchored 20-byte EVM addresses"
 regexes = [
     '''ERC20Burnable''',
     '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+    # Account 0 (m/44'/60'/0'/0/0) of the industry's shared throwaway "abandon"
+    # test mnemonic. Test funds only; exact literal so no other key matches.
+    '''0x1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727''',
     # Public 20-byte EVM addresses (contract/token addresses trip generic-api-key next to names like
     # `token`). MUST stay anchored: a 32-byte private key begins with 40 hex chars, so an unanchored
     # pattern would allowlist real keys.

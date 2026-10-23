@@ -75,7 +75,7 @@ test("a failed faucet claim returns a fixed 502 and logs the detail without the 
     assert.doesNotMatch(text, /DO_NOT_LEAK|rpc\.example|HTTP error|cast send|--rpc-url/);
     const { error } = JSON.parse(text) as { error: { code: string; message: string; errorId: string } };
     assert.equal(error.code, "ANE-E-1004");
-    assert.equal(error.message, "Faucet claim could not be completed on-chain; try again later");
+    assert.equal(error.message, "Faucet could not check the claim on-chain; try again later");
     assert.equal(logs.length, 1);
     // The detail is logged under the same errorId. Its wording comes from the chain client (which
     // shells out to `cast send`, so it carries the command line and RPC URL) and varies by version.

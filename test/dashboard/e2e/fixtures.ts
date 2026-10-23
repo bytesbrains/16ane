@@ -1,108 +1,44 @@
-// Shared Playwright fixtures: a faithful injected EIP-1193 stub, a static file
-// server that applies the generated _headers (so the Anvil tiers run under the
-// real CSP), route stubs for the hermetic smoke spec, and the shared Anvil +
-// deploy + sandbox + served-dashboard stack both wallet tiers boot from.
+// Shared Playwright fixtures: a faithful injected EIP-1193 stub (wallet calls
+// answered locally, transactions forwarded to Anvil, personal_sign answered by
+// the test process) plus the shared stack re-exported from dashboard-stack.ts.
 import { test as base, type Page } from "@playwright/test";
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { createServer, type Server } from "node:http";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import {
-  OWNER_KEY,
-  PROVIDER_KEY,
-  startSandboxStack,
-  type SandboxStack,
-} from "../../../e2e/harness.js";
-import { privateKeyToAddress, SecretKey } from "../../../packages/sdk-ts/src/index.js";
+import { keccak256 } from "../../../packages/sdk-ts/src/keccak.js";
+import { signDigest } from "../../../packages/sdk-ts/src/secp256k1.js";
 
-export const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
+export { REPO_ROOT, startDashboardStack, type DashboardStack } from "./dashboard-stack.ts";
 
 export interface StubWallet {
   accounts: string[];
   chainIdHex: string;
+  /** Private keys by address for personal_sign (the test process signs: Anvil cannot sign for impersonated accounts). */
+  keys?: Record<string, string>;
 }
 
-const CONTENT_TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".png": "image/png",
-};
-
-// Parses the `/*` rule of a generated _headers file into response headers.
-export function headersFor(rootDir: string): Record<string, string> {
-  const lines = readFileSync(path.join(rootDir, "_headers"), "utf8").split("\n");
-  const headers: Record<string, string> = {};
-  let inRoot = false;
-  for (const line of lines) {
-    if (line.trim() === "/*") {
-      inRoot = true;
-      continue;
-    }
-    if (inRoot) {
-      if (!/^\s+\S/.test(line)) break;
-      const at = line.indexOf(":");
-      headers[line.slice(0, at).trim()] = line.slice(at + 1).trim();
-    }
-  }
-  return headers;
-}
-
-export async function serveDirectory(rootDir: string): Promise<{ url: string; close: () => Promise<void> }> {
-  const headers = headersFor(rootDir);
-  const server: Server = createServer((req, res) => {
-    try {
-      const url = new URL(req.url ?? "/", "http://localhost");
-      let rel = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html";
-      if (rel.includes("..")) {
-        res.writeHead(400);
-        res.end("bad path");
-        return;
-      }
-      let file = path.join(rootDir, rel);
-      if (!file.startsWith(rootDir)) {
-        res.writeHead(400);
-        res.end("bad path");
-        return;
-      }
-      let body: Buffer;
-      try {
-        body = readFileSync(file);
-      } catch {
-        res.writeHead(404, { ...headers, "content-type": "text/html; charset=utf-8" });
-        try {
-          res.end(readFileSync(path.join(rootDir, "404.html")));
-        } catch {
-          res.end("not found");
-        }
-        return;
-      }
-      res.writeHead(200, {
-        ...headers,
-        "content-type": CONTENT_TYPES[path.extname(file)] ?? "application/octet-stream",
-      });
-      res.end(body);
-    } catch {
-      res.writeHead(500);
-      res.end("error");
-    }
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : 0;
-  return {
-    url: `http://127.0.0.1:${port}`,
-    close: () => new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve()))),
-  };
+// EIP-191 personal_sign over raw message bytes — what a wallet returns for the
+// dashboard's UTF-8 control messages, verified by packages/sdk-ts recoverAddress.
+function personalSignBytes(messageHex: string, key: string): string {
+  const body = Buffer.from(messageHex.replace(/^0x/i, ""), "hex");
+  const prefix = new TextEncoder().encode(`\x19Ethereum Signed Message:\n${body.length}`);
+  const joined = new Uint8Array(prefix.length + body.length);
+  joined.set(prefix);
+  joined.set(body, prefix.length);
+  return signDigest(keccak256(joined), key).serialized;
 }
 
 // Injects window.ethereum before any page script runs. Wallet methods are
-// answered locally; everything else (eth_call, eth_sendTransaction,
-// eth_getTransactionReceipt, personal_sign) is forwarded to rpcUrl, so against
-// Anvil the stub really signs. Calls are recorded on window.__pw.calls and
-// watchAsset offers on window.__pw.watchAssets.
+// answered locally; transaction and receipt calls are forwarded to rpcUrl, so
+// against Anvil the stub really sends. personal_sign is answered by the test
+// process over a binding (Anvil cannot sign for impersonated accounts).
+// Calls are recorded on window.__pw.calls and watchAsset offers on
+// window.__pw.watchAssets.
 export async function injectProviderStub(page: Page, wallet: StubWallet & { rpcUrl: string }): Promise<void> {
+  const keys = new Map<string, string>();
+  for (const [address, key] of Object.entries(wallet.keys ?? {})) keys.set(address.toLowerCase(), key);
+  await page.exposeBinding("__pwPersonalSign", (_source, messageHex: string, address: string) => {
+    const key = keys.get(String(address).toLowerCase());
+    if (!key) throw new Error(`stub: no key for ${address}`);
+    return personalSignBytes(messageHex, key);
+  });
   await page.addInitScript(
     ({ accounts, chainIdHex, rpcUrl }) => {
       const calls: { method: string; params?: unknown }[] = [];
@@ -158,6 +94,21 @@ export async function injectProviderStub(page: Page, wallet: StubWallet & { rpcU
             case "wallet_watchAsset":
               watchAssets.push(params);
               return true;
+            case "personal_sign": {
+              // Real wallets accept a UTF-8 message; the binding signs raw
+              // bytes, so translate once here and let the test process sign.
+              const [message, address] = (params ?? []) as [unknown, unknown];
+              const hexMessage =
+                typeof message === "string" && !message.startsWith("0x")
+                  ? "0x" +
+                    [...new TextEncoder().encode(message)].map((b) => b.toString(16).padStart(2, "0")).join("")
+                  : message;
+              return (
+                window as unknown as {
+                  __pwPersonalSign: (messageHex: unknown, address: unknown) => Promise<unknown>;
+                }
+              ).__pwPersonalSign(hexMessage, address);
+            }
             default:
               return forward(method, params);
           }
@@ -183,71 +134,4 @@ export async function rpcCall(rpcUrl: string, method: string, params: unknown[] 
   const body = (await res.json()) as { result?: unknown; error?: { message?: string } };
   if (body.error) throw new Error(`anvil ${method}: ${body.error.message}`);
   return body.result;
-}
-
-export interface DashboardStack {
-  stack: SandboxStack;
-  /** Served dashboard build URL (generated network file + API URL baked in). */
-  url: string;
-  owner: string;
-  provider: string;
-  close: () => Promise<void>;
-}
-
-// Boots Anvil on `chainId`, deploys the sandbox contracts, starts the sandbox
-// server, builds the dashboard against them, and serves it under the generated
-// headers. Tier-1 passes 84532 and impersonates the stub accounts afterwards
-// (Anvil signs for them); Tier-2 passes 31337 with no impersonation so a real
-// MetaMask can add the test chain without colliding with built-in Base Sepolia.
-export async function startDashboardStack(opts: {
-  chainId: number;
-  chainName: string;
-}): Promise<DashboardStack> {
-  const teardowns: (() => Promise<void>)[] = [];
-  // The e2e harness only uses t.after: feed it a shim and run teardowns here.
-  const stack = await startSandboxStack(
-    { after: (fn: () => Promise<void>) => void teardowns.push(fn) } as never,
-    { chainId: opts.chainId },
-  );
-  const owner = privateKeyToAddress(new SecretKey(OWNER_KEY));
-  const provider = privateKeyToAddress(new SecretKey(PROVIDER_KEY));
-  const dir = mkdtempSync(path.join(tmpdir(), "dashboard-e2e-"));
-  const networkFile = path.join(dir, "networks-local.json");
-  writeFileSync(
-    networkFile,
-    JSON.stringify({
-      name: "local",
-      environment: "sandbox",
-      chainId: opts.chainId,
-      caip2: `eip155:${opts.chainId}`,
-      chainName: opts.chainName,
-      rpcUrl: stack.rpcUrl,
-      explorer: null,
-      explorerName: null,
-      registryAddress: stack.registryAddress,
-      contracts: stack.contracts,
-      assetSymbol: "tANE",
-      assetDecimals: 18,
-    }),
-  );
-  const outDir = path.join(dir, "site");
-  execFileSync(process.execPath, [
-    path.join(REPO_ROOT, "scripts", "dashboard-env.cjs"),
-    "--network-file",
-    networkFile,
-    outDir,
-    "--api-url",
-    stack.sandbox.url,
-  ]);
-  const served = await serveDirectory(outDir);
-  teardowns.push(served.close);
-  return {
-    stack,
-    url: served.url,
-    owner,
-    provider,
-    close: async () => {
-      for (const fn of teardowns.splice(0).reverse()) await fn();
-    },
-  };
 }

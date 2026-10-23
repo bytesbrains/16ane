@@ -376,14 +376,16 @@ async function delegate(event) {
   setBusy(button, true, "Confirm in wallet…");
   try {
     await ensureChain();
-    // Bounded by maximum total spend (daily limit and expiry left open, fixed mode):
-    // 0 means "none" for the open knobs, per the vault's limit semantics.
+    // Bounded by maximum total spend in fixed mode. A daily limit of 0 means
+    // "none", but the vault treats an expiry of 0 as already expired, so the
+    // form's "left open" intent is a distant default until this screen grows
+    // an expiry control.
     const data = setPolicyData({
       agentSigner: agent,
       maxTotalSpend: maxTotal,
       maxPerTx,
       dailyLimit: 0n,
-      expiry: 0,
+      expiry: Math.floor(Date.now() / 1000) + 10 * 365 * 86400,
       budgetMode: "FIXED",
       revolvingTreasuryCeiling: 0n,
     });
@@ -572,8 +574,16 @@ function init() {
   });
   document.getElementById("payment-form").addEventListener("submit", lookupPayment);
   if (hasWallet() && window.ethereum) {
-    window.ethereum.on?.("accountsChanged", () => window.location.reload());
-    window.ethereum.on?.("chainChanged", () => window.location.reload());
+    // Reload only when the event invalidates the connected session. The wallet
+    // also fires these while connect() itself grants accounts and adds/switches
+    // to the dashboard chain; reloading then would abort the first connect.
+    window.ethereum.on?.("accountsChanged", (accounts) => {
+      const next = Array.isArray(accounts) && accounts[0] ? String(accounts[0]).toLowerCase() : "";
+      if (state.account && next !== state.account.toLowerCase()) window.location.reload();
+    });
+    window.ethereum.on?.("chainChanged", (chainId) => {
+      if (state.account && Number.parseInt(chainId, 16) !== NETWORK.chainId) window.location.reload();
+    });
   }
   refreshNetworkLine();
   refreshEarn();

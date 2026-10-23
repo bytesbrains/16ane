@@ -86,3 +86,6 @@ e2e-artifacts/
 test-results/
 playwright-report/
 playwright/.auth/
+
+# Synpress wallet-setup cache (built by the Tier-2 runner before the specs)
+.cache-synpress/

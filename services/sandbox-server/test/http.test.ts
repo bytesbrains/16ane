@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type http from "node:http";
 import { Readable } from "node:stream";
-import { clientIp, PayloadTooLargeError, readRequestBody } from "../src/http.ts";
+import { clientIp, handleCorsPreflight, PayloadTooLargeError, readRequestBody, sendJson } from "../src/http.ts";
 
 function fakeRequest(
   chunks: Buffer[],
@@ -58,4 +58,40 @@ test("clientIp ignores a configured header that doesn't hold an IP address", () 
   }
   const v6 = fakeRequest([], { "fly-client-ip": "2001:db8::1" }, "172.16.0.2");
   assert.equal(clientIp(v6, false, "fly-client-ip"), "2001:db8::1");
+});
+
+function fakeResponse(): http.ServerResponse & { status: number; headers: Record<string, string>; body: string } {
+  const res = {
+    status: 0,
+    headers: {} as Record<string, string>,
+    body: "",
+    writeHead(status: number, headers: Record<string, string>) {
+      res.status = status;
+      res.headers = headers;
+    },
+    end(payload?: string) {
+      res.body = payload ?? "";
+    },
+  };
+  return res as unknown as http.ServerResponse & { status: number; headers: Record<string, string>; body: string };
+}
+
+test("sendJson serves browser clients with a wildcard CORS origin", () => {
+  const res = fakeResponse();
+  sendJson(res, 200, { ok: true });
+  assert.equal(res.headers["access-control-allow-origin"], "*");
+  assert.ok(!("access-control-allow-credentials" in res.headers), "no ambient credentials");
+});
+
+test("handleCorsPreflight answers OPTIONS and ignores other methods", () => {
+  const preflight = fakeResponse();
+  const handled = handleCorsPreflight({ method: "OPTIONS" } as http.IncomingMessage, preflight);
+  assert.equal(handled, true);
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers["access-control-allow-origin"], "*");
+  assert.match(preflight.headers["access-control-allow-methods"], /POST/);
+  assert.match(preflight.headers["access-control-allow-headers"], /content-type/);
+  const get = fakeResponse();
+  assert.equal(handleCorsPreflight({ method: "GET" } as http.IncomingMessage, get), false);
+  assert.equal(get.status, 0);
 });

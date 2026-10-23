@@ -13,9 +13,33 @@ export function sendJson(
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "x-16ane-disclaimer": SANDBOX_DISCLAIMER,
+    ...CORS_HEADERS,
     ...extraHeaders,
   });
   res.end(payload);
+}
+
+// CORS for browser clients: the dashboard calls this API cross-origin
+// (app.16ane.com -> api.16ane.com) and across ports in tests. Reads are
+// public and writes carry per-request signatures in the body — no cookies or
+// ambient credentials — so a wildcard origin exposes nothing ambient. Never
+// add Access-Control-Allow-Credentials here.
+export const CORS_HEADERS: Record<string, string> = {
+  "access-control-allow-origin": "*",
+};
+
+// Answers a CORS preflight (OPTIONS) for the dashboard's JSON POSTs.
+// Returns true when the request was a preflight and is now handled.
+export function handleCorsPreflight(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+  if ((req.method ?? "GET").toUpperCase() !== "OPTIONS") return false;
+  res.writeHead(204, {
+    ...CORS_HEADERS,
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type",
+    "access-control-max-age": "86400",
+  });
+  res.end();
+  return true;
 }
 
 export function sendError(

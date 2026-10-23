@@ -55,8 +55,15 @@ export function currentRoute() {
   return ROUTES.includes(hash) ? hash : "overview";
 }
 
+let shownRoute = null;
+
 export function showRoute(name, { focus = true } = {}) {
   const route = ROUTES.includes(name) ? name : "overview";
+  // Showing the already-shown route (e.g. the hashchange echo of init's own
+  // hash write) must not steal focus: moving focus on page load disorients
+  // keyboard and screen-reader users without any user action.
+  const alreadyShown = route === shownRoute;
+  shownRoute = route;
   for (const section of document.querySelectorAll("[data-screen]")) {
     section.hidden = section.dataset.screen !== route;
   }
@@ -65,7 +72,7 @@ export function showRoute(name, { focus = true } = {}) {
     else link.removeAttribute("aria-current");
   }
   if (window.location.hash !== `#/${route}`) window.location.hash = `#/${route}`;
-  if (focus) {
+  if (focus && !alreadyShown) {
     const heading = document.querySelector(`[data-screen="${route}"] h2`);
     if (heading) heading.focus({ preventScroll: true });
     window.scrollTo(0, 0);

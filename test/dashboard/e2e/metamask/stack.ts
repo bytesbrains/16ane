@@ -12,12 +12,14 @@ export interface Tier2StackFile {
   dashboardUrl: string;
   owner: string;
   provider: string;
-  ownerKey: string;
+  ownerMnemonic: string;
   paymentId: string;
 }
 
 export function tier2StackFile(): string {
-  return path.resolve(__dirname, "..", "..", "..", "..", "test-results", "tier2-stack.json");
+  // Resolved from the working directory (repo root): the wallet setup is also
+  // loaded from Synpress's compiled cache dir, where __dirname differs.
+  return path.resolve("test-results", "tier2-stack.json");
 }
 
 function isAddress(value: unknown): value is string {
@@ -33,7 +35,7 @@ export function readTier2Stack(): Tier2StackFile {
       "tier2 stack not booted: run via `npm run test:e2e:dashboard-tier2` so the global setup writes test-results/tier2-stack.json",
     );
   }
-  const { rpcUrl, chainId, registryAddress, sandboxUrl, dashboardUrl, owner, provider, ownerKey, paymentId } =
+  const { rpcUrl, chainId, registryAddress, sandboxUrl, dashboardUrl, owner, provider, ownerMnemonic, paymentId } =
     parsed;
   if (
     typeof rpcUrl !== "string" ||
@@ -46,8 +48,8 @@ export function readTier2Stack(): Tier2StackFile {
     !dashboardUrl.startsWith("http://127.0.0.1:") ||
     !isAddress(owner) ||
     !isAddress(provider) ||
-    typeof ownerKey !== "string" ||
-    !/^0x[0-9a-fA-F]{64}$/.test(ownerKey) ||
+    typeof ownerMnemonic !== "string" ||
+    !/^[a-z]+( [a-z]+){11}$/.test(ownerMnemonic) ||
     typeof paymentId !== "string" ||
     !/^0x[0-9a-f]{64}$/.test(paymentId)
   ) {
@@ -61,7 +63,7 @@ export function readTier2Stack(): Tier2StackFile {
     dashboardUrl,
     owner,
     provider,
-    ownerKey,
+    ownerMnemonic,
     paymentId,
   };
 }

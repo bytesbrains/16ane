@@ -156,14 +156,20 @@ jobs:
       - name: Install Chromium with system dependencies
         run: npx playwright install --with-deps chromium
 
+      # Synpress builds its wallet cache with a nested Playwright 1.48.2, which
+      # needs its own Chromium revision (system deps already installed above).
+      - name: Install Chromium for Synpress's nested Playwright
+        run: node node_modules/@synthetixio/synpress/node_modules/playwright-core/cli.js install chromium
+
       - name: Ensure xvfb for the headed browser
         run: |
           if ! command -v xvfb-run >/dev/null 2>&1; then
             sudo apt-get update && sudo apt-get install -y xvfb
           fi
 
-      # Synpress downloads the pinned MetaMask 13.13.1 from GitHub releases on
-      # first run and caches the wallet setup under ~/.cache/synpress.
+      # The runner boots the stack, builds the Synpress wallet cache under
+      # .cache-synpress/ (downloading the pinned MetaMask 13.13.1 from GitHub
+      # releases on first run), then runs the specs against the live stack.
       - name: Run Tier-2 MetaMask journey under xvfb
         run: xvfb-run -a npm run test:e2e:dashboard-tier2
 

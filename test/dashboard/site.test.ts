@@ -98,7 +98,7 @@ for (const page of PAGES) {
 
   test(`${page}: no inline scripts, styles or event handlers`, () => {
     const html = read(page);
-    for (const tag of html.match(/<script[^>]*>/g) ?? []) {
+    for (const tag of html.match(/<script[^>]*>/gi) ?? []) {
       assert.match(tag, /src="/, "script tags load files, never inline code");
     }
     assert.doesNotMatch(html, /\sstyle=|<style/i);

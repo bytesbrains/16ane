@@ -11,8 +11,10 @@
   <link rel="canonical" href="https://app.16ane.com/">
   <link rel="icon" href="https://16ane.com/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="https://16ane.com/apple-touch-icon.png">
-  <link rel="stylesheet" href="/styles.css">
-  <script type="module" src="/assets/app.js"></script>
+  <!-- Relative asset paths: the Worker serves this page at /, and the hermetic
+       smoke suite loads it over file://, where root-absolute URLs resolve nowhere. -->
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="assets/app.js"></script>
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -87,6 +89,7 @@
     <section data-screen="vaults" aria-labelledby="vaults-title" hidden>
       <h2 id="vaults-title" tabindex="-1">Vaults</h2>
       <p class="lede">An agent vault holds one agent's budget apart from your own wallet. Create one, then open it to see policy, spending, and controls.</p>
+      <p class="disclaimer-chip">TEST TOKENS — NO CASH VALUE</p>
       <form id="vault-create-form">
         <fieldset>
           <legend>Create a vault</legend>

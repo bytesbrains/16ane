@@ -19,7 +19,13 @@ import { createSandboxServer } from "../services/sandbox-server/src/server.ts";
 const execFileAsync = promisify(execFile);
 
 export const DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-export const OWNER_KEY = keccak256Utf8("16ane.e2e.owner.key.v1");
+// The e2e owner doubles as the Tier-2 MetaMask account, and MetaMask onboards
+// from a seed phrase only — so the owner key is account 0 (m/44'/60'/0'/0/0)
+// of this public test mnemonic, not a keccak label like the other test keys.
+// Test funds only; this mnemonic is the industry's shared throwaway vector.
+export const OWNER_MNEMONIC =
+  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+export const OWNER_KEY = "0x1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727";
 export const SESSION_KEY = keccak256Utf8("16ane.e2e.session.key.v1");
 export const PROVIDER_KEY = keccak256Utf8("16ane.e2e.provider.key.v1");
 export const PEER_OWNER_KEY = keccak256Utf8("16ane.e2e.peer.owner.key.v1");

@@ -17,13 +17,17 @@ import { testWithSynpress } from "@synthetixio/synpress";
 import { metaMaskFixtures } from "@synthetixio/synpress/playwright";
 import { expect } from "@playwright/test";
 import { readTier2Stack } from "./stack.js";
-import { tier2WalletSetup } from "./wallet-setup.js";
+import { tier2WalletSetup } from "./wallet.setup.js";
 
 const test = testWithSynpress(metaMaskFixtures(tier2WalletSetup));
 
 test.describe("tier2", () => {
-  test("owner journey through a real MetaMask", async ({ page, metamask }) => {
+  test("owner journey through a real MetaMask", async ({ context, metamask }) => {
     const stack = readTier2Stack();
+    // New page straight from the wallet context: Synpress's `page` fixture
+    // navigates to '/' and this suite has no static baseURL (the dashboard
+    // port is per-run), so that fixture cannot be used here.
+    const page = await context.newPage();
     // The wallet account is the harness owner: prove it before spending.
     await metamask.addNetwork({
       name: "Anvil 31337",
@@ -38,13 +42,13 @@ test.describe("tier2", () => {
     await metamask.connectToDapp();
     await expect(page.getByText("0x", { exact: false }).first()).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole("link", { name: "Fund" }).click();
+    await page.getByRole("link", { name: "Fund", exact: true }).click();
     await page.getByRole("button", { name: "Use connected wallet" }).click();
     await page.getByRole("button", { name: "Claim test tokens" }).click();
     await metamask.confirmTransaction();
     await expect(page.getByText("Claim confirmed.")).toBeVisible({ timeout: 60_000 });
 
-    await page.getByRole("link", { name: "Vaults" }).click();
+    await page.getByRole("link", { name: "Vaults", exact: true }).click();
     await page.getByRole("button", { name: "Create vault", exact: true }).click();
     await metamask.confirmTransaction();
     await expect(page.getByText(/Vault .* created/)).toBeVisible({ timeout: 60_000 });
@@ -56,7 +60,7 @@ test.describe("tier2", () => {
     await metamask.confirmTransaction();
     await expect(page.getByText(/Delegated 320 tANE/)).toBeVisible({ timeout: 60_000 });
 
-    await page.getByRole("link", { name: "Vaults" }).click();
+    await page.getByRole("link", { name: "Vaults", exact: true }).click();
     await page.getByRole("button", { name: "Revoke agent" }).click();
     await metamask.confirmTransaction();
     await expect(page.getByText(/Agent revoked/)).toBeVisible({ timeout: 60_000 });

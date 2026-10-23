@@ -61,9 +61,10 @@ testnet ETH for gas; the Fund screen's faucet needs no tANE to start.
   connect, fund, vault, delegate, revoke/withdraw, campaign pause/resume and
   payment lookup.
 - `npm run test:e2e:dashboard-tier2` — Playwright + Anvil + a real MetaMask via Synpress
-  (CI-only, headed under xvfb): the owner journey end to end on chain 31337.
-  See `test/dashboard/e2e/metamask/tier2.spec.ts` for why Tier-2 lives in a CJS
-  subdirectory with an ESM global setup.
+  (CI-only, headed under xvfb on Linux): the owner journey end to end on chain
+  31337. Linux-only because Synpress reuses the wallet profile across browser
+  relaunches, which macOS keychain behavior breaks; see `test/dashboard/e2e/metamask/tier2.spec.ts`
+  for why Tier-2 lives in a CJS subdirectory with an ESM global setup.
 
 CI: `.github/workflows/dashboard.yml` (static checks, smoke, Tier-1, Tier-2).
 Type-check: `npm run typecheck` covers `test/dashboard/e2e` as its own

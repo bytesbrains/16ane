@@ -9,6 +9,7 @@ test.describe("smoke", () => {
     await stubNetwork(page);
     await openDashboard(page);
     await expect(page.getByText(/Base Sepolia/)).toBeVisible();
+    await page.getByRole("link", { name: "Earn", exact: true }).click();
     await expect(page.getByText("Demo Summarizer")).toBeVisible();
     await page.getByRole("link", { name: "Campaigns" }).click();
     await expect(page.getByText(/trial-1/)).toBeVisible();
@@ -17,9 +18,9 @@ test.describe("smoke", () => {
   test("routes move focus and mark the current page", async ({ page }) => {
     await stubNetwork(page);
     await openDashboard(page);
-    await page.getByRole("link", { name: "Fund" }).click();
+    await page.getByRole("link", { name: "Fund", exact: true }).click();
     await expect(page).toHaveURL(/#\/fund/);
-    await expect(page.getByRole("link", { name: "Fund" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Fund", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { name: "Fund" })).toBeFocused();
     await expect(page.getByRole("heading", { name: "Overview" })).toBeHidden();
   });
@@ -29,7 +30,7 @@ test.describe("smoke", () => {
     // The stub answers eth_requestAccounts + eth_chainId locally; reads hit fixtures.
     await openDashboard(page);
     await page.getByRole("button", { name: "Connect wallet" }).click();
-    await expect(page.getByText("0x1111…1111")).toBeVisible();
+    await expect(page.locator("#wallet-address")).toHaveText("0x1111…1111");
     await expect(page.getByText("16000 tANE").first()).toBeVisible();
   });
 
@@ -39,14 +40,15 @@ test.describe("smoke", () => {
     await page.getByRole("button", { name: "Add tANE to wallet" }).click();
     const assets = await page.evaluate(() => (window as unknown as { __pw: { watchAssets: unknown[] } }).__pw.watchAssets);
     expect(assets).toHaveLength(1);
-    expect(JSON.stringify(assets[0])).toContain(TOKEN.toLowerCase());
+    expect(JSON.stringify(assets[0]).toLowerCase()).toContain(TOKEN.toLowerCase());
     expect(JSON.stringify(assets[0])).toContain("https://16ane.com/mark-square.png");
   });
 
   test("faucet form rejects a bad address without touching the wallet", async ({ page }) => {
     await stubNetwork(page);
     await openDashboard(page);
-    await page.getByRole("link", { name: "Fund" }).click();
+    await page.getByRole("button", { name: "Connect wallet" }).click();
+    await page.getByRole("link", { name: "Fund", exact: true }).click();
     await page.getByLabel("Recipient address").fill("not-an-address");
     await page.getByRole("button", { name: "Claim test tokens" }).click();
     await expect(page.getByText("Recipient is not an address.")).toBeVisible();

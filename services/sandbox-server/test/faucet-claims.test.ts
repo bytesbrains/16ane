@@ -32,7 +32,11 @@ const now = () => Math.floor(Date.now() / 1000);
 
 // An RPC that knows the registry and the faucet's views, records every method it is asked for, and refuses
 // everything else. A refused claim must never get past eth_call: no nonce lookup, no gas estimate, no send.
-async function fakeRpc(usedNonces: Set<string>, nonceReply?: { result?: string; delayMs?: number }) {
+async function fakeRpc(
+  usedNonces: Set<string>,
+  nonceReply?: { result?: string; delayMs?: number },
+  nextClaimTime?: bigint,
+) {
   const methods: string[] = [];
   const server = http.createServer((req, res) => {
     let body = "";
@@ -46,6 +50,7 @@ async function fakeRpc(usedNonces: Set<string>, nonceReply?: { result?: string; 
         const data = params[0].data;
         if (data.startsWith(functionSelector("claimAmount()"))) result = "0x" + word(16_000n * 10n ** 18n);
         else if (data.startsWith(functionSelector("cooldownSeconds()"))) result = "0x" + word(3600);
+        else if (data.startsWith(functionSelector("nextClaimTime(address)"))) result = "0x" + word(nextClaimTime ?? 0n);
         else if (data.startsWith(functionSelector("relayedNonceUsed(bytes32)"))) {
           methods.push("relayedNonceUsed");
           await new Promise((resolve) => setTimeout(resolve, nonceReply?.delayMs ?? 0));
@@ -100,10 +105,14 @@ async function fakeSiteverify() {
 
 async function withServer(
   t: test.TestContext,
-  options: Partial<SandboxServerConfig> & { usedNonces?: Set<string>; nonceReply?: { result?: string; delayMs?: number } },
+  options: Partial<SandboxServerConfig> & {
+    usedNonces?: Set<string>;
+    nonceReply?: { result?: string; delayMs?: number };
+    nextClaimTime?: bigint;
+  },
   run: (claim: (body: object) => Promise<{ status: number; code?: string; message?: string }>, rpcMethods: string[]) => Promise<void>,
 ) {
-  const rpc = await fakeRpc(options.usedNonces ?? new Set(), options.nonceReply);
+  const rpc = await fakeRpc(options.usedNonces ?? new Set(), options.nonceReply, options.nextClaimTime);
   const sandbox = await createSandboxServer({
     rpcUrl: rpc.url,
     registryAddress: "0x" + "ab".repeat(20),
@@ -185,6 +194,16 @@ test("a replayed claim (nonce already used on-chain) is refused without spending
     assert.equal(r.status, 403);
     assert.match(r.message!, /nonce was already used/);
     assert.ok(methods.length > 0 && onlyReads(methods), `only the nonce lookup: ${methods.join(",")}`);
+  });
+});
+
+test("a recipient in on-chain cooldown (direct claim) gets 429 without spending gas", async (t) => {
+  await withServer(t, { nextClaimTime: BigInt(now() + 300) }, async (claim, methods) => {
+    const r = await claim(asBody(await signer.signFaucetClaim(RECIPIENT_KEY)));
+    assert.equal(r.status, 429);
+    assert.equal(r.code, "ANE-E-1003");
+    assert.match(r.message!, /retry in \d+s/);
+    assert.ok(onlyReads(methods), `no relay send: ${methods.join(",")}`);
   });
 });
 

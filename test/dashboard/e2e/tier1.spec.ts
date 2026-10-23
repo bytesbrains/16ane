@@ -11,7 +11,7 @@ import {
   type DashboardStack,
 } from "./fixtures.js";
 import type { Page } from "@playwright/test";
-import { setupFundedSession } from "../../../e2e/harness.js";
+import { OWNER_KEY, PROVIDER_KEY, setupFundedSession } from "../../../e2e/harness.js";
 
 let shared: DashboardStack | null = null;
 
@@ -39,6 +39,7 @@ async function openDashboard(page: Page, tier: DashboardStack, accounts?: string
     accounts: accounts ?? [tier.owner],
     chainIdHex: "0x14a34",
     rpcUrl: tier.stack.rpcUrl,
+    keys: { [tier.owner]: OWNER_KEY, [tier.provider]: PROVIDER_KEY },
   });
   await page.goto(tier.url);
 }
@@ -49,7 +50,7 @@ test.describe("tier1", () => {
     await openDashboard(page, tier);
     await page.getByRole("button", { name: "Connect wallet" }).click();
     await expect(page.getByText("0x", { exact: false }).first()).toBeVisible();
-    await page.getByRole("link", { name: "Fund" }).click();
+    await page.getByRole("link", { name: "Fund", exact: true }).click();
     await page.getByRole("button", { name: "Use connected wallet" }).click();
     await page.getByRole("button", { name: "Claim test tokens" }).click();
     await expect(page.getByText("Claim confirmed.")).toBeVisible({ timeout: 60_000 });
@@ -60,7 +61,7 @@ test.describe("tier1", () => {
     const tier = await startTier1();
     await openDashboard(page, tier);
     await page.getByRole("button", { name: "Connect wallet" }).click();
-    await page.getByRole("link", { name: "Vaults" }).click();
+    await page.getByRole("link", { name: "Vaults", exact: true }).click();
     await page.getByRole("button", { name: "Create vault", exact: true }).click();
     await expect(page.getByText(/Vault .* created/)).toBeVisible({ timeout: 60_000 });
     await page.getByRole("link", { name: "Delegate" }).click();
@@ -69,7 +70,7 @@ test.describe("tier1", () => {
     await page.getByLabel("Maximum total spend in tANE (whole units)").fill("320");
     await page.getByRole("button", { name: "Sign delegation" }).click();
     await expect(page.getByText(/Delegated 320 tANE/)).toBeVisible({ timeout: 60_000 });
-    await page.getByRole("link", { name: "Vaults" }).click();
+    await page.getByRole("link", { name: "Vaults", exact: true }).click();
     await page.getByRole("button", { name: "Revoke agent" }).click();
     await expect(page.getByText(/Agent revoked/)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText("revoked", { exact: true })).toBeVisible();

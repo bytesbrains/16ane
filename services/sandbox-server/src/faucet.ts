@@ -13,6 +13,7 @@ import {
   type SignedFaucetClaim,
   toChecksumAddress,
 } from "../../../packages/sdk-ts/src/index.ts";
+import { abiWordAddress } from "../../../packages/sdk-ts/src/abi.ts";
 import { refuseAboveFeeCeiling, RelayerGasBudgetExceededError, sendBudgetExhausted } from "./gas-budget.ts";
 import { clientIp, type LoggedErrorSink, readRequestBody, sendError, sendJson, sendLoggedError } from "./http.ts";
 
@@ -273,6 +274,29 @@ export async function handleFaucetClaim(
         sendError(res, 403, "ANE-E-1008", `Faucet claim refused: ${refusal}`, false);
         return;
       }
+    }
+
+    // A direct on-chain claim (dashboard self-serve) bypasses the mirror above,
+    // so ask the faucet itself: an in-cooldown recipient gets a clear 429 here
+    // instead of a reverted relay (502) below.
+    let nextEligible: bigint;
+    try {
+      const raw = await ctx.client.ethCall(
+        ctx.faucetAddress,
+        functionSelector("nextClaimTime(address)") + abiWordAddress(recipient),
+      );
+      if (typeof raw !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(raw)) {
+        throw new Error(`nextClaimTime returned ${JSON.stringify(raw)}`);
+      }
+      nextEligible = BigInt(raw);
+    } catch (err) {
+      sendLoggedError(res, 502, "ANE-E-1004", "Faucet could not check the claim on-chain; try again later", true, err, ctx.loggedErrorSink);
+      return;
+    }
+    if (BigInt(nowSec) < nextEligible) {
+      const waitSeconds = Number(nextEligible - BigInt(nowSec));
+      sendError(res, 429, "ANE-E-1003", `Faucet cooldown active for this recipient; retry in ${waitSeconds}s`, true);
+      return;
     }
 
     const selfServe = "claim directly from the AneFaucet contract (claim(address)) with your own gas";

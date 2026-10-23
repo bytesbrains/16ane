@@ -30,6 +30,7 @@ import {
 } from "./faucet.ts";
 import {
   DEFAULT_MAX_BODY_BYTES,
+  handleCorsPreflight,
   readRequestBody,
   sendError,
   sendJson,
@@ -198,6 +199,9 @@ export async function createSandboxServer(config: SandboxServerConfig): Promise<
       const fullUrl = new URL(req.url ?? "/", `${protocol}://${host}`);
       const pathname = fullUrl.pathname;
       const method = (req.method ?? "GET").toUpperCase();
+
+      // 0. CORS preflight for browser clients (dashboard fetch POSTs).
+      if (handleCorsPreflight(req, res)) return;
 
       // 1. Service Discovery Manifest (/.well-known/16ane-service.json)
       if (method === "GET" && pathname === "/.well-known/16ane-service.json") {

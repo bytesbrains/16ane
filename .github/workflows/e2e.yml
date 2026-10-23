@@ -85,6 +85,43 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  # The hackathon kit's promise (#20): from a fresh checkout with the toolchain installed, the whole
+  # workshop journey runs in under five minutes. The timed step is install plus demo, as a participant
+  # types them; the docs check proves every command the guides give exists.
+  kit:
+    name: Hackathon kit in under five minutes
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+
+      - name: Install, then run the whole kit journey (five-minute budget)
+        timeout-minutes: 5
+        run: |
+          python3 --version
+          npm ci --ignore-scripts
+          npm run kit:demo
+
+      - name: Guides and kit docs (links, commands, EN/HI parity, no-value callout)
+        run: npm run test:kit
+
   fork:
     name: E2E flows on a Base Sepolia fork
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

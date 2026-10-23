@@ -20,9 +20,12 @@
     "packages/cli/test",
     "services/sandbox-server/src",
     "services/sandbox-server/test",
+    "services/facilitator/src",
     "e2e",
     "scripts",
     "test/web",
+    "test/hackathon-kit",
+    "examples/hackathon-kit",
     "test/dashboard/*.ts"
   ]
 }

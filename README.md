@@ -79,5 +79,6 @@ Individual suites: `make test-contracts`, `make test-sdk-ts`, `make test-sdk-py`
 - [Running the sandbox server yourself (Docker)](docs/operations/SELF_HOSTING.md)
 - [Deploying the sandbox API to Fly.io](docs/operations/DEPLOY_API.md)
 - [Example scenarios](examples/SCENARIOS.md)
+- [Getting started guide](docs/guides/ONBOARDING.md) ([हिन्दी](docs/guides/ONBOARDING.hi.md)) and [hackathon kit](examples/hackathon-kit/README.md)
 
 **Names and domains.** `16ane.com` serves the project overview (live since 2026-10-19, `ADR-0015`); every other subdomain is a proposal, not a deployment. The domain's earlier business-marketplace use is covered in `ADR-0014`. The names `16ane`, `ANE` and `tANE` are used without trademark registration (maintainer decision, 2026-10-19, #32). Token symbols are not unique: unrelated tokens already use `ANE`, and anyone can deploy a token with the same symbol. Always identify `tANE` by its chain ID and contract address, never by symbol alone (`ADR-0014`).

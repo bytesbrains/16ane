@@ -67,8 +67,8 @@ jobs:
       - name: Type-check TypeScript (SDK, CLI, MCP server, server, E2E)
         run: npm run typecheck
 
-      - name: Lint Python SDK
-        run: '"${RUNNER_TEMP}/pytools/bin/ruff" check packages/sdk-py'
+      - name: Lint Python SDK and hackathon kit
+        run: '"${RUNNER_TEMP}/pytools/bin/ruff" check packages/sdk-py examples/hackathon-kit/python'
 
       - name: Build Python SDK sdist and wheel
         run: '"${RUNNER_TEMP}/pytools/bin/python" -m build --sdist --wheel --outdir "${RUNNER_TEMP}/dist" packages/sdk-py'

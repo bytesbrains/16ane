@@ -89,3 +89,6 @@ playwright/.auth/
 
 # Synpress wallet-setup cache (built by the Tier-2 runner before the specs)
 .cache-synpress/
+
+# Hackathon kit state: network settings and generated keys (examples/hackathon-kit)
+examples/hackathon-kit/.kit/

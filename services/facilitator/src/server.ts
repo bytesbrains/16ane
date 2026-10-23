@@ -5,6 +5,7 @@ import {
   SANDBOX_DISCLAIMER,
   type KeyValueStore,
   MemoryKeyValueStore,
+  type SecretKey,
 } from "../../../packages/sdk-ts/src/index.ts";
 import { DEFAULT_MAX_BODY_BYTES, sendError, sendJson } from "../../sandbox-server/src/http.ts";
 import {

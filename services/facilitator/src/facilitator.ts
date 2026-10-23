@@ -55,7 +55,7 @@ const UINT = /^\d+$/;
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isAddress = (v: unknown) => typeof v === "string" && ADDRESS.test(v);
 const isBytes32 = (v: unknown) => typeof v === "string" && BYTES32.test(v);
-const isUintString = (v: unknown) => typeof v === "string" && UINT.test(v);
+const isUintString = (v: unknown): v is string => typeof v === "string" && UINT.test(v);
 const isSafeUint = (v: unknown) =>
   (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) ||
   (typeof v === "string" && UINT.test(v) && BigInt(v) <= BigInt(Number.MAX_SAFE_INTEGER));
@@ -173,7 +173,7 @@ function payerOf(scheme: string, payload: Record<string, unknown>): string | und
 function receiptIds(scheme: string, payload: Record<string, unknown>, chainId: number, asset: string): string[] {
   try {
     if (scheme === "ane-vault-v1") {
-      const p = payload as unknown as Parameters<typeof hashSpendIntent>[1];
+      const p = payload as unknown as Parameters<typeof hashSpendIntent>[1] & { txHash?: unknown };
       const { structHash, paymentId } = hashSpendIntent(chainId, p);
       const ids = [paymentId, structHash];
       if (typeof p.txHash === "string") ids.push(p.txHash);

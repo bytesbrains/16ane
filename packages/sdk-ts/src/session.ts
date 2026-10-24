@@ -11,6 +11,7 @@ import {
 } from "./crypto.ts";
 import { keccak256Utf8 } from "./keccak.ts";
 import {
+  parseBaseUnits,
   probeOffer,
   routeOffers,
   selectRequirement,
@@ -157,10 +158,12 @@ export class AgentSession {
     candidates: ProviderCandidate[],
     constraints: { maxPayment: bigint | string; maxLatencyMs?: number; prefer?: "price" | "latency" },
   ): Promise<RouteResult> {
+    // A cap is held to the same canonical base-unit form as a quote's amount, before any network call.
+    const maxAmount = parseBaseUnits(constraints.maxPayment);
     const asset: AcceptedAsset = {
       chainId: this.client.chainId,
       asset: await this.vaultAsset(),
-      maxAmount: BigInt(constraints.maxPayment),
+      maxAmount,
     };
     const offers = await this.probeProviders(candidates);
     return routeOffers(offers, {
@@ -204,6 +207,8 @@ export class AgentSession {
     url: string,
     options: PurchaseOptions = {},
   ): Promise<PurchaseResult<T>> {
+    // Refuse a cap that does not mean what it looks like ("0x10", "016", -1n) before anything is fetched.
+    const maxPayment = options.maxPayment === undefined ? undefined : parseBaseUnits(options.maxPayment);
     const method = options.method ?? (options.body ? "POST" : "GET");
     const idempotencyKey = options.idempotencyKey ?? `idem-${randomBytes32Hex().slice(2, 34)}`;
     const baseHeaders: Record<string, string> = {
@@ -281,10 +286,8 @@ export class AgentSession {
     }
 
     const requiredAmount = match.amount;
-    if (options.maxPayment !== undefined && requiredAmount > BigInt(options.maxPayment)) {
-      throw new Error(
-        `ANE-E-3002: Quote amount ${requiredAmount} exceeds caller maxPayment ${BigInt(options.maxPayment)}`,
-      );
+    if (maxPayment !== undefined && requiredAmount > maxPayment) {
+      throw new Error(`ANE-E-3002: Quote amount ${requiredAmount} exceeds caller maxPayment ${maxPayment}`);
     }
 
     let manifest = options.manifest;

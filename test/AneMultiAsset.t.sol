@@ -191,7 +191,10 @@ contract AneMultiAssetTest is Test {
         DeploySandbox.DeployedStack memory stack = script.deployForTest(deployer, script.SANDBOX_REGISTRY_SALT());
 
         assertEq(stack.sixDecimalVaultFactory.taneToken(), address(stack.sixDecimalToken));
-        assertTrue(stack.sixDecimalToken.hasRole(stack.sixDecimalToken.MINTER_ROLE(), deployer));
+        // The tSIX faucet is the only minter, as the tANE faucet is for tANE (ADR-0021).
+        assertTrue(stack.sixDecimalToken.hasRole(stack.sixDecimalToken.MINTER_ROLE(), address(stack.sixDecimalFaucet)));
+        assertFalse(stack.sixDecimalToken.hasRole(stack.sixDecimalToken.MINTER_ROLE(), deployer));
+        assertEq(address(stack.sixDecimalFaucet.tsixToken()), address(stack.sixDecimalToken));
         (address token, address factory,,,,) = stack.registry.getDeployment();
         assertEq(token, address(stack.taneToken));
         assertEq(factory, address(stack.vaultFactory));
@@ -216,6 +219,11 @@ contract AneMultiAssetTest is Test {
         SecondAssetDeployment.Deployed memory d = script.deployForTest(deployer);
         assertEq(d.vaultFactory.taneToken(), address(d.token));
         assertTrue(d.token.hasRole(d.token.DEFAULT_ADMIN_ROLE(), deployer));
+        assertEq(address(d.faucet.tsixToken()), address(d.token));
+        assertEq(d.faucet.owner(), deployer);
+        // A claim is 16,000 tSIX in tSIX's own 6-decimal units, not 16,000e18.
+        assertEq(d.faucet.claim(makeAddr("tester")), 16_000e6);
+        assertEq(d.token.balanceOf(makeAddr("tester")), 16_000e6);
 
         vm.chainId(8453);
         vm.expectRevert(abi.encodeWithSelector(DeploySecondAsset.SandboxTestnetOnly.selector, 8453));

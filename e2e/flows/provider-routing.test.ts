@@ -125,11 +125,10 @@ test("S3: the agent routes to the provider that meets its constraints and pays o
   });
 
   await t.test("with a tSIX vault, a tSIX preference routes to the tSIX seller and that vault pays it, verified on-chain", async () => {
-    // The operator mints tSIX on request (no tSIX faucet yet); the owner gets one vault per asset for the same salt.
-    await client.sendContractTx(new SecretKey(DEPLOYER_KEY), secondAsset.token, "mint(address,uint256)", [
-      owner.address,
-      (1000n * ONE_TSIX).toString(),
-    ]);
+    // The owner claims tSIX from its own faucet (ADR-0021): a permissionless claim, so any account may submit it.
+    // The owner then gets one vault per asset for the same salt.
+    await client.sendContractTx(new SecretKey(DEPLOYER_KEY), secondAsset.faucet, "claim(address)", [owner.address]);
+    assert.equal(await client.getTokenBalance(owner.address, secondAsset.token), 16_000n * ONE_TSIX);
     const { vaultAddress: tsixVault } = await owner.ensureVaultDeployed(0n, { vaultFactory: secondAsset.vaultFactory });
     assert.notEqual(tsixVault, vaultAddress);
     assert.equal(await client.getVaultAsset(tsixVault), toChecksumAddress(secondAsset.token));

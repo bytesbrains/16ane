@@ -22,6 +22,7 @@ import {
   decodeDataUri,
   decodeNewFeedbackLog,
   functionSelector,
+  getAgentIdentity,
   giveFeedbackOnChain,
   hashAgentWalletSet,
   keccak256,
@@ -150,8 +151,9 @@ test("a proof for another chain, or with a malformed hash, is not verified", asy
   );
 });
 
-// A chain with one agent (id 5, owned by OWNER, no vault, data: registration file) and the given feedback events.
-function chainWith(feedback: Array<{ client: string; uri: string; hash: string }>) {
+// A chain with one agent (id 5, owned by OWNER, data: registration file, an optional `16ane.vault` claim) and the
+// given feedback events. Like a client built for ERC-8004 alone, it has no 16ane contracts to resolve.
+function chainWith(feedback: Array<{ client: string; uri: string; hash: string }>, vaultClaim = "") {
   const abiString = (s: string) => {
     const hex = Buffer.from(s, "utf8").toString("hex");
     return abiWordUint(32) + abiWordUint(hex.length / 2) + hex.padEnd(Math.ceil(hex.length / 64) * 64, "0");
@@ -164,8 +166,11 @@ function chainWith(feedback: Array<{ client: string; uri: string; hash: string }
     ethCall: async (_to: string, data: string) => {
       if (data.startsWith(selector("ownerOf(uint256)")) || data.startsWith(selector("getAgentWallet(uint256)"))) return word(OWNER);
       if (data.startsWith(selector("tokenURI(uint256)"))) return "0x" + abiString(tokenURI);
-      if (data.startsWith(selector("getMetadata(uint256,string)"))) return "0x" + abiWordUint(32) + abiWordUint(0);
+      if (data.startsWith(selector("getMetadata(uint256,string)"))) return "0x" + abiString(vaultClaim);
       throw new Error(`unexpected call ${data.slice(0, 10)}`);
+    },
+    resolveContracts: async () => {
+      throw new Error("Neither contract addresses nor registryAddress configured on AneClient");
     },
     rpcCall: async (method: string, params: Array<{ topics: string[] }>) => {
       if (method === "eth_blockNumber") return "0x20";
@@ -211,4 +216,16 @@ test("the reader flags a tampered, misdirected or unreadable feedback file and a
   // With a fetcher, an off-chain file must still carry a hash.
   const fetched = await readAgentFeedback(client, { agentId: 5, fromBlock: 0 }, { fetchUri: async () => new Uint8Array(Buffer.from(json)) });
   assert.equal(fetched.entries[4].payment.reason, "no feedbackHash for an off-chain file");
+});
+
+test("a vault claim that cannot be checked reads as unverified instead of failing the whole identity read", async () => {
+  const vault = "0x" + "ee".repeat(20);
+  const client = chainWith([], `eip155:84532:${vault}`);
+  const identity = await getAgentIdentity(client, 5);
+  assert.equal(identity.vault?.address?.toLowerCase(), vault);
+  assert.equal(identity.vault?.verified, false);
+  assert.equal(identity.vault?.reason, "vault check failed: Neither contract addresses nor registryAddress configured on AneClient");
+  assert.equal(identity.registrationBindsBack, true);
+  // The feedback reader, which loads the identity first, still answers.
+  assert.equal((await readAgentFeedback(client, { agentId: 5, fromBlock: 0 })).caveat, REPUTATION_CAVEAT);
 });

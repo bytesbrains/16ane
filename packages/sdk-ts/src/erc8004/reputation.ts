@@ -291,6 +291,7 @@ export async function readAgentFeedback(
     entries.push(entry);
     try {
       const bytes = await loadUri(base.feedbackURI, opts.fetchUri);
+      // A data: file is the event's own immutable bytes, so a zero hash hides nothing; any other file needs one.
       if (base.feedbackHash !== ZERO_HASH && keccak256(bytes) !== base.feedbackHash) throw new Error("file does not match feedbackHash");
       if (base.feedbackHash === ZERO_HASH && !base.feedbackURI.startsWith("data:")) throw new Error("no feedbackHash for an off-chain file");
       const file = JSON.parse(Buffer.from(bytes).toString("utf8")) as FeedbackFile;
@@ -307,6 +308,8 @@ export async function readAgentFeedback(
         { agentId, clientAddress: base.clientAddress, proof: file.proofOfPayment, identity },
         { identityRegistry },
       );
+      // Only a verified entry consumes its proof: anyone can copy a txHash into an earlier, failing entry, and
+      // letting that consume the proof would let a stranger void the real payer's review.
       if (entry.payment.verified) usedProofs.add(proofKey);
     } catch (err) {
       entry.payment = { verified: false, reason: err instanceof Error ? err.message : String(err) };

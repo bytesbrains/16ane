@@ -247,22 +247,30 @@ export interface AgentIdentity {
   registrationBindsBack: boolean;
 }
 
-/** Checks a `16ane.vault` claim against the chain. */
+/**
+ * Checks a `16ane.vault` claim against the chain. A check that cannot complete (no 16ane contracts on this
+ * client, a revert, a short reply) fails closed as unverified rather than throwing: the claim is owner-written.
+ */
 export async function verifyVaultClaim(client: AneClient, owner: string, claimed: string): Promise<AgentVaultClaim> {
   const parsed = parseCaip10(claimed);
   if (!parsed) return { claimed, verified: false, reason: "not a CAIP-10 eip155 account" };
   if (parsed.chainId !== client.chainId) {
     return { claimed, address: parsed.address, verified: false, reason: `vault is on chain ${parsed.chainId}` };
   }
-  const { aneVaultFactory } = await client.resolveContracts();
-  const registered = abiReadWord(
-    await client.ethCall(aneVaultFactory, callWord("isRegisteredVault(address)", abiWordAddress(parsed.address))),
-    0,
-  );
-  if (registered === 0n) return { claimed, address: parsed.address, verified: false, reason: "not a 16ane vault" };
-  const vaultOwner = toAddress(abiReadWord(await client.ethCall(parsed.address, callWord("owner()")), 0));
-  if (vaultOwner !== toChecksumAddress(owner)) {
-    return { claimed, address: parsed.address, verified: false, reason: "vault is owned by someone else" };
+  try {
+    const { aneVaultFactory } = await client.resolveContracts();
+    const registered = abiReadWord(
+      await client.ethCall(aneVaultFactory, callWord("isRegisteredVault(address)", abiWordAddress(parsed.address))),
+      0,
+    );
+    if (registered === 0n) return { claimed, address: parsed.address, verified: false, reason: "not a 16ane vault" };
+    const vaultOwner = toAddress(abiReadWord(await client.ethCall(parsed.address, callWord("owner()")), 0));
+    if (vaultOwner !== toChecksumAddress(owner)) {
+      return { claimed, address: parsed.address, verified: false, reason: "vault is owned by someone else" };
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { claimed, address: parsed.address, verified: false, reason: `vault check failed: ${message}` };
   }
   return { claimed, address: parsed.address, verified: true };
 }

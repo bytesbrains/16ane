@@ -3,7 +3,7 @@
 // stay in one asset.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AgentSession, AneClient, MultiAssetSession, functionSelector, toChecksumAddress } from "../src/index.ts";
+import { AgentSession, AneClient, MultiAssetSession, functionSelector, parseBaseUnits, toChecksumAddress } from "../src/index.ts";
 
 const TANE = toChecksumAddress("0x" + "a1".repeat(20));
 const TSIX = toChecksumAddress("0x" + "b2".repeat(20));
@@ -185,4 +185,51 @@ test("misconfiguration is refused: unheld or repeated assets, repeated vaults, m
       ]),
     /same chain/,
   );
+});
+
+test("a cap is a canonical base-unit integer, as strict as a quote's amount", async () => {
+  for (const maxPayment of ["0x10", "016", "-1", "1e6", "1.5", " 16", ""]) {
+    await assert.rejects(agent().chooseProvider([], { caps: [{ asset: TSIX, maxPayment }] }), /Invalid base-unit amount/);
+  }
+  for (const maxPayment of [-1n, 1n << 256n]) {
+    await assert.rejects(agent().chooseProvider([], { caps: [{ asset: TSIX, maxPayment }] }), /outside uint256/);
+  }
+  assert.equal(parseBaseUnits("2500000"), 2_500_000n);
+  assert.equal(parseBaseUnits((1n << 256n) - 1n), (1n << 256n) - 1n);
+});
+
+test("a failed vault read is retried, and a stale failure never evicts the retry", async () => {
+  let reads = 0;
+  let fail = true;
+  const c = {
+    chainId: 84532,
+    getVaultAsset: async (vault: string) => {
+      reads++;
+      await null;
+      if (fail) throw new Error("rpc down");
+      return toChecksumAddress(vault) === TANE_VAULT ? TANE : TSIX;
+    },
+  } as unknown as AneClient;
+  const session = new AgentSession({ client: c, vaultAddress: TSIX_VAULT, sessionKey: "0x" + "11".repeat(32) });
+  let retry: Promise<string> | undefined;
+  // The first caller retries the moment it sees the failure; a second caller was waiting on the same read.
+  const first = session.vaultAsset().catch(() => {
+    fail = false;
+    retry = session.vaultAsset();
+  });
+  await assert.rejects(session.vaultAsset(), /rpc down/);
+  await first;
+  assert.equal(await retry, TSIX);
+  assert.equal(await session.vaultAsset(), TSIX);
+  assert.equal(reads, 2, "one failed read, one retry, and the retry stays cached");
+
+  // MultiAssetSession caches its vault map the same way.
+  fail = true;
+  const multi = agent({ chainId: 84532, getVaultAsset: c.getVaultAsset } as unknown as AneClient);
+  await assert.rejects(multi.vaultAssets(), /rpc down/);
+  fail = false;
+  assert.deepEqual(await multi.vaultAssets(), [
+    { asset: TANE, vaultAddress: TANE_VAULT },
+    { asset: TSIX, vaultAddress: TSIX_VAULT },
+  ]);
 });

@@ -140,11 +140,13 @@ export class AgentSession {
 
   /** The one token this vault can pay in (`AneAgentVault.taneToken`), read once from the vault itself. */
   vaultAsset(): Promise<string> {
-    this.#vaultAsset ??= this.client.getVaultAsset(this.vaultAddress);
-    this.#vaultAsset.catch(() => {
-      this.#vaultAsset = undefined;
+    if (this.#vaultAsset) return this.#vaultAsset;
+    const vaultAsset = this.client.getVaultAsset(this.vaultAddress);
+    // Forget only this read if it fails: a retry started meanwhile is newer and stays cached.
+    vaultAsset.catch(() => {
+      if (this.#vaultAsset === vaultAsset) this.#vaultAsset = undefined;
     });
-    return this.#vaultAsset;
+    return (this.#vaultAsset = vaultAsset);
   }
 
   /**

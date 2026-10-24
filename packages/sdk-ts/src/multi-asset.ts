@@ -3,7 +3,7 @@
 // the vaults' assets in the caller's preference order and hands the purchase to the vault for the winning asset,
 // which then verifies the receipt against that asset.
 import type { AneClient } from "./client.ts";
-import { routeOffers, type AcceptedAsset, type RankedOffer, type RouteResult } from "./routing.ts";
+import { parseBaseUnits, routeOffers, type AcceptedAsset, type RankedOffer, type RouteResult } from "./routing.ts";
 import type { AgentSession, ProviderCandidate } from "./session.ts";
 import { toChecksumAddress } from "./secp256k1.ts";
 import type { PurchaseOptions, PurchaseResult } from "./x402.ts";
@@ -82,7 +82,8 @@ export class MultiAssetSession {
   }
 
   #assetMap(): Promise<Map<string, AgentSession>> {
-    this.#byAsset ??= Promise.all(this.sessions.map(async (s) => [await s.vaultAsset(), s] as const)).then((pairs) => {
+    if (this.#byAsset) return this.#byAsset;
+    const byAsset = Promise.all(this.sessions.map(async (s) => [await s.vaultAsset(), s] as const)).then((pairs) => {
       const map = new Map<string, AgentSession>();
       for (const [asset, s] of pairs) {
         // Two vaults in one asset would make "which vault pays" a guess.
@@ -91,10 +92,11 @@ export class MultiAssetSession {
       }
       return map;
     });
-    this.#byAsset.catch(() => {
-      this.#byAsset = undefined;
+    // Forget only this read if it fails: a retry started meanwhile is newer and stays cached.
+    byAsset.catch(() => {
+      if (this.#byAsset === byAsset) this.#byAsset = undefined;
     });
-    return this.#byAsset;
+    return (this.#byAsset = byAsset);
   }
 
   async #sessionFor(asset: string): Promise<AgentSession> {
@@ -112,7 +114,7 @@ export class MultiAssetSession {
       if (seen.has(asset)) throw new Error(`Asset ${asset} has two caps`);
       seen.add(asset);
       await this.#sessionFor(asset);
-      accepted.push({ chainId: this.client.chainId, asset, maxAmount: BigInt(cap.maxPayment) });
+      accepted.push({ chainId: this.client.chainId, asset, maxAmount: parseBaseUnits(cap.maxPayment) });
     }
     return accepted;
   }

@@ -44,6 +44,14 @@ export function parseAssetAmount(value: string, decimals: number): bigint {
   return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0");
 }
 
+/** A base-unit amount as a uint256: the same canonical form a quote's `amount` must take, so "0x10" is not 16. */
+export function parseBaseUnits(value: bigint | string): bigint {
+  if (typeof value === "string" && !BASE_UNITS.test(value)) throw new Error(`Invalid base-unit amount: ${show(value)}`);
+  const amount = BigInt(value);
+  if (amount < 0n || amount > MAX_UINT256) throw new Error(`Base-unit amount ${amount} is outside uint256`);
+  return amount;
+}
+
 export function formatAssetAmount(amount: bigint, decimals: number): string {
   checkDecimals(decimals);
   if (amount < 0n) throw new Error("Negative amount");

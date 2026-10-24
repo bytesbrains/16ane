@@ -198,9 +198,9 @@ function sessionWith(respond: (init: RequestInit, call: number) => Response) {
   const calls: RequestInit[] = [];
   const client = {
     chainId: 84532,
-    ethCall: async (_to: string, data: string) => {
-      assert.equal(data, functionSelector("taneToken()"));
-      return "0x" + TANE.slice(2).toLowerCase().padStart(64, "0");
+    getVaultAsset: async (vault: string) => {
+      assert.equal(vault, toChecksumAddress("0x" + "ee".repeat(20)));
+      return TANE;
     },
     getAccountingSummary: async () => ({ active: true, spendableNow: 1000n * ONE_TANE, policyVersion: 1 }),
   } as unknown as AneClient;

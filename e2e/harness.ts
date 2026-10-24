@@ -211,6 +211,11 @@ export async function startSandboxStack(t: TestContext, opts: { chainId?: number
   const escrowMatch = deployOut.match(/AneTaskEscrow:\s*(0x[0-9a-fA-F]{40})/);
   assert.ok(escrowMatch, `Failed to parse AneTaskEscrow from deploy output:\n${deployOut}`);
   const taskEscrowAddress = escrowMatch[1];
+  // The second test asset and its own vault factory (ADR-0020), also outside the registry.
+  const tsixMatch = deployOut.match(/AneSixDecimalTestToken \(tSIX\):\s*(0x[0-9a-fA-F]{40})/);
+  const tsixFactoryMatch = deployOut.match(/AneVaultFactory \(tSIX\):\s*(0x[0-9a-fA-F]{40})/);
+  assert.ok(tsixMatch && tsixFactoryMatch, `Failed to parse tSIX from deploy output:\n${deployOut}`);
+  const secondAsset = { token: tsixMatch[1], vaultFactory: tsixFactoryMatch[1] };
   if (artifactDir) {
     writeFileSync(
       path.join(artifactDir, `deploy-${anvilPort}.log`),
@@ -289,6 +294,7 @@ export async function startSandboxStack(t: TestContext, opts: { chainId?: number
     repoRoot,
     registryAddress,
     taskEscrowAddress,
+    secondAsset,
     sandbox,
     client,
     contracts,

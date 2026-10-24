@@ -9,13 +9,13 @@ import {
   type ServiceManifestPayload,
   type SpendIntent,
 } from "./crypto.ts";
-import { abiReadWord, functionSelector } from "./abi.ts";
 import { keccak256Utf8 } from "./keccak.ts";
 import {
   probeOffer,
   routeOffers,
   selectRequirement,
   type AcceptedAsset,
+  type ProviderOffer,
   type RankedOffer,
   type RouteResult,
 } from "./routing.ts";
@@ -27,6 +27,17 @@ import {
   type X402QuoteEnvelope,
   type X402Receipt,
 } from "./x402.ts";
+
+/** A provider to ask for a quote before choosing whom to buy from. */
+export interface ProviderCandidate {
+  url: string;
+  providerId?: string;
+  method?: PurchaseOptions["method"];
+  headers?: Record<string, string>;
+  body?: string;
+  /** The caller's own measurement, e.g. from past purchases; replaces the probe's quote round trip. */
+  latencyMs?: number;
+}
 
 export class AgentSession {
   readonly client: AneClient;
@@ -129,13 +140,13 @@ export class AgentSession {
 
   /** The one token this vault can pay in (`AneAgentVault.taneToken`), read once from the vault itself. */
   vaultAsset(): Promise<string> {
-    this.#vaultAsset ??= this.client
-      .ethCall(this.vaultAddress, functionSelector("taneToken()"))
-      .then((word) => toChecksumAddress("0x" + abiReadWord(word, 0).toString(16).padStart(40, "0")));
-    this.#vaultAsset.catch(() => {
-      this.#vaultAsset = undefined;
+    if (this.#vaultAsset) return this.#vaultAsset;
+    const vaultAsset = this.client.getVaultAsset(this.vaultAddress);
+    // Forget only this read if it fails: a retry started meanwhile is newer and stays cached.
+    vaultAsset.catch(() => {
+      if (this.#vaultAsset === vaultAsset) this.#vaultAsset = undefined;
     });
-    return this.#vaultAsset;
+    return (this.#vaultAsset = vaultAsset);
   }
 
   /**
@@ -143,15 +154,7 @@ export class AgentSession {
    * token on this chain, at or under `maxPayment`, within `maxLatencyMs` of measured quote latency.
    */
   async chooseProvider(
-    candidates: Array<{
-      url: string;
-      providerId?: string;
-      method?: PurchaseOptions["method"];
-      headers?: Record<string, string>;
-      body?: string;
-      /** The caller's own measurement, e.g. from past purchases; replaces the probe's quote round trip. */
-      latencyMs?: number;
-    }>,
+    candidates: ProviderCandidate[],
     constraints: { maxPayment: bigint | string; maxLatencyMs?: number; prefer?: "price" | "latency" },
   ): Promise<RouteResult> {
     const asset: AcceptedAsset = {
@@ -159,7 +162,17 @@ export class AgentSession {
       asset: await this.vaultAsset(),
       maxAmount: BigInt(constraints.maxPayment),
     };
-    const offers = await Promise.all(
+    const offers = await this.probeProviders(candidates);
+    return routeOffers(offers, {
+      assets: [asset],
+      maxLatencyMs: constraints.maxLatencyMs,
+      prefer: constraints.prefer,
+    });
+  }
+
+  /** Asks each candidate for a quote without paying (`probeOffer`), identifying this vault and session. */
+  probeProviders(candidates: ProviderCandidate[]): Promise<ProviderOffer[]> {
+    return Promise.all(
       candidates.map(async (c) => {
         const offer = await probeOffer(c.url, {
           providerId: c.providerId,
@@ -170,11 +183,6 @@ export class AgentSession {
         return c.latencyMs === undefined ? offer : { ...offer, latencyMs: c.latencyMs };
       }),
     );
-    return routeOffers(offers, {
-      assets: [asset],
-      maxLatencyMs: constraints.maxLatencyMs,
-      prefer: constraints.prefer,
-    });
   }
 
   /**

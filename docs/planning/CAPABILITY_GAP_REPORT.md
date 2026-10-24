@@ -54,7 +54,7 @@ Per `README.md` ("Reuse open wallet/payment infrastructure where possible; do no
 | **Self-Hostable x402 Facilitator & Manifest Indexer Package** | REQ-001, REQ-106 | E16 | Missing | P1 |
 | **Asynchronous Task Escrow Contract (`AneTaskEscrow`)** | REQ-201 | E18 | Implemented (#21); not yet deployed to the public sandbox | P2 |
 | **ERC-8004 Portable Agent Identity & Reputation Adapter** | REQ-202 | E19 | Implemented (#22): identity and payment-backed reputation in the TS SDK against the canonical registries; Validation Registry deferred (ADR-0018) | P2 |
-| **Multi-Asset / Cross-Rail Payment Adapter** | REQ-204 | E20 | Partial (#23): asset-aware quote selection and S3 provider routing in the SDKs; the vault still pays only tANE, multi-asset vault deferred (ADR-0019) | P2 |
+| **Multi-Asset / Cross-Rail Payment Adapter** | REQ-204 | E20 | Implemented on a local chain (#23, #133): asset-aware quote selection and S3 routing (ADR-0019); one vault per asset with a 6-decimal tSIX test asset and `MultiAssetSession` (ADR-0020). Not yet on Base Sepolia: the additive tSIX deploy and a tSIX faucet are pending | P2 |
 | **India-First Multilingual Guides & Hackathon Kit** | REQ-DOC | E21 | Missing | P1 |
 | **Future Regulated INR `ANE` Feasibility & Legal Questionnaire** | — (`MAINNET_AND_REGULATORY.md`) | E22 | Research only (`BLOCKED-LEGAL`) | Research |
 

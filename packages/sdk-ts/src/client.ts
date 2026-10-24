@@ -148,19 +148,36 @@ export class AneClient {
     return this.cachedContracts;
   }
 
-  async getTokenBalance(account: string): Promise<bigint> {
-    const { aneTestToken } = await this.resolveContracts();
+  /** Balance of `token`, tANE unless given. */
+  async getTokenBalance(account: string, token?: string): Promise<bigint> {
+    const asset = token ?? (await this.resolveContracts()).aneTestToken;
     const sel = functionSelector("balanceOf(address)");
-    const out = await this.ethCall(aneTestToken, sel + abiWordAddress(account));
+    const out = await this.ethCall(asset, sel + abiWordAddress(account));
     return wordToBigInt(splitWords(out)[0]);
   }
 
-  async computeVaultAddress(owner: string, salt: bigint | number | string = 0n): Promise<string> {
-    const { aneVaultFactory } = await this.resolveContracts();
+  /** The one token a vault holds and pays in (`AneAgentVault.taneToken`, which names the asset, not only tANE). */
+  async getVaultAsset(vaultAddress: string): Promise<string> {
+    const asset = wordToAddress(splitWords(await this.ethCall(vaultAddress, functionSelector("taneToken()")))[0]);
+    // An address with no code answers an eth_call with nothing, which would read as the zero address.
+    if (BigInt(asset) === 0n) throw new Error(`${toChecksumAddress(vaultAddress)} is not a 16ane vault`);
+    return asset;
+  }
+
+  /**
+   * The vault `owner` gets for `salt`. `vaultFactory` defaults to the registry's tANE factory; each other asset
+   * has its own factory (ADR-0020), so the same owner and salt give one vault per asset.
+   */
+  async computeVaultAddress(
+    owner: string,
+    salt: bigint | number | string = 0n,
+    vaultFactory?: string,
+  ): Promise<string> {
+    const factory = vaultFactory ?? (await this.resolveContracts()).aneVaultFactory;
     const sel = functionSelector("predictVaultAddress(address,bytes32)");
     const saltB32 = normalizeSaltBytes32(salt);
     const out = await this.ethCall(
-      aneVaultFactory,
+      factory,
       sel + abiWordAddress(owner) + abiWordBytes32(saltB32),
     );
     return wordToAddress(splitWords(out)[0]);

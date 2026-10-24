@@ -52,3 +52,26 @@ export function encodeCallWithTrailingBytes(signature: string, staticWords: stri
   return functionSelector(signature) + staticWords.join("") + offset + abiBytesTail(bytesHex);
 }
 
+// Minimal ABI decoding of call results and event data: the 32-byte word at `index`, and a dynamic
+// `bytes`/`string` value whose offset sits at `index`.
+export function abiReadWord(hex: string, index: number): bigint {
+  const clean = hex.replace(/^0x/i, "");
+  const word = clean.slice(index * 64, (index + 1) * 64);
+  if (word.length !== 64) throw new Error(`ABI data too short for word ${index}`);
+  return BigInt("0x" + word);
+}
+
+export function abiReadBytes(hex: string, index: number): string {
+  const clean = hex.replace(/^0x/i, "");
+  const offset = Number(abiReadWord(clean, index));
+  if (offset % 32 !== 0) throw new Error("Malformed ABI offset");
+  const length = Number(abiReadWord(clean, offset / 32));
+  const start = offset * 2 + 64;
+  const data = clean.slice(start, start + length * 2);
+  if (data.length !== length * 2) throw new Error("ABI bytes run past the data");
+  return "0x" + data;
+}
+
+export function abiReadString(hex: string, index: number): string {
+  return Buffer.from(abiReadBytes(hex, index).slice(2), "hex").toString("utf8");
+}

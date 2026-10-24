@@ -15,3 +15,4 @@ export * from "./session.ts";
 export * from "./campaigns.ts";
 export * from "./merchant.ts";
 export * from "./escrow.ts";
+export * from "./erc8004/index.ts";

@@ -53,5 +53,19 @@ Each case below has a test in `test/AneTaskEscrow.t.sol`.
 - **Forged or replayed receipts.** The escrow accepts only the owner, or the agent while active. Receipts are bound to the escrow, the chain and the task. Cumulative amounts make a replay pay nothing more, and revoking the agent voids its receipts.
 - **Reentrancy.** Every state-changing function is `nonReentrant`. The task is recorded before the vault call, and the token is tANE.
 
+## ERC-8004 adapter additions (ADR-0018, ISS-022)
+
+Each case below has a test in `packages/sdk-ts/test/erc8004.test.ts` or `e2e/flows/erc8004-reputation.test.ts`.
+
+- **Someone claims a vault they do not own.** The registry stores any `16ane.vault` claim. `getAgentIdentity` treats the claim as verified only if the factory registered the vault and `vault.owner()` is the identity's owner.
+- **A registration file copied from another agent.** `registrationBindsBack` is true only when the file's `registrations` names this registry and this id.
+- **Feedback citing someone else's payment.** Both the SDK and the reader require the reviewer to be the payer, or the owner or agent signer of the paying vault. The payee must also be the agent's owner, wallet or verified vault.
+- **One payment reused for many reviews.** One transaction proves at most one entry; later entries are marked unverified.
+- **A tampered or misdirected feedback file.** The file must match `feedbackHash` and must name this registry, this agent and this reviewer. An off-chain file without a hash is never verified.
+- **Self-review.** The registry refuses feedback from the agent's owner or operators.
+- **Wash trading with free tANE.** Not preventable: someone can pay themselves through a second identity. Every read carries `REPUTATION_CAVEAT`, the SDK computes no score, and reputation must never gate trust or spending.
+- **A hostile file URL (SSRF, size).** Only `data:` URIs are read unless the caller supplies a fetcher. Files are capped at 64 KiB, and their text is untrusted.
+- **A third-party registry upgrade.** The registries are proxies owned by their maintainers. No funds pass through them. `npm run check:erc8004-fixture` detects a change of implementation.
+
 ## Launch gates
 Threat model reviewed, tests automated, secrets scanned, source verified, contract roles disclosed, rollback/migration rehearsed, hosted spend caps configured, abuse reporting contact live. For future real-value mainnet, require external security audits and explicit legal/compliance sign-off; a public testnet launch does not satisfy those requirements.

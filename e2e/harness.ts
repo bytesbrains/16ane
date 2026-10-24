@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, execFile, type ChildProcess } from "node:child_process";
-import { closeSync, mkdirSync, openSync, writeFileSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 import net from "node:net";
 import path from "node:path";
@@ -10,6 +10,7 @@ import {
   AgentSession,
   OwnerWallet,
   SecretKey,
+  keccak256,
   keccak256Utf8,
   privateKeyToAddress,
   type SpendIntent,
@@ -333,4 +334,36 @@ export async function setupFundedSession(
     ...(opts.ceiling === undefined ? {} : { revolvingTreasuryCeiling: opts.ceiling }),
     ...(opts.daily === undefined ? {} : { dailyLimit: opts.daily }),
   });
+}
+
+// The canonical ERC-8004 registries (#22, ADR-0018) at their Base Sepolia addresses. On a fork of Base Sepolia
+// they are already there; on an empty chain the deployed v2.0.0 implementation bytecode (e2e/fixtures) is
+// placed at the same addresses and initialized, so the SDK's defaults work unchanged and the flow runs the
+// code the public registries run.
+const OWNABLE_SLOT = "0x9016d09d72d40fdae2fd8ceac6b6234c7706214fd39c1cd1e609a0528c199300";
+
+export async function installErc8004Registries(client: AneClient): Promise<{ identityRegistry: string; reputationRegistry: string }> {
+  const fixture = JSON.parse(readFileSync(path.join(import.meta.dirname, "fixtures/erc8004-registries.json"), "utf8")) as {
+    source: { identityProxy: string; reputationProxy: string };
+    identityRegistry: { code: string; codehash: string };
+    reputationRegistry: { code: string; codehash: string };
+  };
+  const identityRegistry = fixture.source.identityProxy;
+  const reputationRegistry = fixture.source.reputationProxy;
+  if (await client.isContractDeployed(identityRegistry)) return { identityRegistry, reputationRegistry };
+
+  const deployer = new SecretKey(DEPLOYER_KEY);
+  const ownerWord = "0x" + privateKeyToAddress(deployer).slice(2).toLowerCase().padStart(64, "0");
+  for (const [address, impl] of [
+    [identityRegistry, fixture.identityRegistry],
+    [reputationRegistry, fixture.reputationRegistry],
+  ] as const) {
+    assert.equal(keccak256(impl.code), impl.codehash, "ERC-8004 fixture bytecode does not match its recorded codehash");
+    await client.rpcCall("anvil_setCode", [address, impl.code]);
+    // initialize() is onlyOwner, as on the live proxies; make the deployer the owner.
+    await client.rpcCall("anvil_setStorageAt", [address, OWNABLE_SLOT, ownerWord]);
+  }
+  await client.sendContractTx(deployer, identityRegistry, "initialize()");
+  await client.sendContractTx(deployer, reputationRegistry, "initialize(address)", [identityRegistry]);
+  return { identityRegistry, reputationRegistry };
 }

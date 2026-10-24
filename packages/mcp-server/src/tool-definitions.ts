@@ -4,6 +4,14 @@
 
 import type { ToolDefinition } from "./protocol.ts";
 
+const READ_ONLY = { readOnlyHint: true, idempotentHint: true, openWorldHint: true };
+const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE"];
+const URL_PROPERTY = { type: "string", description: "Full https URL of the service endpoint." };
+
+function methodProperty(description: string): Record<string, unknown> {
+  return { type: "string", enum: HTTP_METHODS, description };
+}
+
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: "list_services",
@@ -26,7 +34,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+    annotations: READ_ONLY,
   },
   {
     name: "get_quote",
@@ -38,12 +46,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        url: { type: "string", description: "Full https URL of the service endpoint." },
-        method: {
-          type: "string",
-          enum: ["GET", "POST", "PUT", "DELETE"],
-          description: "HTTP method to probe with (default GET, or POST when body is set).",
-        },
+        url: URL_PROPERTY,
+        method: methodProperty("HTTP method to probe with (default GET, or POST when body is set)."),
         body: { type: "string", description: "Optional raw request body for the probe." },
         verify_manifest: {
           type: "boolean",
@@ -54,7 +58,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["url"],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+    annotations: READ_ONLY,
   },
   {
     name: "wallet_balance",
@@ -63,7 +67,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       "Reads the configured agent vault's tANE balance and delegation accounting (spendable now, " +
       "authorized remaining, budget mode) directly from chain state. Read-only.",
     inputSchema: { type: "object", additionalProperties: false },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+    annotations: READ_ONLY,
   },
   {
     name: "payment_status",
@@ -85,7 +89,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+    annotations: READ_ONLY,
   },
   {
     name: "purchase_service",
@@ -97,12 +101,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {
-        url: { type: "string", description: "Full https URL of the service endpoint." },
-        method: {
-          type: "string",
-          enum: ["GET", "POST", "PUT", "DELETE"],
-          description: "HTTP method (default GET, or POST when body is set).",
-        },
+        url: URL_PROPERTY,
+        method: methodProperty("HTTP method (default GET, or POST when body is set)."),
         headers: {
           type: "object",
           description: "Extra HTTP headers for the service request.",
@@ -158,7 +158,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
             type: "object",
             properties: {
               id: { type: "string" },
-              method: { type: "string", enum: ["GET", "POST", "PUT", "DELETE"] },
+              method: { type: "string", enum: HTTP_METHODS },
               path: { type: "string" },
               price_amount: { type: "string", description: "Price in tANE base units." },
               scheme: { type: "string", enum: ["ane-vault-v1", "exact"] },
@@ -200,7 +200,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ["payment_id"],
       additionalProperties: false,
     },
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+    annotations: READ_ONLY,
   },
 ];
 

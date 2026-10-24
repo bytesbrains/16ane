@@ -143,7 +143,15 @@ for (const page of PAGES) {
 
 test("dashboard scripts use no innerHTML, eval, or dynamic code loading", () => {
   // Rendered chain/API data must never become markup: textContent only.
-  const sources = ["assets/app.js", "assets/api.js", "assets/contracts.js", "assets/provider.js", "assets/ui.js"];
+  const sources = [
+    "assets/app.js",
+    "assets/api.js",
+    "assets/contracts.js",
+    "assets/provider.js",
+    "assets/provider-screens.js",
+    "assets/session.js",
+    "assets/ui.js",
+  ];
   for (const rel of sources) {
     const js = read(rel)
       .replace(/\/\*[\s\S]*?\*\//g, " ")

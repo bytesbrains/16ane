@@ -53,7 +53,7 @@ export async function getReceipt(id) {
   }
 }
 
-// Exact message format of signCampaignControl (packages/sdk-ts/src/campaigns.ts):
+// Exact message format of signCampaignControl (packages/sdk-ts/src/campaign-control.ts):
 // personal_sign over this string verifies server-side.
 export function campaignControlMessage({ providerId, campaignId, action, deadline }) {
   return (

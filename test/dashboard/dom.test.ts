@@ -327,6 +327,10 @@ async function boot(opts?: { services?: unknown[]; campaigns?: unknown[] }): Pro
   const dom = buildDom(html);
   const net = makeNet();
   net.install(dom, opts);
+  // app.js is re-imported fresh per boot, but the session module it shares with the screen modules
+  // stays cached: reset it so no test inherits a previous test's account, contracts or open vault.
+  const { state } = await import("../../dashboard/assets/session.js");
+  Object.assign(state, { account: null, contracts: null, openVault: null });
   await import(`../../dashboard/assets/app.js?fresh=${fresh++}`);
   // Let init()'s async refreshes settle.
   await new Promise((resolve) => setTimeout(resolve, 50));

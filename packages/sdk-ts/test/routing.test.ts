@@ -258,3 +258,21 @@ test("a routed purchase is pinned to the quote that won: a higher price or anoth
     }
   }
 });
+
+test("a session cap is a canonical base-unit integer on both paths, refused before anything is fetched (#135)", async () => {
+  const cases: [bigint | string, RegExp][] = [
+    ...["0x10", "016", "-1", "1e6", "1.5", " 16", ""].map((v): [string, RegExp] => [v, /Invalid base-unit amount/]),
+    [-1n, /outside uint256/],
+    [1n << 256n, /outside uint256/],
+  ];
+  for (const [maxPayment, error] of cases) {
+    const { session, calls, restore } = sessionWith(() => new Response("{}", { status: 402 }));
+    try {
+      await assert.rejects(session.chooseProvider([{ url: "https://a.example/v1/infer" }], { maxPayment }), error);
+      await assert.rejects(session.purchase("https://a.example/v1/infer", { maxPayment }), error);
+      assert.equal(calls.length, 0, `nothing is fetched for ${String(maxPayment)}`);
+    } finally {
+      restore();
+    }
+  }
+});

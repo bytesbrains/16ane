@@ -9,7 +9,16 @@ import {
   type ServiceManifestPayload,
   type SpendIntent,
 } from "./crypto.ts";
+import { abiReadWord, functionSelector } from "./abi.ts";
 import { keccak256Utf8 } from "./keccak.ts";
+import {
+  probeOffer,
+  routeOffers,
+  selectRequirement,
+  type AcceptedAsset,
+  type RankedOffer,
+  type RouteResult,
+} from "./routing.ts";
 import { REDACTED_PRIVATE_KEY, SecretKey } from "./secret.ts";
 import { privateKeyToAddress, signDigest, toChecksumAddress } from "./secp256k1.ts";
 import {
@@ -24,6 +33,7 @@ export class AgentSession {
   readonly vaultAddress: string;
   readonly sessionAddress: string;
   #sessionKey: SecretKey;
+  #vaultAsset?: Promise<string>;
 
   constructor(params: {
     client: AneClient;
@@ -117,6 +127,71 @@ export class AgentSession {
     };
   }
 
+  /** The one token this vault can pay in (`AneAgentVault.taneToken`), read once from the vault itself. */
+  vaultAsset(): Promise<string> {
+    this.#vaultAsset ??= this.client
+      .ethCall(this.vaultAddress, functionSelector("taneToken()"))
+      .then((word) => toChecksumAddress("0x" + abiReadWord(word, 0).toString(16).padStart(40, "0")));
+    this.#vaultAsset.catch(() => {
+      this.#vaultAsset = undefined;
+    });
+    return this.#vaultAsset;
+  }
+
+  /**
+   * Asks each candidate for a quote without paying, then ranks the offers this vault can pay (ADR-0019): its own
+   * token on this chain, at or under `maxPayment`, within `maxLatencyMs` of measured quote latency.
+   */
+  async chooseProvider(
+    candidates: Array<{
+      url: string;
+      providerId?: string;
+      method?: PurchaseOptions["method"];
+      headers?: Record<string, string>;
+      body?: string;
+      /** The caller's own measurement, e.g. from past purchases; replaces the probe's quote round trip. */
+      latencyMs?: number;
+    }>,
+    constraints: { maxPayment: bigint | string; maxLatencyMs?: number; prefer?: "price" | "latency" },
+  ): Promise<RouteResult> {
+    const asset: AcceptedAsset = {
+      chainId: this.client.chainId,
+      asset: await this.vaultAsset(),
+      maxAmount: BigInt(constraints.maxPayment),
+    };
+    const offers = await Promise.all(
+      candidates.map(async (c) => {
+        const offer = await probeOffer(c.url, {
+          providerId: c.providerId,
+          method: c.method,
+          headers: { "x-agent-vault": this.vaultAddress, "x-agent-session": this.sessionAddress, ...c.headers },
+          body: c.body,
+        });
+        return c.latencyMs === undefined ? offer : { ...offer, latencyMs: c.latencyMs };
+      }),
+    );
+    return routeOffers(offers, {
+      assets: [asset],
+      maxLatencyMs: constraints.maxLatencyMs,
+      prefer: constraints.prefer,
+    });
+  }
+
+  /**
+   * Buys from a routed offer, pinned to it: the purchase refuses a fresh quote that costs more or pays someone
+   * else, so a provider cannot win the ranking with one quote and charge another.
+   */
+  purchaseRouted<T = unknown>(
+    chosen: RankedOffer,
+    options: Omit<PurchaseOptions, "maxPayment" | "expectedPayTo"> = {},
+  ): Promise<PurchaseResult<T>> {
+    return this.purchase<T>(chosen.url, {
+      ...options,
+      maxPayment: chosen.amount,
+      expectedPayTo: chosen.requirement.payTo,
+    });
+  }
+
   async purchase<T = unknown>(
     url: string,
     options: PurchaseOptions = {},
@@ -181,13 +256,23 @@ export class AgentSession {
       Buffer.from(paymentRequiredB64, "base64").toString("utf8"),
     ) as X402QuoteEnvelope;
 
-    const requirement =
-      quoteEnvelope.accepts.find((a) => a.scheme === "ane-vault-v1") ?? quoteEnvelope.accepts[0];
-    if (!requirement) {
-      throw new Error("No compatible payment scheme in 402 PAYMENT-REQUIRED");
+    // The vault pays only its own token, so only a quote in that token on this chain is payable; an amount
+    // quoted in any other asset would be read in the wrong units (ADR-0019).
+    const vaultAsset = await this.vaultAsset();
+    const { match, rejected } = selectRequirement(quoteEnvelope?.accepts, [
+      { chainId: this.client.chainId, asset: vaultAsset, maxAmount: (1n << 256n) - 1n },
+    ]);
+    if (!match) {
+      throw new Error(
+        `ANE-E-3003: No 402 quote is payable from this vault (tANE ${vaultAsset} on eip155:${this.client.chainId}): ${rejected.join("; ")}`,
+      );
+    }
+    const requirement = match.requirement;
+    if (options.expectedPayTo !== undefined && requirement.payTo !== toChecksumAddress(options.expectedPayTo)) {
+      throw new Error(`ANE-E-5003: 402 payTo ${requirement.payTo} is not the expected ${options.expectedPayTo}`);
     }
 
-    const requiredAmount = BigInt(requirement.amount);
+    const requiredAmount = match.amount;
     if (options.maxPayment !== undefined && requiredAmount > BigInt(options.maxPayment)) {
       throw new Error(
         `ANE-E-3002: Quote amount ${requiredAmount} exceeds caller maxPayment ${BigInt(options.maxPayment)}`,
@@ -324,7 +409,7 @@ export class AgentSession {
     if (paidRes.ok && receipt && options.verifyReceiptOnChain && !receipt.sponsored) {
       const check = await this.client.verifySettlementOnChain({
         txHash: receipt.txHash,
-        expectedAsset: receipt.asset,
+        expectedAsset: vaultAsset,
         expectedPayee: receipt.payTo,
         expectedAmount: receipt.amount,
         expectedVault: this.vaultAddress,

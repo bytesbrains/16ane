@@ -52,6 +52,12 @@ test("amounts parse and format by the token's decimals and are never rounded", (
   }
   assert.equal(formatAssetAmount(1_500_000n, 6), "1.5");
   assert.equal(formatAssetAmount(16n * ONE_TANE, 18), "16");
+  assert.equal(formatAssetAmount(1n, 18), "0.000000000000000001");
+  assert.equal(formatAssetAmount(0n, 6), "0");
+  assert.equal(formatAssetAmount(7n, 0), "7");
+  for (const bad of [-1, 37, 1.5, Number.NaN]) {
+    assert.throws(() => formatAssetAmount(1n, bad), /Invalid decimals/, String(bad));
+  }
 });
 
 test("decimals come from the token contract, and an implausible answer is refused", async () => {

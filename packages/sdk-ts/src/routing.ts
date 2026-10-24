@@ -31,9 +31,13 @@ export async function readAssetDecimals(client: Pick<AneClient, "ethCall">, asse
   return Number(decimals);
 }
 
+function checkDecimals(decimals: number): void {
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) throw new Error(`Invalid decimals: ${decimals}`);
+}
+
 /** "1.5" with 6 decimals is 1500000n. Refuses more fractional digits than the asset has instead of rounding. */
 export function parseAssetAmount(value: string, decimals: number): bigint {
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) throw new Error(`Invalid decimals: ${decimals}`);
+  checkDecimals(decimals);
   if (!HUMAN_AMOUNT.test(value)) throw new Error(`Invalid amount: ${JSON.stringify(value)}`);
   const [whole, fraction = ""] = value.split(".");
   if (fraction.length > decimals) throw new Error(`${value} has more than ${decimals} decimal places`);
@@ -41,9 +45,14 @@ export function parseAssetAmount(value: string, decimals: number): bigint {
 }
 
 export function formatAssetAmount(amount: bigint, decimals: number): string {
+  checkDecimals(decimals);
   if (amount < 0n) throw new Error("Negative amount");
   const unit = 10n ** BigInt(decimals);
-  const fraction = (amount % unit).toString().padStart(decimals, "0").replace(/0+$/, "");
+  const padded = (amount % unit).toString().padStart(decimals, "0");
+  // A linear trim of trailing zeros: /0+$/ backtracks quadratically on "000…01".
+  let end = padded.length;
+  while (end > 0 && padded[end - 1] === "0") end--;
+  const fraction = padded.slice(0, end);
   return fraction ? `${amount / unit}.${fraction}` : `${amount / unit}`;
 }
 

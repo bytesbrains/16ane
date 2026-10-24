@@ -39,19 +39,21 @@ export class OwnerWallet {
     return `OwnerWallet(address=${this.address}, secretKey=${REDACTED_PRIVATE_KEY})`;
   }
 
+  /** Deploys this owner's vault for `salt` if needed; pass another asset's `vaultFactory` for a vault in that asset. */
   async ensureVaultDeployed(
     salt: bigint | number | string = 0n,
+    options: { vaultFactory?: string } = {},
   ): Promise<{ vaultAddress: string; txHash?: string }> {
     const saltB32 = normalizeSaltBytes32(salt);
-    const vaultAddress = await this.client.computeVaultAddress(this.address, saltB32);
+    const factory = options.vaultFactory ?? (await this.client.resolveContracts()).aneVaultFactory;
+    const vaultAddress = await this.client.computeVaultAddress(this.address, saltB32, factory);
     const deployed = await this.client.isContractDeployed(vaultAddress);
     if (deployed) {
       return { vaultAddress };
     }
-    const { aneVaultFactory } = await this.client.resolveContracts();
     const res = await this.client.sendContractTx(
       this.#secretKey,
-      aneVaultFactory,
+      factory,
       "createVault(address,bytes32)",
       [this.address, saltB32],
     );
@@ -62,10 +64,11 @@ export class OwnerWallet {
     vaultAddress: string,
     amount: bigint | string,
   ): Promise<{ approveTxHash: string; depositTxHash: string }> {
-    const { aneTestToken } = await this.client.resolveContracts();
+    // The vault's own token, which is tANE only for a vault from the tANE factory.
+    const asset = await this.client.getVaultAsset(vaultAddress);
     const approveRes = await this.client.sendContractTx(
       this.#secretKey,
-      aneTestToken,
+      asset,
       "approve(address,uint256)",
       [vaultAddress, amount.toString()],
     );

@@ -42,7 +42,7 @@ Option A. The maintainer chose it on 2026-10-24 for this issue. Options B and C 
 
 ## Consequences and limitations
 
-- **REQ-204 is only partly met.** The router, the quote matcher and the merchant verifier (`assetAddress` per endpoint) are asset-agnostic. A 16ane vault, however, can still pay only tANE, so a vault-funded agent cannot yet buy in another token. Removing that limit needs Option B or C, with its own ADR and a vault redeploy (follow-up).
+- **REQ-204 is only partly met.** The router, the quote matcher and the merchant verifier (`assetAddress` per endpoint) are asset-agnostic. A 16ane vault, however, can still pay only tANE, so a vault-funded agent cannot yet buy in another token. Removing that limit needs Option B or C, with its own ADR and a vault redeploy (follow-up). *Update: ADR-0020 (#133) took Option C as one factory per asset, which needs no vault redeploy.*
 - **Probe latency is a lower bound.** It measures the network and the provider's quote path, not the time to perform the work. Providers that answer quotes fast and work slowly will look better than they are, until callers feed in their own measurements.
 - **Each probe is an extra unpaid request.** A probe adds no protocol rate limit (it follows the agent-speed principle in #61 and #62), but a provider is free to rate-limit its own quotes. A probe that fails or returns something unreadable is reported in `rejected` with its reason, never silently dropped.
 - **The probe quote and the purchase quote are separate requests.** Pinning bounds the price and payee. A provider that refuses or raises its price at purchase time is not retried automatically. The caller can try the next entry in `ranked`.

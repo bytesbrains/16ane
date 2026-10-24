@@ -31,6 +31,7 @@ Research compatibility, token/chain restrictions, audit maturity, deployment ava
 - **ADR-013** Open-source licenses and contribution governance.
 - **ADR-018** ERC-8004 identity and reputation adapter (canonical registries, vault named by metadata, payment-backed feedback).
 - **ADR-019** Multi-asset quote selection and provider routing (exact `(chain, asset)` matching, per-asset caps, caller-measured latency, routed purchases pinned to the winning quote; the vault stays single-asset).
+- **ADR-020** One vault per asset (#133): each further asset gets its own unchanged `AneVaultFactory`, so budgets, revenue credit and escrow registration never cross assets; tSIX is the 6-decimal second test asset; no deployed contract changes.
 - **ADR-014** Brand/domain collision with existing 16ane business marketplace.
 - **ADR-015** Web hosting and DNS.
 - **ADR-016** Hosted faucet and demo server.

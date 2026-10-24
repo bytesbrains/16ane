@@ -8,6 +8,8 @@ import {AneVaultFactory} from "../src/AneVaultFactory.sol";
 import {AneFaucet} from "../src/AneFaucet.sol";
 import {AneServiceDirectory} from "../src/AneServiceDirectory.sol";
 import {AneTaskEscrow} from "../src/AneTaskEscrow.sol";
+import {AneSixDecimalTestToken} from "../src/AneSixDecimalTestToken.sol";
+import {SecondAssetDeployment} from "./DeploySecondAsset.s.sol";
 
 /// @title DeploySandbox — Deterministic Sandbox & Dev Environment Deployment Script
 /// @notice Deploys and wires the 16ane public sandbox contracts on Base Sepolia (84532) or Anvil (31337).
@@ -30,6 +32,8 @@ contract DeploySandbox is Script {
         AneFaucet faucet;
         AneServiceDirectory serviceDirectory;
         AneTaskEscrow taskEscrow;
+        AneSixDecimalTestToken sixDecimalToken;
+        AneVaultFactory sixDecimalVaultFactory;
     }
 
     function run() external returns (DeployedStack memory stack) {
@@ -84,6 +88,12 @@ contract DeploySandbox is Script {
         console.log("AneFaucet:", address(stack.faucet));
         console.log("AneServiceDirectory:", address(stack.serviceDirectory));
         console.log("AneTaskEscrow:", address(stack.taskEscrow));
+
+        // The second test asset and its own vault factory (ADR-0020), after everything else so no address above
+        // moves. Like the escrow, the registry has no slot for them: clients take them from the deploy output.
+        SecondAssetDeployment.Deployed memory second = SecondAssetDeployment.deploy(deployer);
+        stack.sixDecimalToken = second.token;
+        stack.sixDecimalVaultFactory = second.vaultFactory;
     }
 
     function _resolveRegistrySalt() internal view returns (bytes32) {

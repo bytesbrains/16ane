@@ -110,6 +110,19 @@ From then on, `ADR-0001`'s continuity policy applies: at least 30 days' notice b
 - **Faucet sizing:** change it on-chain with `AneFaucet.setFaucetConfig` (`ADR-0006`, #61); no redeploy is needed.
   The reference server reads the live values at startup.
 
+## Adding the tSIX test asset to the live sandbox (#133)
+`tSIX` is a second free, worthless test token with 6 decimals, with its own `AneVaultFactory` (ADR-0020). Adding it
+deploys only those two contracts and moves nothing already deployed, so the continuity notice does not apply. It
+still needs the same maintainer authorization as section 0, and the security review that ADR-0020 calls for.
+```bash
+forge script script/DeploySecondAsset.s.sol:DeploySecondAsset \
+  --rpc-url $RPC_URL --account sandbox-deployer --sender $DEPLOYER \
+  --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
+```
+The script refuses any chain but Base Sepolia or a local one and gives the deployer `MINTER_ROLE` on tSIX (there is
+no tSIX faucet yet). Then add `"aneSixDecimalTestToken"` and `"aneSixDecimalVaultFactory"` to `contracts` in
+`networks/sandbox-sepolia.json`. The registry has no slot for them.
+
 ## Adding `AneTaskEscrow` to the live sandbox (#21)
 The sandbox deployed on 2026-10-20 predates the escrow. Adding it does not redeploy anything else, so the
 continuity notice does not apply. It still needs the same maintainer authorization as section 0.

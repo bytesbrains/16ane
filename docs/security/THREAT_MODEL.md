@@ -79,5 +79,17 @@ Each case below has a test in `packages/sdk-ts/test/routing.test.ts`, `e2e/flows
 - **Provider-claimed latency.** Latency is measured by the caller and never taken from the provider. A probe measures only the time to the quote, which is a lower bound on how long the work takes.
 - **Provider text in errors.** Rejection reasons quote provider fields as JSON strings cut to 48 characters, because they can reach logs and LLM context.
 
+## One vault per asset additions (ADR-0020, #133)
+
+Each case below has a test in `test/AneMultiAsset.t.sol`, `test/AneMultiAsset.invariant.t.sol`, `packages/sdk-ts/test/multi-asset.test.ts` or `e2e/flows/provider-routing.test.ts`.
+
+- **Revenue credited in the wrong asset.** A vault credits revenue only to merchants its own factory registered. Each factory makes vaults of one asset, so a tANE payment into a tSIX vault (or the reverse) credits nothing, and a REVOLVING ceiling never grows by an amount read in the wrong units. This holds only while no factory produces two assets' vaults; ADR-0020 makes that an invariant.
+- **Escrow paying out another asset.** The tANE escrow accepts only vaults its tANE factory registered, so a tSIX vault cannot lock tSIX and release other tasks' tANE.
+- **A foreign token counted as budget.** Spendable balance, withdrawal and refunds read only the vault's own token. A foreign token paid in is inert, and it is also unrecoverable.
+- **A cap applied to the wrong asset in the SDK.** `MultiAssetSession` takes one cap per asset, refuses a cap for an asset none of its vaults holds, a repeated asset, two vaults in one asset, and mixed chains. The winning offer is paid by the vault for its asset, which verifies the receipt against that asset.
+- **Who may add an asset.** No contract role: a new asset is a new factory deployment by the operator. `DeploySecondAsset` refuses anything but Base Sepolia and Anvil, and tSIX carries `isTestToken()`. Fee-on-transfer, rebasing or otherwise hostile tokens are excluded by only deploying 16ane's own test tokens; nothing on-chain enforces that.
+- **Revocation of several vaults.** Each vault is revoked on its own, so an owner revoking an agent with two vaults sends two transactions, and the second is not atomic with the first.
+- **Review gate.** No enforcement code changed, but the isolation argument is the boundary. It needs its own security review before the public deploy.
+
 ## Launch gates
 Threat model reviewed, tests automated, secrets scanned, source verified, contract roles disclosed, rollback/migration rehearsed, hosted spend caps configured, abuse reporting contact live. For future real-value mainnet, require external security audits and explicit legal/compliance sign-off; a public testnet launch does not satisfy those requirements.

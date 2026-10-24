@@ -17,7 +17,7 @@ Publish manifest -> validate schema -> optional wallet signature -> test payment
 ## Agent evaluation
 Compare quoted price, chain/asset, service schema, latency/reliability observations, terms, quotas, reputation and task suitability. Reputation signals are untrusted and vulnerable to Sybil/wash trading. Agents must not assume a lower price means better value.
 
-The TypeScript SDK's `AgentSession.chooseProvider` does this for price, latency and asset (ADR-0019). It sends each candidate an unpaid request and ranks the quotes the vault can pay: its own token on this chain, at or under the agent's cap, within its latency bound. `purchaseRouted` then buys from the winner, refusing a fresh quote that costs more or pays someone else. Latency is the agent's own measurement, never the provider's claim; a probe measures only the time to the quote.
+The TypeScript SDK's `AgentSession.chooseProvider` does this for price, latency and asset (ADR-0019). It sends each candidate an unpaid request and ranks the quotes the vault can pay: its own token on this chain, at or under the agent's cap, within its latency bound. `purchaseRouted` then buys from the winner, refusing a fresh quote that costs more or pays someone else. Latency is the agent's own measurement, never the provider's claim; a probe measures only the time to the quote. An agent with one vault per asset (ADR-0020) uses `MultiAssetSession`, which takes a cap per asset in preference order and pays the winner from the vault that holds its asset.
 
 ## Service lifecycle
 Draft -> Active -> Paused -> Deprecated; expiry and versioning. No implicit recurring payment authority; subscriptions/streams require explicit additional authorization.

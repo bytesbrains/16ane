@@ -1,17 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { AnePaymentVerifier, SecretKey, keccak256Utf8, privateKeyToAddress, toChecksumAddress } from "../../packages/sdk-ts/src/index.ts";
-import { ONE_TANE, setupFundedSession, startSandboxStack } from "../harness.ts";
+import {
+  AgentSession,
+  AnePaymentVerifier,
+  MultiAssetSession,
+  SecretKey,
+  keccak256Utf8,
+  privateKeyToAddress,
+  toChecksumAddress,
+} from "../../packages/sdk-ts/src/index.ts";
+import { DEPLOYER_KEY, ONE_TANE, SESSION_KEY, setupFundedSession, startSandboxStack } from "../harness.ts";
+
+const ONE_TSIX = 10n ** 6n;
 
 // SCENARIOS.md S3 provider routing (#23, REQ-203, REQ-204, ADR-0019): two sellers offer the same capability at
 // different prices and quote latencies; the agent probes both without paying, picks the one that meets its
 // (max_price, max_latency, asset) constraints, and buys from it pinned to the winning quote. A seller quoting in
 // another asset is never chosen, and a seller that raises its price after winning is refused before any payment.
+// With a second vault in tSIX (#133, ADR-0020), a tSIX seller wins under a tSIX preference and that vault pays it.
 test("S3: the agent routes to the provider that meets its constraints and pays only the winning quote", async (t) => {
   const stack = await startSandboxStack(t);
   await setupFundedSession(stack, { cap: 100n * ONE_TANE, perTx: 64n * ONE_TANE });
-  const { client, contracts, vaultAddress, session } = stack;
+  const { client, contracts, vaultAddress, session, owner, secondAsset } = stack;
 
   // A seller built on the SDK's own verifier. `price` may change per quote; `delayMs` slows only the quote.
   const startSeller = async (name: string, opts: { price: (quoteNo: number) => bigint; delayMs?: number; asset?: string }) => {
@@ -111,5 +122,52 @@ test("S3: the agent routes to the provider that meets its constraints and pays o
     await assert.rejects(session.purchaseRouted(route.chosen!, { body: "{}" }), /ANE-E-3002/);
     assert.equal((await client.getAccountingSummary(vaultAddress)).spendableNow, spendable);
     assert.equal(await client.getTokenBalance(baitAndSwitch.payTo), 0n);
+  });
+
+  await t.test("with a tSIX vault, a tSIX preference routes to the tSIX seller and that vault pays it, verified on-chain", async () => {
+    // The operator mints tSIX on request (no tSIX faucet yet); the owner gets one vault per asset for the same salt.
+    await client.sendContractTx(new SecretKey(DEPLOYER_KEY), secondAsset.token, "mint(address,uint256)", [
+      owner.address,
+      (1000n * ONE_TSIX).toString(),
+    ]);
+    const { vaultAddress: tsixVault } = await owner.ensureVaultDeployed(0n, { vaultFactory: secondAsset.vaultFactory });
+    assert.notEqual(tsixVault, vaultAddress);
+    assert.equal(await client.getVaultAsset(tsixVault), toChecksumAddress(secondAsset.token));
+    await owner.fundVault(tsixVault, 100n * ONE_TSIX);
+    await owner.delegateSession(tsixVault, session.sessionAddress, {
+      mode: "FIXED",
+      allowanceCap: 10n * ONE_TSIX,
+      perTxLimit: 4n * ONE_TSIX,
+      expiry: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const agent = new MultiAssetSession([
+      session,
+      new AgentSession({ client, vaultAddress: tsixVault, sessionKey: new SecretKey(SESSION_KEY) }),
+    ]);
+
+    const six = await startSeller("tsix", { price: () => 2_500_000n, asset: secondAsset.token });
+    const withSix = [...candidates.slice(0, 2), { providerId: "tsix", url: six.url, method: "POST" as const, body: "{}" }];
+    const tsixCap = { asset: secondAsset.token, maxPayment: 3n * ONE_TSIX };
+    const taneCap = { asset: contracts.aneTestToken, maxPayment: 16n * ONE_TANE };
+
+    // tANE preferred: the cheaper tANE seller wins, whatever the far smaller raw tSIX amount.
+    assert.equal((await agent.chooseProvider(withSix, { caps: [taneCap, tsixCap] })).chosen?.providerId, "cheap-slow");
+
+    const route = await agent.chooseProvider(withSix, { caps: [tsixCap, taneCap] });
+    assert.deepEqual(route.ranked.map((o) => o.providerId), ["tsix", "cheap-slow", "fast"]);
+    const taneBefore = await client.getAccountingSummary(vaultAddress);
+    const res = await agent.purchaseRouted(route.chosen!, { body: "{}", verifyReceiptOnChain: true });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.data, { seller: "tsix" });
+    assert.equal(res.receipt?.amount, "2500000");
+
+    assert.equal(await client.getTokenBalance(six.payTo, secondAsset.token), 2_500_000n);
+    assert.equal(await client.getTokenBalance(six.payTo), 0n, "no tANE moved");
+    const tsixSummary = await client.getAccountingSummary(tsixVault);
+    assert.equal(tsixSummary.cumulativeSpent, 2_500_000n);
+    assert.equal(tsixSummary.spendableNow, 10n * ONE_TSIX - 2_500_000n);
+    const taneAfter = await client.getAccountingSummary(vaultAddress);
+    assert.equal(taneAfter.cumulativeSpent, taneBefore.cumulativeSpent);
+    assert.equal(taneAfter.spendableNow, taneBefore.spendableNow);
   });
 });

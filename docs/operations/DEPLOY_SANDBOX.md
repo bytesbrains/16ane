@@ -70,6 +70,9 @@ are the deployment's transactions.
   forge verify-contract <address> src/AneFaucet.sol:AneFaucet --chain 84532 --watch \
     --constructor-args $(cast abi-encode 'c(address,address,uint256,uint64,uint256)' <tANE> <deployer> <claim> <cooldown> <dailyCap>)
   ```
+  The faucet deployed on 2026-10-20 was built from `e43ccc8`. Since ADR-0021, `AneFaucet` inherits `AneFaucetBase`
+  and compiles to slightly different bytecode (same ABI, storage and EIP-712 domain), so verify or audit that faucet
+  from `e43ccc8`, not from `main`.
   `ETHERSCAN_API_KEY` in `.env` is picked up automatically; Etherscan API v2 uses one key for Basescan too.
 - **If a broadcast fails partway,** use `--resume`. Don't start again from scratch: `AneRegistry` is deployed
   with `CREATE2`, so a fresh run would collide with the registry that's already there.
@@ -111,17 +114,18 @@ From then on, `ADR-0001`'s continuity policy applies: at least 30 days' notice b
   The reference server reads the live values at startup.
 
 ## Adding the tSIX test asset to the live sandbox (#133)
-`tSIX` is a second free, worthless test token with 6 decimals, with its own `AneVaultFactory` (ADR-0020). Adding it
-deploys only those two contracts and moves nothing already deployed, so the continuity notice does not apply. It
+`tSIX` is a second free, worthless test token with 6 decimals, with its own `AneVaultFactory` (ADR-0020) and its own
+faucet, `AneSixDecimalFaucet` (ADR-0021). Adding it deploys only those three contracts and moves nothing already deployed, so the continuity notice does not apply. It
 still needs the same maintainer authorization as section 0, and the security review that ADR-0020 calls for.
 ```bash
 forge script script/DeploySecondAsset.s.sol:DeploySecondAsset \
   --rpc-url $RPC_URL --account sandbox-deployer --sender $DEPLOYER \
   --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
 ```
-The script refuses any chain but Base Sepolia or a local one and gives the deployer `MINTER_ROLE` on tSIX (there is
-no tSIX faucet yet). Then add `"aneSixDecimalTestToken"` and `"aneSixDecimalVaultFactory"` to `contracts` in
-`networks/sandbox-sepolia.json`. The registry has no slot for them.
+The script refuses any chain but Base Sepolia or a local one. It makes the tSIX faucet the only tSIX minter, sized
+like the tANE faucet in 6-decimal units (16,000 tSIX per claim, 1 hour cooldown, 160 M per day); the deployer owns
+the faucet and keeps tSIX's admin role. Then add `"aneSixDecimalTestToken"`, `"aneSixDecimalVaultFactory"` and
+`"aneSixDecimalFaucet"` to `contracts` in `networks/sandbox-sepolia.json`. The registry has no slot for them.
 
 ## Adding `AneTaskEscrow` to the live sandbox (#21)
 The sandbox deployed on 2026-10-20 predates the escrow. Adding it does not redeploy anything else, so the

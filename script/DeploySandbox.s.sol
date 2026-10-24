@@ -8,6 +8,7 @@ import {AneVaultFactory} from "../src/AneVaultFactory.sol";
 import {AneFaucet} from "../src/AneFaucet.sol";
 import {AneServiceDirectory} from "../src/AneServiceDirectory.sol";
 import {AneTaskEscrow} from "../src/AneTaskEscrow.sol";
+import {AneSixDecimalFaucet} from "../src/AneSixDecimalFaucet.sol";
 import {AneSixDecimalTestToken} from "../src/AneSixDecimalTestToken.sol";
 import {SecondAssetDeployment} from "./DeploySecondAsset.s.sol";
 
@@ -34,6 +35,7 @@ contract DeploySandbox is Script {
         AneTaskEscrow taskEscrow;
         AneSixDecimalTestToken sixDecimalToken;
         AneVaultFactory sixDecimalVaultFactory;
+        AneSixDecimalFaucet sixDecimalFaucet;
     }
 
     function run() external returns (DeployedStack memory stack) {
@@ -94,6 +96,7 @@ contract DeploySandbox is Script {
         SecondAssetDeployment.Deployed memory second = SecondAssetDeployment.deploy(deployer);
         stack.sixDecimalToken = second.token;
         stack.sixDecimalVaultFactory = second.vaultFactory;
+        stack.sixDecimalFaucet = second.faucet;
     }
 
     function _resolveRegistrySalt() internal view returns (bytes32) {

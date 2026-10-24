@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {AneTestToken} from "../src/AneTestToken.sol";
 import {AneFaucet} from "../src/AneFaucet.sol";
+import {AneFaucetBase} from "../src/AneFaucetBase.sol";
 
 contract AneFaucetTest is Test {
     AneTestToken internal token;
@@ -38,7 +39,9 @@ contract AneFaucetTest is Test {
         // Second claim within 24 hours reverts (REQ-002)
         uint64 expectedNext = uint64(block.timestamp + 24 hours);
         vm.expectRevert(
-            abi.encodeWithSelector(AneFaucet.FaucetCooldownActive.selector, user, expectedNext, uint64(block.timestamp))
+            abi.encodeWithSelector(
+                AneFaucetBase.FaucetCooldownActive.selector, user, expectedNext, uint64(block.timestamp)
+            )
         );
         faucet.claim(user);
 
@@ -56,7 +59,7 @@ contract AneFaucetTest is Test {
         faucet.claim(user1); // 1,600 tANE
         faucet.claim(user2); // 3,200 tANE (hits daily cap of 3,200 tANE)
 
-        vm.expectRevert(abi.encodeWithSelector(AneFaucet.DailyMintCapExceeded.selector, 1_600e18, 0));
+        vm.expectRevert(abi.encodeWithSelector(AneFaucetBase.DailyMintCapExceeded.selector, 1_600e18, 0));
         faucet.claim(user3);
 
         // Next UTC day resets daily cap
@@ -86,7 +89,7 @@ contract AneFaucetTest is Test {
         // Replay of same nonce reverts
         vm.warp(block.timestamp + 25 hours);
         vm.prank(relayer);
-        vm.expectRevert(abi.encodeWithSelector(AneFaucet.RelayedNonceAlreadyUsed.selector, nonce));
+        vm.expectRevert(abi.encodeWithSelector(AneFaucetBase.RelayedNonceAlreadyUsed.selector, nonce));
         faucet.relayedClaim(user, campaignId, deadline + 25 hours, nonce, sig);
     }
 

@@ -53,7 +53,7 @@ An inventory at `067b99a` found:
 4. **The second test asset is tSIX.** `AneSixDecimalTestToken` is free, unbacked and worthless, like tANE. It has 6 decimals so the decimals mismatch is exercised, and the same `isTestToken()` guard and `DISCLAIMER`. It also has EIP-2612 permit, burn and `AccessControlDefaultAdminRules`.
    - It has no EIP-3009, so the gasless relay stays tANE-only (ADR-0006).
    - It is not tANE, does not convert to tANE or ANE, and is not modelled on any real asset.
-   - It has no faucet yet. `AneFaucet`'s on-chain disclaimer names tANE, and a second faucet means a change to deployed source. Until then the operator holds `MINTER_ROLE` and mints tSIX for testers on request.
+   - It had no faucet at first, because `AneFaucet`'s on-chain disclaimer names tANE. ADR-0021 adds `AneSixDecimalFaucet` on a shared faucet base; it is now tSIX's only minter.
 5. **Deployment is additive.**
    - `script/DeploySecondAsset.s.sol` deploys tSIX and its factory and nothing else, so it needs no continuity notice. It refuses any chain except 84532 and 31337.
    - `DeploySandbox` deploys both after everything else, so no existing address moves.
@@ -69,7 +69,7 @@ An inventory at `067b99a` found:
 
 ## Consequences and limitations
 
-- **REQ-204 is met for vault-funded agents on a local chain.** It is not yet met on the public sandbox: that needs the additive deploy and a tSIX faucet.
+- **REQ-204 is met for vault-funded agents on a local chain.** It is not yet met on the public sandbox: that needs the additive deploy, which now includes the tSIX faucet (ADR-0021).
 - **Revocation is per vault.** An agent with two vaults has two policies, so revoking means two `revoke` transactions, which are not atomic. `revokeAndSweep` is also per vault.
 - **Each additional asset adds a factory address** that clients must be told about, because the registry does not list it.
 - **The facilitator, the reference sandbox server and the MCP server stay tANE-only.** The facilitator refuses other assets explicitly (`services/facilitator/src/facilitator.ts`). The Python SDK needed no change, because `AgentSession.purchase` there already pays only `vault_asset()`. It has no multi-vault router (ADR-0019 scope).

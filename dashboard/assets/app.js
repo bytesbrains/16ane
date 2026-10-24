@@ -6,9 +6,7 @@ import { NETWORK } from "./network.js";
 import { isAddress, parseUnits } from "./abi.js";
 import {
   ensureChain,
-  friendlyWalletError,
   hasWallet,
-  personalSign,
   requestAccounts,
   sendTransaction,
   watchAsset,
@@ -23,14 +21,13 @@ import {
   paymentRecord,
   predictVaultAddress,
   randomBytes32,
-  resolveContracts,
   revokeData,
   setPolicyData,
   tokenBalanceOf,
   vaultsByOwner,
   withdrawData,
 } from "./contracts.js";
-import { controlCampaign, campaignControlMessage, getReceipt, listCampaigns, listServices } from "./api.js";
+import { getReceipt } from "./api.js";
 import {
   currentRoute,
   el,
@@ -43,41 +40,8 @@ import {
   showRoute,
   txLink,
 } from "./ui.js";
-
-const state = { account: null, contracts: null, openVault: null };
-
-function storeKey(suffix) {
-  return `16ane.dashboard.${suffix}.${NETWORK.chainId}.${(state.account ?? "anon").toLowerCase()}`;
-}
-
-function recentVaults() {
-  try {
-    const ids = JSON.parse(localStorage.getItem(storeKey("vaults")) ?? "[]");
-    return Array.isArray(ids) ? ids.filter(isAddress) : [];
-  } catch {
-    return [];
-  }
-}
-
-function rememberVault(address) {
-  const ids = [address, ...recentVaults().filter((v) => v.toLowerCase() !== address.toLowerCase())].slice(0, 12);
-  try {
-    localStorage.setItem(storeKey("vaults"), JSON.stringify(ids));
-    localStorage.setItem(storeKey("open"), address);
-  } catch {
-    // Private mode: the dashboard works, it just forgets.
-  }
-}
-
-function fail(err, what) {
-  console.error(what, err);
-  setStatus(`${what}: ${friendlyWalletError(err)}`, "error");
-}
-
-async function withContracts() {
-  if (!state.contracts) state.contracts = await resolveContracts();
-  return state.contracts;
-}
+import { controlCampaignSubmit, refreshCampaigns, refreshEarn } from "./provider-screens.js";
+import { fail, recentVaults, rememberVault, requireAccount, state, storeKey, withContracts } from "./session.js";
 
 async function refreshNetworkLine() {
   const line = document.getElementById("network-line");
@@ -111,14 +75,6 @@ async function connect() {
   } finally {
     setBusy(button, false);
   }
-}
-
-function requireAccount() {
-  if (!state.account) {
-    setStatus("Connect a wallet first.", "error");
-    return false;
-  }
-  return true;
 }
 
 async function refreshAll() {
@@ -397,106 +353,6 @@ async function delegate(event) {
     fail(err, "Delegation failed");
   } finally {
     setBusy(button, false);
-  }
-}
-
-// --- Earn ---
-
-async function refreshEarn() {
-  const list = document.getElementById("service-list");
-  list.replaceChildren();
-  try {
-    const services = await listServices();
-    if (services.length === 0) {
-      list.append(el("li", { class: "muted", text: "No services are listed in the directory." }));
-    }
-    for (const service of services.slice(0, 50)) {
-      const endpoints = Array.isArray(service.endpoints) ? service.endpoints : [];
-      const prices = endpoints.map((e) => `${e.method} ${e.path}: ${e.priceAmount} base units`).join("; ");
-      list.append(
-        el("li", {}, [
-          el("strong", { text: String(service.name ?? service.serviceId) }),
-          el("br"),
-          el("span", { class: "muted", text: String(service.description ?? "") }),
-          el("br"),
-          el("code", { text: prices || "no priced endpoints" }),
-        ]),
-      );
-    }
-  } catch (err) {
-    console.error("services", err);
-    list.append(el("li", { class: "muted", text: "The directory is unreachable right now." }));
-  }
-  try {
-    if (!state.openVault) return;
-    const summary = await accountingSummary(state.openVault);
-    document.getElementById("revenue-verified").textContent = fmtTane(summary.verifiedRevenue);
-    document.getElementById("revenue-mode").textContent = summary.budgetMode;
-  } catch (err) {
-    console.error("revenue", err);
-  }
-}
-
-// --- Campaigns ---
-
-async function refreshCampaigns() {
-  const list = document.getElementById("campaign-list");
-  list.replaceChildren();
-  try {
-    const campaigns = await listCampaigns();
-    if (campaigns.length === 0) {
-      list.append(el("li", { class: "muted", text: "No campaigns are running." }));
-    }
-    for (const campaign of campaigns) {
-      const quota = campaign.quota && typeof campaign.quota === "object" ? campaign.quota : {};
-      list.append(
-        el("li", {}, [
-          el("strong", { text: `Campaign ${String(campaign.id ?? campaign.campaignId ?? "?")}` }),
-          el("br"),
-          el("span", {
-            class: "muted",
-            text: `sponsor ${String(campaign.sponsor ?? campaign.providerId ?? "?")} · ` +
-              `status ${String(campaign.status ?? (campaign.paused ? "paused" : "active"))} · ` +
-              `remaining ${String(quota.remaining ?? quota.remainingCalls ?? "?")}`,
-          }),
-        ]),
-      );
-    }
-    document.getElementById("campaign-control-form").hidden = campaigns.length === 0;
-  } catch (err) {
-    console.error("campaigns", err);
-    list.append(el("li", { class: "muted", text: "Campaign data is unreachable right now." }));
-  }
-}
-
-async function controlCampaignSubmit(event, action) {
-  event.preventDefault();
-  if (!requireAccount()) return;
-  const campaignId = document.getElementById("campaign-id").value.trim();
-  if (!campaignId) {
-    setStatus("Enter a campaign id.", "error");
-    return;
-  }
-  const buttons = [...document.querySelectorAll("#campaign-control-form button[type=submit]")];
-  for (const b of buttons) b.disabled = true;
-  try {
-    await ensureChain();
-    const deadline = Math.floor(Date.now() / 1000) + 600;
-    const message = campaignControlMessage({ providerId: state.account, campaignId, action, deadline });
-    const signature = await personalSign(message, state.account);
-    await controlCampaign(campaignId, action, {
-      providerId: state.account,
-      campaignId,
-      action,
-      deadline,
-      signature,
-    });
-    setStatus(`Campaign ${campaignId} ${action === "pause" ? "paused" : "resumed"}.`, "ok");
-    await refreshCampaigns();
-  } catch (err) {
-    fail(err, `Could not ${action} the campaign (only its provider can)`);
-  } finally {
-    for (const b of buttons) b.disabled = false;
   }
 }
 

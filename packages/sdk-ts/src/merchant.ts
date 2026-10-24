@@ -1,25 +1,28 @@
-import { abiWordAddress, functionSelector } from "./abi.ts";
 import { type AneClient } from "./client.ts";
+import { computeRequestHash, computeResourceHash } from "./crypto.ts";
+import { build402Challenge, SANDBOX_DISCLAIMER } from "./payment-challenge.ts";
 import {
-  computeRequestHash,
-  computeResourceHash,
-  hashSpendIntent,
-  hashTransferWithAuthorization,
-  randomBytes32Hex,
-  type SpendIntent,
-  type TransferWithAuthorization,
-} from "./crypto.ts";
+  checkExactPayment,
+  checkVaultPayment,
+  type ExactPaymentPayload,
+  type MerchantEndpointConfig,
+  type VaultPaymentPayload,
+  type X402DecodedPayment,
+} from "./payment-checks.ts";
+import { simulationFailure, vaultRegistrationFailure } from "./payment-preflight.ts";
 import { type SecretKey } from "./secret.ts";
-import { settlePaymentCalldata, transferCalldata } from "./signed-actions.ts";
 import { type KeyValueStore, MemoryKeyValueStore } from "./store.ts";
 import { privateKeyToAddress, recoverAddress, toChecksumAddress } from "./secp256k1.ts";
-import {
-  type X402PaymentRequirements,
-  type X402QuoteEnvelope,
-  type X402Receipt,
-} from "./x402.ts";
+import { type X402Receipt } from "./x402.ts";
 
-export const SANDBOX_DISCLAIMER = "TEST TOKENS (tANE) - NO CASH VALUE" as const;
+export { SANDBOX_DISCLAIMER } from "./payment-challenge.ts";
+export {
+  type ExactPaymentPayload,
+  type MerchantEndpointConfig,
+  type PaymentBinding,
+  type VaultPaymentPayload,
+  type X402DecodedPayment,
+} from "./payment-checks.ts";
 
 export interface CachedIdempotentResponse {
   requestHash: string;
@@ -27,41 +30,6 @@ export interface CachedIdempotentResponse {
   headers: Record<string, string>;
   body: unknown;
   receipt: X402Receipt;
-}
-
-export interface MerchantEndpointConfig {
-  serviceId: string;
-  priceAmount: bigint | string;
-  payTo: string;
-  assetAddress: string;
-  network?: "eip155:84532" | "eip155:31337";
-  description?: string;
-  maxTimeoutSeconds?: number;
-}
-
-/** A parsed x402 payment: the base64 PAYMENT-SIGNATURE header decoded, or a facilitator's paymentPayload mapped onto it. */
-export interface X402DecodedPayment {
-  x402Version: number;
-  scheme: "ane-vault-v1" | "exact";
-  network: "eip155:84532" | "eip155:31337";
-  accepted: { asset: string; amount: string; payTo: string };
-  payload: Record<string, unknown>;
-}
-
-export type VaultPaymentPayload = SpendIntent & {
-  resourceHash?: string;
-  requestHash?: string;
-  signature: string;
-  txHash?: string;
-};
-
-export type ExactPaymentPayload = TransferWithAuthorization & { signature: string };
-
-/** What the HTTP request binds a payment to. Merchants always pass it; a facilitator has no request to bind. */
-export interface PaymentBinding {
-  method: string;
-  canonicalUrl: string;
-  rawBody?: string;
 }
 
 export class AnePaymentVerifier {
@@ -160,213 +128,10 @@ export class AnePaymentVerifier {
     endpoint: MerchantEndpointConfig,
     canonicalResourceUrl: string,
     trialAvailable = false,
-  ): {
-    status: 402;
-    headers: Record<string, string>;
-    body: Record<string, unknown>;
-    quoteEnvelope: X402QuoteEnvelope;
-  } {
-    const nowSec = Math.floor(Date.now() / 1000);
-    const maxTimeoutSeconds = endpoint.maxTimeoutSeconds ?? 300;
-    const expiresAt = nowSec + maxTimeoutSeconds;
-    const quoteId = `quote_${randomBytes32Hex().slice(2, 26)}`;
-    const network = endpoint.network ?? "eip155:84532";
-    const payTo = toChecksumAddress(endpoint.payTo);
-    const asset = toChecksumAddress(endpoint.assetAddress);
-    const amountStr = BigInt(endpoint.priceAmount).toString();
-
-    const requirement: X402PaymentRequirements = {
-      scheme: "ane-vault-v1",
-      network,
-      asset,
-      assetSymbol: "tANE",
-      amount: amountStr,
-      payTo,
-      maxTimeoutSeconds,
-      resource: canonicalResourceUrl,
-      description: endpoint.description ?? `Paid endpoint (${endpoint.serviceId})`,
-      extra: {
-        quoteId,
-        expiresAt,
-        serviceId: endpoint.serviceId,
-        trialAvailable,
-        disclaimer: SANDBOX_DISCLAIMER,
-      },
-    };
-
-    const quoteEnvelope: X402QuoteEnvelope = {
-      x402Version: 2,
-      accepts: [requirement],
-      error: "Payment Required: provide PAYMENT-SIGNATURE header with signed tANE SpendIntent",
-    };
-
-    const paymentRequiredB64 = Buffer.from(JSON.stringify(quoteEnvelope), "utf8").toString(
-      "base64",
-    );
-
-    return {
-      status: 402,
-      headers: {
-        "payment-required": paymentRequiredB64,
-        "content-type": "application/json",
-      },
-      body: {
-        error: {
-          code: "ANE-E-4002",
-          message: "Payment Required (x402 v2)",
-          retryable: true,
-          details: {
-            quoteId,
-            amount: amountStr,
-            assetSymbol: "tANE",
-            payTo,
-            network,
-          },
-          disclaimer: SANDBOX_DISCLAIMER,
-        },
-      },
-      quoteEnvelope,
-    };
+  ): ReturnType<typeof build402Challenge> {
+    return build402Challenge(endpoint, canonicalResourceUrl, trialAvailable);
   }
 
-  // Static (chain-free) checks for an ane-vault-v1 payload, shared by merchants and the facilitator so
-  // verify and settle can never disagree on validity. Request binding applies only when the caller passes
-  // what the payment binds to; merchants always do, a facilitator has no request to bind.
-  #checkVaultPayment(
-    p: VaultPaymentPayload,
-    endpoint: MerchantEndpointConfig,
-    binding: PaymentBinding | undefined,
-  ):
-    | {
-        ok: true;
-        intentId: string;
-        digest: string;
-        paymentId: string;
-        directTxHash: string | undefined;
-        payer: string;
-        proofIds: string[];
-      }
-    | { ok: false; failure: { status: number; code: string; message: string } } {
-    const fail = (status: number, code: string, message: string) => ({ ok: false as const, failure: { status, code, message } });
-    if (binding) {
-      // The client signs the URL it called, but a TLS-terminating proxy hides the scheme from the
-      // server (our reference server only ever sees http): accept the hash for either scheme (#109).
-      // The scheme is not a security boundary — host, path, method and query stay bound either way.
-      const swapScheme = (url: string) =>
-        url.replace(/^https?:\/\//i, (m) => (m.toLowerCase() === "https://" ? "http://" : "https://"));
-      const expectedResourceHashes = [binding.canonicalUrl, swapScheme(binding.canonicalUrl)].map((u) =>
-        computeResourceHash(binding.method, u).toLowerCase(),
-      );
-      const requestMismatch =
-        binding.rawBody !== undefined &&
-        p.requestHash !== undefined &&
-        p.requestHash.toLowerCase() !== computeRequestHash(binding.rawBody).toLowerCase();
-      if (
-        (p.resourceHash && !expectedResourceHashes.includes(p.resourceHash.toLowerCase())) ||
-        requestMismatch
-      ) {
-        return fail(400, "ANE-E-4006", "SpendIntent resourceHash or requestHash does not match HTTP request");
-      }
-    }
-    const requiredAmount = BigInt(endpoint.priceAmount);
-    const expectedPayTo = toChecksumAddress(endpoint.payTo);
-    if (p.merchant.toLowerCase() !== expectedPayTo.toLowerCase()) {
-      return fail(
-        400,
-        "ANE-E-4007",
-        `SpendIntent merchant (${p.merchant}) does not match merchant payTo (${expectedPayTo})`,
-      );
-    }
-    if (BigInt(p.amount) < requiredAmount) {
-      return fail(402, "ANE-E-4008", `SpendIntent amount (${p.amount}) is less than required (${requiredAmount})`);
-    }
-
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (Number(p.validBefore) <= nowSec) {
-      return fail(402, "ANE-E-4003", `SpendIntent expired at ${p.validBefore} (now ${nowSec})`);
-    }
-
-    const {
-      structHash: intentId,
-      digest,
-      paymentId,
-    } = hashSpendIntent(this.client.chainId, p);
-    const directTxHash = p.txHash && p.txHash !== "0x" + "00".repeat(32) ? p.txHash : undefined;
-    const proofIds = directTxHash ? [intentId, paymentId, directTxHash] : [intentId, paymentId];
-    return { ok: true, intentId, digest, paymentId, directTxHash, payer: toChecksumAddress(p.vault), proofIds };
-  }
-
-  // Static checks for an exact (EIP-3009) payload. Time bounds and funds are enforced where the
-  // authorization executes: on-chain at settle, or by simulation in verify-only and preflight.
-  #checkExactPayment(
-    p: ExactPaymentPayload,
-    endpoint: MerchantEndpointConfig,
-  ):
-    | { ok: true; structHash: string; digest: string; payer: string }
-    | { ok: false; failure: { status: number; code: string; message: string } } {
-    const fail = (status: number, code: string, message: string) => ({ ok: false as const, failure: { status, code, message } });
-    const requiredAmount = BigInt(endpoint.priceAmount);
-    const expectedPayTo = toChecksumAddress(endpoint.payTo);
-    const expectedAsset = toChecksumAddress(endpoint.assetAddress);
-    if (p.to.toLowerCase() !== expectedPayTo.toLowerCase()) {
-      return fail(
-        400,
-        "ANE-E-4007",
-        `Authorization recipient (${p.to}) does not match merchant payTo (${expectedPayTo})`,
-      );
-    }
-    if (BigInt(p.value) < requiredAmount) {
-      return fail(402, "ANE-E-4008", `Authorization value (${p.value}) is less than required (${requiredAmount})`);
-    }
-    const { structHash, digest } = hashTransferWithAuthorization(
-      this.client.chainId,
-      expectedAsset,
-      p,
-    );
-    return { ok: true, structHash, digest, payer: toChecksumAddress(p.from) };
-  }
-
-  // The settlement target allowlist (#18): a vault intent settles only to a vault the 16ane factory
-  // registered. A send to any other address would succeed vacuously on-chain while settling nothing.
-  async #vaultRegistrationFailure(vault: string): Promise<{ status: number; code: string; message: string } | undefined> {
-    const { aneVaultFactory } = await this.client.resolveContracts();
-    const registered = await this.client.ethCall(
-      aneVaultFactory,
-      functionSelector("isRegisteredVault(address)") + abiWordAddress(vault),
-    );
-    if (BigInt(registered.slice(0, 66)) === 0n) {
-      return {
-        status: 403,
-        code: "ANE-E-4013",
-        message: `${vault} is not a vault created by the 16ane factory`,
-      };
-    }
-    return undefined;
-  }
-
-  // Would the relayer's send succeed? Simulation runs the exact settlement from the relayer's address
-  // without spending gas, so an underfunded, expired or already-used authorization is refused up front.
-  async #simulationFailure(
-    scheme: "ane-vault-v1" | "exact",
-    p: VaultPaymentPayload | ExactPaymentPayload,
-    to: string,
-  ): Promise<{ status: number; code: string; message: string } | undefined> {
-    const data =
-      scheme === "ane-vault-v1"
-        ? settlePaymentCalldata(p as VaultPaymentPayload, (p as VaultPaymentPayload).signature)
-        : transferCalldata(p as ExactPaymentPayload);
-    try {
-      await this.client.simulateCall(privateKeyToAddress(this.relayerKey), to, data);
-    } catch (err) {
-      // A fetch-level failure (DNS, refused, reset) is the chain being unreachable, not a bad
-      // payment: let it surface as a 500 "cannot evaluate" instead of a 402 rejection. An EVM
-      // revert always arrives as an RPC error payload, never as a TypeError.
-      if (err instanceof TypeError) throw err;
-      const why = (err instanceof Error ? err.message : String(err)).slice(0, 300);
-      return { status: 402, code: "ANE-E-4011", message: `Settlement would revert, so nothing was sent: ${why}` };
-    }
-    return undefined;
-  }
 
   /**
    * Answers "would this payment settle" without settling or consuming anything: static checks, the
@@ -393,7 +158,7 @@ export class AnePaymentVerifier {
 
     if (decoded.scheme === "ane-vault-v1") {
       const p = decoded.payload as unknown as VaultPaymentPayload;
-      const checked = this.#checkVaultPayment(p, params.endpoint, binding);
+      const checked = checkVaultPayment(this.client.chainId, p, params.endpoint, binding);
       if (!checked.ok) return { valid: false, ...checked.failure };
       if (checked.proofIds.some((id) => this.#consumed(id))) {
         return {
@@ -427,16 +192,16 @@ export class AnePaymentVerifier {
       } catch {
         return { valid: false, status: 401, code: "ANE-E-4010", message: "Signature recovery failed" };
       }
-      const registration = await this.#vaultRegistrationFailure(p.vault);
+      const registration = await vaultRegistrationFailure(this.client, p.vault);
       if (registration) return { valid: false, ...registration };
-      const simulation = await this.#simulationFailure("ane-vault-v1", p, p.vault);
+      const simulation = await simulationFailure(this.client, privateKeyToAddress(this.relayerKey), "ane-vault-v1", p, p.vault);
       if (simulation) return { valid: false, ...simulation };
       return { valid: true, payer: checked.payer };
     }
 
     if (decoded.scheme === "exact") {
       const p = decoded.payload as unknown as ExactPaymentPayload;
-      const checked = this.#checkExactPayment(p, params.endpoint);
+      const checked = checkExactPayment(this.client.chainId, p, params.endpoint);
       if (!checked.ok) return { valid: false, ...checked.failure };
       if (this.#consumed(checked.structHash)) {
         return {
@@ -455,7 +220,7 @@ export class AnePaymentVerifier {
       if (recovered.toLowerCase() !== p.from.toLowerCase()) {
         return { valid: false, status: 401, code: "ANE-E-4010", message: "Invalid EIP-3009 signature" };
       }
-      const simulation = await this.#simulationFailure("exact", p, expectedAsset);
+      const simulation = await simulationFailure(this.client, privateKeyToAddress(this.relayerKey), "exact", p, expectedAsset);
       if (simulation) return { valid: false, ...simulation };
       return { valid: true, payer: checked.payer };
     }
@@ -529,21 +294,15 @@ export class AnePaymentVerifier {
 
     // Unbound without a request (the facilitator settles authorizations, not requests): the receipt then
     // carries empty hashes and the merchant still checks binding at delivery.
-    const expectedResourceHash =
-      params.method !== undefined && params.canonicalUrl !== undefined
-        ? computeResourceHash(params.method, params.canonicalUrl)
-        : "";
-    const expectedRequestHash =
-      params.method !== undefined && params.canonicalUrl !== undefined
-        ? computeRequestHash(params.rawBody)
-        : "";
+    const expectedResourceHash = binding ? computeResourceHash(binding.method, binding.canonicalUrl) : "";
+    const expectedRequestHash = binding ? computeRequestHash(binding.rawBody) : "";
     const requiredAmount = BigInt(params.endpoint.priceAmount);
     const expectedPayTo = toChecksumAddress(params.endpoint.payTo);
     const expectedAsset = toChecksumAddress(params.endpoint.assetAddress);
 
     if (decoded.scheme === "ane-vault-v1") {
       const p = decoded.payload as unknown as VaultPaymentPayload;
-      const checked = this.#checkVaultPayment(p, params.endpoint, binding);
+      const checked = checkVaultPayment(this.client.chainId, p, params.endpoint, binding);
       if (!checked.ok) {
         return { ok: false, ...checked.failure };
       }
@@ -594,11 +353,11 @@ export class AnePaymentVerifier {
           }
 
           if (params.preflight?.requireRegisteredVault) {
-            const registration = await this.#vaultRegistrationFailure(p.vault);
+            const registration = await vaultRegistrationFailure(this.client, p.vault);
             if (registration) return { ok: false, ...registration };
           }
           if (params.preflight?.simulate) {
-            const simulation = await this.#simulationFailure("ane-vault-v1", p, p.vault);
+            const simulation = await simulationFailure(this.client, privateKeyToAddress(this.relayerKey), "ane-vault-v1", p, p.vault);
             if (simulation) return { ok: false, ...simulation };
           }
 
@@ -653,7 +412,7 @@ export class AnePaymentVerifier {
 
     if (decoded.scheme === "exact") {
       const p = decoded.payload as unknown as ExactPaymentPayload;
-      const checked = this.#checkExactPayment(p, params.endpoint);
+      const checked = checkExactPayment(this.client.chainId, p, params.endpoint);
       if (!checked.ok) {
         return { ok: false, ...checked.failure };
       }
@@ -687,7 +446,7 @@ export class AnePaymentVerifier {
           };
         }
         if (params.preflight?.simulate) {
-          const simulation = await this.#simulationFailure("exact", p, expectedAsset);
+          const simulation = await simulationFailure(this.client, privateKeyToAddress(this.relayerKey), "exact", p, expectedAsset);
           if (simulation) return { ok: false, ...simulation };
         }
         const settled = await this.client.settleExactAuthorizationOnChain(

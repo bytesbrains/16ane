@@ -1,4 +1,11 @@
-from .client import REDACTED_PRIVATE_KEY, AgentSession, AneClient, SecretKey, redact_secrets
+from .client import (
+    REDACTED_PRIVATE_KEY,
+    AgentSession,
+    AneClient,
+    SecretKey,
+    redact_secrets,
+    select_vault_requirement,
+)
 from .crypto import (
     compute_payment_id,
     compute_request_hash,
@@ -22,6 +29,7 @@ __all__ = [
     "redact_secrets",
     "AneClient",
     "AgentSession",
+    "select_vault_requirement",
     "keccak256",
     "keccak256_utf8",
     "private_key_to_address",

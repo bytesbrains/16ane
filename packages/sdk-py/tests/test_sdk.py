@@ -1,6 +1,11 @@
+import base64
+import io
+import json
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -19,6 +24,7 @@ from ane_sdk import (
     private_key_to_address,
     recover_address,
     redact_secrets,
+    select_vault_requirement,
     sign_digest,
 )
 
@@ -125,6 +131,58 @@ class TestAnePythonSdk(unittest.TestCase):
         receipt = session.sign_task_release(escrow, lock["taskId"], 40 * 10**18, keccak256_utf8("d"))
         release_digest = hash_task_release(84532, escrow, lock["taskId"], 40 * 10**18, keccak256_utf8("d"))
         self.assertEqual(recover_address(release_digest, receipt), session.session_address)
+
+
+TANE = "0x" + "a1" * 20
+USDC = "0x" + "b2" * 20
+
+
+def _quote(**over):
+    q = {"scheme": "ane-vault-v1", "network": "eip155:84532", "asset": TANE, "amount": str(16 * 10**18), "payTo": "0x" + "c3" * 20}
+    q.update(over)
+    return q
+
+
+class TestVaultQuoteSelection(unittest.TestCase):
+    """ADR-0019: the vault pays only its own token on its own chain; parity with the TypeScript SDK."""
+
+    def test_only_the_vault_token_on_this_chain_is_payable(self) -> None:
+        picked, rejected = select_vault_requirement(
+            [_quote(asset=USDC, amount="1"), _quote(amount=str(9 * 10**18)), _quote(amount=str(7 * 10**18)), _quote(network="eip155:1")],
+            84532,
+            TANE,
+        )
+        self.assertEqual(picked["amount"], str(7 * 10**18))
+        self.assertEqual(len(rejected), 2)
+        self.assertIn("is not accepted", rejected[0])
+        self.assertIn('on "eip155:1"', rejected[1])
+
+    def test_untrusted_amount_and_scheme_encodings_are_refused(self) -> None:
+        for amount in ["1e18", "-1", "0x10", "1.0", " 16", "016", 16, str(2**256), "\u0661"]:
+            picked, rejected = select_vault_requirement([_quote(amount=amount)], 84532, TANE)
+            self.assertIsNone(picked, amount)
+            self.assertEqual(rejected, ["amount is not a base-unit integer"])
+        picked, rejected = select_vault_requirement([_quote(scheme="x" * 500)], 84532, TANE)
+        self.assertIsNone(picked)
+        self.assertLess(len(rejected[0]), 80)
+        self.assertEqual(select_vault_requirement("junk", 84532, TANE), (None, ["no payment options offered"]))
+
+    def test_purchase_refuses_a_foreign_asset_quote_before_signing(self) -> None:
+        client = AneClient(rpc_url="http://127.0.0.1:1", chain_id=84532)
+        client.eth_call = lambda to, data: "0x" + TANE[2:].rjust(64, "0")
+        session = AgentSession(client, "0x" + "ee" * 20, "0x" + "11" * 32)
+        envelope = base64.b64encode(json.dumps({"x402Version": 2, "accepts": [_quote(asset=USDC, amount="1")]}).encode()).decode()
+        calls = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(req)
+            raise urllib.error.HTTPError(req.full_url, 402, "Payment Required", {"payment-required": envelope}, io.BytesIO(b"{}"))
+
+        with mock.patch("urllib.request.urlopen", fake_urlopen):
+            with self.assertRaisesRegex(RuntimeError, "ANE-E-3003"):
+                session.purchase("https://a.example/v1/infer", body="{}", max_payment=100 * 10**18)
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("payment-signature", {k.lower() for k in calls[0].headers})
 
 
 if __name__ == "__main__":

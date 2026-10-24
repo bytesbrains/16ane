@@ -195,6 +195,48 @@ class AneClient:
         return {"valid": True, "signer": recovered, "digest": digest}
 
 
+_BASE_UNITS = re.compile(r"(0|[1-9][0-9]*)")
+
+
+def select_vault_requirement(
+    accepts: Any, chain_id: int, asset: str
+) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """Picks the cheapest `ane-vault-v1` quote in `asset` on `chain_id` (ADR-0019). The vault pays only its own
+    token, so an amount quoted in any other asset, or on another chain, would be read in the wrong units."""
+    want = to_checksum_address(asset)
+    matches: List[Tuple[int, Dict[str, Any]]] = []
+    rejected: List[str] = []
+    for item in accepts if isinstance(accepts, list) else []:
+        if not isinstance(item, dict):
+            rejected.append("not an object")
+            continue
+        # Quote fields are provider text: quoted and cut short before they reach a log or a prompt.
+        if item.get("scheme") != "ane-vault-v1":
+            rejected.append(f"scheme {json.dumps(str(item.get('scheme'))[:48])} is not accepted")
+            continue
+        try:
+            got = to_checksum_address(str(item.get("asset")))
+            to_checksum_address(str(item.get("payTo")))
+        except ValueError:
+            rejected.append("malformed asset or payTo address")
+            continue
+        if got != want:
+            rejected.append(f"asset {got} is not accepted")
+            continue
+        if item.get("network") != f"eip155:{chain_id}":
+            rejected.append(f"asset {got} is not accepted on {json.dumps(str(item.get('network'))[:48])}")
+            continue
+        amount = item.get("amount")
+        if not isinstance(amount, str) or not _BASE_UNITS.fullmatch(amount) or int(amount) >= 2**256:
+            rejected.append("amount is not a base-unit integer")
+            continue
+        matches.append((int(amount), item))
+    if not isinstance(accepts, list) or not accepts:
+        rejected.append("no payment options offered")
+    matches.sort(key=lambda m: m[0])
+    return (matches[0][1] if matches else None), rejected
+
+
 class AgentSession:
     """Bounded session-key client for 16ane x402 v2 purchases (REQ-003, REQ-006)."""
 
@@ -210,6 +252,7 @@ class AgentSession:
             session_key if isinstance(session_key, SecretKey) else SecretKey(session_key)
         )
         self.session_address = private_key_to_address(self._session_key._unsafe_unwrap())
+        self._vault_asset: Optional[str] = None
 
     def __repr__(self) -> str:
         return (
@@ -285,6 +328,13 @@ class AgentSession:
         digest = hash_task_release(self.client.chain_id, escrow, task_id, cumulative_amount, delivery_hash)
         return sign_digest(digest, self._session_key._unsafe_unwrap())
 
+    def vault_asset(self) -> str:
+        """The one token this vault can pay in (`AneAgentVault.taneToken`), read once from the vault."""
+        if self._vault_asset is None:
+            out = self.client.eth_call(self.vault_address, _selector("taneToken()"))
+            self._vault_asset = to_checksum_address("0x" + _split_words(out)[0][-40:])
+        return self._vault_asset
+
     def purchase(
         self,
         url: str,
@@ -318,8 +368,9 @@ class AgentSession:
                     resp_headers = {k.lower(): v for k, v in resp.headers.items()}
                     return resp.status, resp_headers, resp.read().decode("utf-8")
             except urllib.error.HTTPError as err:
-                resp_headers = {k.lower(): v for k, v in err.headers.items()}
-                return err.code, resp_headers, err.read().decode("utf-8")
+                with err:
+                    resp_headers = {k.lower(): v for k, v in err.headers.items()}
+                    return err.code, resp_headers, err.read().decode("utf-8")
 
         status, resp_headers, resp_text = _do_request(base_headers)
         if status != 402:
@@ -340,7 +391,17 @@ class AgentSession:
         if not payment_required_b64:
             raise RuntimeError("402 response missing PAYMENT-REQUIRED header")
         quote_envelope = json.loads(base64.b64decode(payment_required_b64).decode("utf-8"))
-        req_item = quote_envelope["accepts"][0]
+        vault_asset = self.vault_asset()
+        req_item, rejected = select_vault_requirement(
+            quote_envelope.get("accepts") if isinstance(quote_envelope, dict) else None,
+            self.client.chain_id,
+            vault_asset,
+        )
+        if req_item is None:
+            raise RuntimeError(
+                f"ANE-E-3003: No 402 quote is payable from this vault (tANE {vault_asset} on "
+                f"eip155:{self.client.chain_id}): {'; '.join(rejected)}"
+            )
         required_amount = int(req_item["amount"])
 
         if max_payment is not None and required_amount > int(max_payment):

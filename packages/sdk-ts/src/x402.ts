@@ -53,6 +53,8 @@ export interface PurchaseOptions {
   headers?: Record<string, string>;
   body?: string;
   maxPayment?: bigint | string;
+  /** Refuse a quote that pays anyone else (set by `AgentSession.purchaseRouted`). */
+  expectedPayTo?: string;
   idempotencyKey?: string;
   manifest?: ServiceManifestPayload;
   verifyManifest?: boolean;

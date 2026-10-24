@@ -67,5 +67,17 @@ Each case below has a test in `packages/sdk-ts/test/erc8004.test.ts` or `e2e/flo
 - **A hostile file URL (SSRF, size).** Only `data:` URIs are read unless the caller supplies a fetcher. Files are capped at 64 KiB, and their text is untrusted.
 - **A third-party registry upgrade.** The registries are proxies owned by their maintainers. No funds pass through them. `npm run check:erc8004-fixture` detects a change of implementation.
 
+## Quote selection and provider routing additions (ADR-0019, ISS-023)
+
+Each case below has a test in `packages/sdk-ts/test/routing.test.ts`, `e2e/flows/provider-routing.test.ts` or `packages/sdk-py/tests/test_sdk.py`.
+
+- **Decimal mismatch between assets.** Each cap belongs to one `(chain, asset)` pair and is compared only with amounts in that asset. An 18-decimal cap never admits a 6-decimal quote, and offers in different assets are never compared by raw amount. Decimals come from the token's `decimals()`, never from a quote, and human amounts are never rounded.
+- **A quote in an asset the vault cannot pay, or on another chain.** `purchase` refuses it before signing (`ANE-E-3003`), even when the merchant lists it first. Receipts are verified against the vault's own token, not the asset the receipt names.
+- **A malformed amount read as a smaller number.** Only canonical base-10 integers below 2^256 are accepted, so `"1e18"`, `"-1"`, `"0x10"`, `"1.0"` and padded strings are refused.
+- **Bait and switch.** A provider could win the ranking with a cheap probe quote and then charge more, or name another payee. `purchaseRouted` pins the purchase to the winning amount and payee, and refuses either change before any payment.
+- **A probe that pays or spends a trial.** Probes strip `payment-signature`, `x-payment` and `x-trial-request`, so a probe gets a quote and nothing else.
+- **Provider-claimed latency.** Latency is measured by the caller and never taken from the provider. A probe measures only the time to the quote, which is a lower bound on how long the work takes.
+- **Provider text in errors.** Rejection reasons quote provider fields as JSON strings cut to 48 characters, because they can reach logs and LLM context.
+
 ## Launch gates
 Threat model reviewed, tests automated, secrets scanned, source verified, contract roles disclosed, rollback/migration rehearsed, hosted spend caps configured, abuse reporting contact live. For future real-value mainnet, require external security audits and explicit legal/compliance sign-off; a public testnet launch does not satisfy those requirements.
